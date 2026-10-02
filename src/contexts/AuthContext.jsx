@@ -9,9 +9,16 @@ import { auth, db } from '../firebase'
 
 const AuthContext = createContext(null)
 
+export const ROL_LABELS = {
+  wachtend: 'Wacht op goedkeuring',
+  invoer: 'Invoer',
+  admin: 'Beheerder',
+}
+
 // Elke ingelogde gebruiker krijgt bij de eerste keer inloggen automatisch een
-// profiel-document in users/{uid} met rol "invoer". Een admin kan iemand later
-// promoveren naar "admin" (zie Gebruikersbeheer).
+// profiel-document in users/{uid} met rol "wachtend". Pas als een admin de rol
+// op "invoer" of "admin" zet, krijgt iemand toegang (zie Gebruikersbeheer en
+// firestore.rules).
 async function ensureUserProfile(user) {
   const ref = doc(db, 'users', user.uid)
   const snap = await getDoc(ref)
@@ -19,7 +26,7 @@ async function ensureUserProfile(user) {
     const profile = {
       email: user.email,
       naam: user.email.split('@')[0],
-      role: 'invoer',
+      role: 'wachtend',
       createdAt: serverTimestamp(),
     }
     await setDoc(ref, profile)
@@ -81,6 +88,7 @@ export function AuthProvider({ children }) {
     loading,
     error,
     isAdmin: profile?.role === 'admin',
+    isActive: profile?.role === 'admin' || profile?.role === 'invoer',
     login,
     logout,
   }

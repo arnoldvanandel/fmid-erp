@@ -1,18 +1,30 @@
 import { doc, updateDoc } from 'firebase/firestore'
 import { useCollection } from '../../hooks/useCollection'
 import { db } from '../../firebase'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth, ROL_LABELS } from '../../contexts/AuthContext'
 import { formatDate } from '../../lib/format'
+
+const ROL_BADGES = {
+  wachtend: 'badge-warning',
+  invoer: 'badge-neutral',
+  admin: 'badge-success',
+}
 
 export default function Gebruikersbeheer() {
   const { data: users, loading } = useCollection('users', { orderByField: 'email' })
   const { user: currentUser } = useAuth()
 
-  async function toggleRole(u) {
-    const nieuweRol = u.role === 'admin' ? 'invoer' : 'admin'
+  // Wachtende gebruikers bovenaan, zodat een admin ze meteen ziet.
+  const gesorteerd = [...users].sort(
+    (a, b) => (a.role === 'wachtend' ? 0 : 1) - (b.role === 'wachtend' ? 0 : 1)
+  )
+  const aantalWachtend = users.filter((u) => u.role === 'wachtend').length
+
+  async function wijzigRol(u, nieuweRol) {
+    if (nieuweRol === u.role) return
     if (
       u.id === currentUser.uid &&
-      nieuweRol === 'invoer' &&
+      nieuweRol !== 'admin' &&
       !confirm('Weet je zeker dat je jezelf de beheerdersrol wilt afnemen?')
     ) {
       return
@@ -31,8 +43,18 @@ export default function Gebruikersbeheer() {
 
       <div className="banner banner-info">
         Nieuwe collega's toevoegen doe je in de Firebase Console onder Authentication → Add user. Zodra
-        iemand voor het eerst inlogt, verschijnt diegene hier automatisch als "Invoer".
+        iemand voor het eerst inlogt, verschijnt diegene hier als "Wacht op goedkeuring" en heeft nog
+        geen toegang. Geef de rol "Invoer" of "Beheerder" om toegang te verlenen.
       </div>
+
+      {aantalWachtend > 0 && (
+        <div className="banner banner-warning">
+          {aantalWachtend === 1
+            ? '1 gebruiker wacht op goedkeuring.'
+            : `${aantalWachtend} gebruikers wachten op goedkeuring.`}{' '}
+          Ken je iemand niet? Verwijder het account dan in de Firebase Console.
+        </div>
+      )}
 
       <div className="card">
         {loading ? (
@@ -50,20 +72,29 @@ export default function Gebruikersbeheer() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
+                {gesorteerd.map((u) => (
                   <tr key={u.id} style={{ cursor: 'default' }}>
                     <td>{u.naam || '-'}</td>
                     <td>{u.email}</td>
                     <td>
-                      <span className={'badge ' + (u.role === 'admin' ? 'badge-success' : 'badge-neutral')}>
-                        {u.role === 'admin' ? 'Beheerder' : 'Invoer'}
+                      <span className={'badge ' + (ROL_BADGES[u.role] || 'badge-neutral')}>
+                        {ROL_LABELS[u.role] || u.role}
                       </span>
                     </td>
                     <td>{formatDate(u.createdAt)}</td>
                     <td style={{ textAlign: 'right' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => toggleRole(u)}>
-                        Maak {u.role === 'admin' ? 'invoer' : 'beheerder'}
-                      </button>
+                      <select
+                        value={u.role}
+                        onChange={(e) => wijzigRol(u, e.target.value)}
+                        aria-label={`Rol van ${u.email}`}
+                        style={{ width: 'auto' }}
+                      >
+                        {Object.entries(ROL_LABELS).map(([rol, label]) => (
+                          <option key={rol} value={rol}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                   </tr>
                 ))}

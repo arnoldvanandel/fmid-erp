@@ -11,52 +11,63 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    function isAdmin() {
+    function hasProfile() {
       return isSignedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && myProfile().role == 'admin';
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    // Elke ingelogde gebruiker heeft een profiel met naam + rol (admin | invoer).
-    // Iedereen mag zijn eigen profiel aanmaken bij eerste login (altijd als "invoer"),
-    // alleen een admin mag rollen wijzigen of andermans profiel aanpassen.
+    function isAdmin() {
+      return hasProfile() && myProfile().role == 'admin';
+    }
+
+    // Alleen door een admin goedgekeurde gebruikers (rol invoer of admin) komen
+    // bij de data. Iedereen kan via de Firebase Auth-API zelf een account
+    // aanmaken, dus "ingelogd" alleen is niet genoeg.
+    function isActive() {
+      return hasProfile() && myProfile().role in ['invoer', 'admin'];
+    }
+
+    // Elke ingelogde gebruiker heeft een profiel met naam + rol
+    // (wachtend | invoer | admin). Bij de eerste login maakt iemand zijn eigen
+    // profiel aan, altijd als "wachtend"; een admin keurt goed door de rol te
+    // wijzigen. Alleen een admin mag rollen wijzigen of andermans profiel aanpassen.
     match /users/{uid} {
-      allow read: if isSignedIn();
+      allow read: if (isSignedIn() && request.auth.uid == uid) || isActive();
       allow create: if isSignedIn()
         && request.auth.uid == uid
-        && request.resource.data.role == 'invoer';
+        && request.resource.data.role == 'wachtend';
       allow update: if isAdmin()
         || (isSignedIn() && request.auth.uid == uid
             && request.resource.data.role == resource.data.role);
       allow delete: if isAdmin();
     }
 
-    // Stamgegevens en orders: alle ingelogde collega's mogen lezen/invoeren/wijzigen.
+    // Stamgegevens en orders: alle goedgekeurde collega's mogen lezen/invoeren/wijzigen.
     // Verwijderen is voorbehouden aan admins, om te voorkomen dat iemand per ongeluk
     // een order of klant volledig weggooit.
     match /klanten/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     match /leveranciers/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     match /artikelen/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     // Locaties/magazijnen: iedereen die is ingelogd mag ze aanmaken en wijzigen
     // (net als artikelen) zodat je niet voor elk nieuw magazijn een admin nodig hebt.
     match /locaties/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
@@ -64,20 +75,20 @@ service cloud.firestore {
     // lib/voorraad.js) geschreven, maar de rule zelf staat gewoon elke
     // ingelogde gebruiker toe te schrijven, net als bij mutaties hieronder.
     match /voorraadstanden/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     match /verkooporders/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     match /inkooporders/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
@@ -85,20 +96,20 @@ service cloud.firestore {
     // Zelfde patroon als stuklijstregels/routeregels: platte collectie,
     // client-side gefilterd op inkooporderId.
     match /inkooporderregels/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     match /productieorders/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     match /voorraadmutaties/{docId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow read: if isActive();
+      allow create: if isActive();
       allow update, delete: if isAdmin();
     }
 
@@ -106,8 +117,8 @@ service cloud.firestore {
     // staat in Storage, zie storage.rules). Zelfde patroon als mutaties: iedereen
     // mag toevoegen, alleen een admin mag verwijderen.
     match /artikeldocumenten/{docId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow read: if isActive();
+      allow create: if isActive();
       allow update, delete: if isAdmin();
     }
 
@@ -115,22 +126,22 @@ service cloud.firestore {
     // "Stuklijst"). Stamgegevens, dus zelfde patroon als artikelen/locaties:
     // iedereen mag aanmaken/wijzigen, verwijderen is voorbehouden aan admins.
     match /stuklijstregels/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     // Routeregels (bewerkingen + bewerkingscentrum + tijd van een artikel met
     // artikeltype "Stuklijst"). Zelfde patroon als stuklijstregels hierboven.
     match /routeregels/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
 
     match /counters/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn();
+      allow read: if isActive();
+      allow create, update: if isActive();
       allow delete: if isAdmin();
     }
   }

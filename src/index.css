@@ -523,6 +523,7 @@ table.data-table {
 
 .banner-danger { background: var(--color-danger-tint); color: var(--color-danger); }
 .banner-info { background: var(--color-primary-tint); color: var(--color-primary-hover); }
+.banner-warning { background: var(--color-warning-tint); color: var(--color-warning); }
 
 .toolbar-right {
   display: flex;

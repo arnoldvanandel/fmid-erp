@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth, ROL_LABELS } from '../contexts/AuthContext'
 
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
@@ -54,7 +54,7 @@ export default function Layout({ children }) {
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <strong>{profile?.naam || profile?.email}</strong>
-            {profile?.role === 'admin' ? 'Beheerder' : 'Invoer'}
+            {ROL_LABELS[profile?.role] || 'Invoer'}
           </div>
           <button className="btn btn-secondary btn-sm" style={{ width: '100%' }} onClick={handleLogout}>
             Uitloggen

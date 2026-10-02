@@ -7,18 +7,30 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function isAdmin() {
+    function myRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function hasProfile() {
       return isSignedIn()
-        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return hasProfile() && myRole() == 'admin';
+    }
+
+    // Alleen goedgekeurde gebruikers (rol invoer of admin), zie firestore.rules.
+    function isActive() {
+      return hasProfile() && myRole() in ['invoer', 'admin'];
     }
 
     // PDF-documenten per artikel (zie ook artikeldocumenten in firestore.rules
-    // voor de metadata). Iedereen die is ingelogd mag uploaden/lezen,
+    // voor de metadata). Iedere goedgekeurde gebruiker mag uploaden/lezen,
     // verwijderen is voorbehouden aan admins.
     match /artikelen/{artikelId}/{fileName} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn()
+      allow read: if isActive();
+      allow create: if isActive()
         && request.resource.size < 25 * 1024 * 1024
         && request.resource.contentType == 'application/pdf';
       allow delete: if isAdmin();
