@@ -1,0 +1,137 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && myProfile().role == 'admin';
+    }
+
+    // Elke ingelogde gebruiker heeft een profiel met naam + rol (admin | invoer).
+    // Iedereen mag zijn eigen profiel aanmaken bij eerste login (altijd als "invoer"),
+    // alleen een admin mag rollen wijzigen of andermans profiel aanpassen.
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'invoer';
+      allow update: if isAdmin()
+        || (isSignedIn() && request.auth.uid == uid
+            && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    // Stamgegevens en orders: alle ingelogde collega's mogen lezen/invoeren/wijzigen.
+    // Verwijderen is voorbehouden aan admins, om te voorkomen dat iemand per ongeluk
+    // een order of klant volledig weggooit.
+    match /klanten/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /leveranciers/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /artikelen/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Locaties/magazijnen: iedereen die is ingelogd mag ze aanmaken en wijzigen
+    // (net als artikelen) zodat je niet voor elk nieuw magazijn een admin nodig hebt.
+    match /locaties/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Voorraadstand per artikel+locatie. Alleen via de app (transactie in
+    // lib/voorraad.js) geschreven, maar de rule zelf staat gewoon elke
+    // ingelogde gebruiker toe te schrijven, net als bij mutaties hieronder.
+    match /voorraadstanden/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /verkooporders/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /inkooporders/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Inkooporderregels (artikel + aantal + prijs van een inkooporder).
+    // Zelfde patroon als stuklijstregels/routeregels: platte collectie,
+    // client-side gefilterd op inkooporderId.
+    match /inkooporderregels/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /productieorders/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /voorraadmutaties/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Metadata van PDF's die aan een artikel gekoppeld zijn (het bestand zelf
+    // staat in Storage, zie storage.rules). Zelfde patroon als mutaties: iedereen
+    // mag toevoegen, alleen een admin mag verwijderen.
+    match /artikeldocumenten/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // Stuklijstregels (componenten + aantal van een artikel met artikeltype
+    // "Stuklijst"). Stamgegevens, dus zelfde patroon als artikelen/locaties:
+    // iedereen mag aanmaken/wijzigen, verwijderen is voorbehouden aan admins.
+    match /stuklijstregels/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    // Routeregels (bewerkingen + bewerkingscentrum + tijd van een artikel met
+    // artikeltype "Stuklijst"). Zelfde patroon als stuklijstregels hierboven.
+    match /routeregels/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+
+    match /counters/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
+  }
+}

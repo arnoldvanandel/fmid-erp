@@ -1,0 +1,12 @@
+{
+  "name": "fmid-erp-migratie",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "proef": "node migreer.mjs",
+    "echt": "node migreer.mjs --echt"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

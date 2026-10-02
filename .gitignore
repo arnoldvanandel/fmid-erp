@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.local
+.firebase
+firebase-debug.log
+
+# migratie: sleutels en exports nooit committen
+migratie/*.json
+!migratie/package.json
+!migratie/package-lock.json
