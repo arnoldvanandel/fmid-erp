@@ -1,6 +1,8 @@
 node_modules
 dist
 .env
+# functions/.env bevat alleen niet-geheime SMTP-instellingen
+!functions/.env
 .env.local
 .firebase
 firebase-debug.log

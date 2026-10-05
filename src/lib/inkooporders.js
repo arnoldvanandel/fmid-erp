@@ -1,4 +1,16 @@
-import { addDoc, collection, deleteDoc, doc, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore'
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  runTransaction,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
 import { db } from '../firebase'
 
 // Genereert een oplopend inkoopordernummer (IO-000001, IO-000002, ...) via
@@ -96,4 +108,35 @@ export async function wijzigInkooporderRegel(regelId, updates) {
 
 export async function verwijderInkooporderRegel(regelId) {
   await deleteDoc(doc(db, 'inkooporderregels', regelId))
+}
+
+// Haalt alles op wat nodig is om een inkooporder af te drukken of als PDF te
+// mailen: de kop, de leverancier (adres + e-mailadressen) en de regels.
+export async function laadInkooporderVoorAfdruk(inkooporderId) {
+  const orderSnap = await getDoc(doc(db, 'inkooporders', inkooporderId))
+  if (!orderSnap.exists()) throw new Error('Inkooporder niet gevonden.')
+  const order = { id: orderSnap.id, ...orderSnap.data() }
+
+  const [levSnap, regelSnap] = await Promise.all([
+    order.leverancierId ? getDoc(doc(db, 'leveranciers', order.leverancierId)) : null,
+    getDocs(query(collection(db, 'inkooporderregels'), where('inkooporderId', '==', inkooporderId))),
+  ])
+  const regels = regelSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (Number(a.regelnummer) || 0) - (Number(b.regelnummer) || 0))
+
+  return {
+    order,
+    leverancier: levSnap?.exists() ? { id: levSnap.id, ...levSnap.data() } : null,
+    regels,
+  }
+}
+
+// De adressen waar inkooporders voor deze leverancier heen gaan. Valt terug
+// op het algemene e-mailadres als er geen aparte inkooporder-adressen zijn.
+export function inkooporderEmailadressen(leverancier) {
+  const lijst = leverancier?.inkooporderEmails?.length
+    ? leverancier.inkooporderEmails
+    : [leverancier?.email].filter(Boolean)
+  return [...new Set(lijst.map((e) => e.trim()).filter(Boolean))]
 }

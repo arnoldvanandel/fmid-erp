@@ -1,8 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
-import { formatCurrency, formatNumber } from '../../lib/format'
+import { formatCurrency, formatDateTime, formatNumber } from '../../lib/format'
+import { mailInkooporder } from '../../lib/inkooporderMail'
 import {
+  inkooporderEmailadressen,
+  laadInkooporderVoorAfdruk,
   verwijderInkooporder,
   verwijderInkooporderRegel,
   voegInkooporderRegelToe,
@@ -19,7 +24,7 @@ const STATUS_LABEL = {
 }
 
 export default function InkooporderForm({ inkooporder, onDone }) {
-  const { isAdmin } = useAuth()
+  const { isAdmin, profile } = useAuth()
   const [status, setStatus] = useState(inkooporder.status || 'concept')
   const [verwachteLeverdatum, setVerwachteLeverdatum] = useState(inkooporder.verwachteLeverdatum || '')
   const [besteldatum, setBesteldatum] = useState(inkooporder.besteldatum || '')
@@ -28,6 +33,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const [levering, setLevering] = useState(inkooporder.levering || '')
   const [opmerkingen, setOpmerkingen] = useState(inkooporder.opmerkingen || '')
   const [saving, setSaving] = useState(false)
+  const [mailen, setMailen] = useState(false)
   const [error, setError] = useState(null)
 
   const { data: artikelen } = useCollection('artikelen', { orderByField: 'artikelnummer' })
@@ -84,12 +90,40 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         levering: levering.trim(),
         opmerkingen: opmerkingen.trim(),
       })
+      await vraagOmTeMailen()
       onDone?.()
     } catch (err) {
       setError(err.message)
     } finally {
       setSaving(false)
+      setMailen(false)
     }
+  }
+
+  // Na het opslaan vragen of de order naar de leverancier gemaild moet
+  // worden, naar de adressen die bij de leverancier zijn ingesteld.
+  async function vraagOmTeMailen() {
+    const gegevens = await laadInkooporderVoorAfdruk(inkooporder.id)
+    const aan = inkooporderEmailadressen(gegevens.leverancier)
+    if (gegevens.regels.length === 0) return
+    if (aan.length === 0) {
+      alert(
+        'Opgeslagen. Er is nog geen e-mailadres ingesteld bij deze leverancier, ' +
+          'dus de inkooporder kan niet per mail verstuurd worden.'
+      )
+      return
+    }
+    const eerder = inkooporder.gemaildOp
+      ? `\n\nLet op: deze order is al eerder gemaild (${formatDateTime(inkooporder.gemaildOp)}).`
+      : ''
+    const vraag = `Inkooporder ${inkooporder.ordernummer} per mail versturen naar:\n\n${aan.join('\n')}${eerder}`
+    if (!confirm(vraag)) return
+    setMailen(true)
+    await mailInkooporder({
+      inkooporderId: inkooporder.id,
+      gebruiker: profile?.naam || profile?.email,
+      gegevens,
+    })
   }
 
   async function handleDelete() {
@@ -235,9 +269,11 @@ export default function InkooporderForm({ inkooporder, onDone }) {
           PDF / afdrukken
         </a>
         <button type="button" className="btn btn-primary btn-sm" onClick={handleHeaderSubmit} disabled={saving}>
-          {saving ? 'Opslaan…' : 'Kopgegevens opslaan'}
+          {mailen ? 'Versturen…' : saving ? 'Opslaan…' : 'Opslaan'}
         </button>
       </div>
+
+      <MailStatus inkooporder={inkooporder} />
 
       <h3 style={{ marginTop: 4 }}>Orderregels</h3>
 
@@ -391,6 +427,37 @@ export default function InkooporderForm({ inkooporder, onDone }) {
           Sluiten
         </button>
       </div>
+    </div>
+  )
+}
+
+// Toont naar wie en wanneer de order gemaild is, en (live) of de
+// Cloud Function verstuurMail de mail daadwerkelijk heeft kunnen versturen.
+function MailStatus({ inkooporder }) {
+  const [delivery, setDelivery] = useState(null)
+
+  useEffect(() => {
+    if (!inkooporder.mailId) return undefined
+    return onSnapshot(
+      doc(db, 'mail', inkooporder.mailId),
+      (snap) => setDelivery(snap.data()?.delivery || null),
+      () => setDelivery(null)
+    )
+  }, [inkooporder.mailId])
+
+  if (!inkooporder.gemaildOp) return null
+
+  const state = delivery?.state
+  const label =
+    state === 'SUCCESS'
+      ? 'verzonden'
+      : state === 'ERROR'
+        ? `niet verzonden: ${delivery.error || 'onbekende fout'}`
+        : 'wacht op verzending'
+
+  return (
+    <div className={'banner ' + (state === 'ERROR' ? 'banner-danger' : state === 'SUCCESS' ? 'banner-info' : 'banner-warning')}>
+      Gemaild naar {(inkooporder.gemaildNaar || []).join(', ')} op {formatDateTime(inkooporder.gemaildOp)} — {label}
     </div>
   )
 }

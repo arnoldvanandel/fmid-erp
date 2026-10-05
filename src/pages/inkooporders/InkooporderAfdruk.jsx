@@ -1,79 +1,28 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
-import { db } from '../../firebase'
-import { formatNumber } from '../../lib/format'
-import './afdruk.css'
-
-// Bedrijfsgegevens zoals ze op de Axapta-inkooporder stonden.
-const BEDRIJF = {
-  naam: 'F.M.I. Dussen B.V.',
-  adres: ['Loswal 5', '4271 BA  Dussen', 'The Netherlands'],
-  telefoon: '+31 (0)416 39 22 33',
-  fax: '+31 (0)416 39 21 26',
-  email: 'info@fmid.nl',
-  website: 'www.fmid.nl',
-}
-
-// "2026-10-01" -> "1-10-2026" (kop) of "01-10-26" (regels), zoals op de oude order.
-function datumLang(iso) {
-  if (!iso) return ''
-  const [j, m, d] = iso.split('-')
-  return `${Number(d)}-${Number(m)}-${j}`
-}
-
-function datumKort(iso) {
-  if (!iso) return ''
-  const [j, m, d] = iso.split('-')
-  return `${d}-${m}-${j.slice(2)}`
-}
-
-function prijs(value) {
-  return formatNumber(value, 2)
-}
+import { laadInkooporderVoorAfdruk } from '../../lib/inkooporders'
+import InkooporderDocument from './InkooporderDocument'
 
 // Printbare inkooporder (A4). Opent in een eigen tabblad vanuit het
 // inkooporderformulier; via de printdialoog van de browser sla je 'm op als PDF.
 export default function InkooporderAfdruk() {
   const { id } = useParams()
-  const [order, setOrder] = useState(null)
-  const [leverancier, setLeverancier] = useState(null)
-  const [regels, setRegels] = useState([])
+  const [gegevens, setGegevens] = useState(null)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     let actief = true
-    async function laad() {
-      try {
-        const orderSnap = await getDoc(doc(db, 'inkooporders', id))
-        if (!orderSnap.exists()) throw new Error('Inkooporder niet gevonden.')
-        const o = { id: orderSnap.id, ...orderSnap.data() }
-
-        const [levSnap, regelSnap] = await Promise.all([
-          o.leverancierId ? getDoc(doc(db, 'leveranciers', o.leverancierId)) : null,
-          getDocs(query(collection(db, 'inkooporderregels'), where('inkooporderId', '==', id))),
-        ])
-        if (!actief) return
-        setOrder(o)
-        setLeverancier(levSnap?.exists() ? levSnap.data() : null)
-        setRegels(
-          regelSnap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => (Number(a.regelnummer) || 0) - (Number(b.regelnummer) || 0))
-        )
-      } catch (err) {
-        if (actief) setError(err.message)
-      }
-    }
-    laad()
+    laadInkooporderVoorAfdruk(id)
+      .then((g) => actief && setGegevens(g))
+      .catch((err) => actief && setError(err.message))
     return () => {
       actief = false
     }
   }, [id])
 
   useEffect(() => {
-    if (order) document.title = `Inkooporder ${order.ordernummer}`
-  }, [order])
+    if (gegevens) document.title = `Inkooporder ${gegevens.order.ordernummer}`
+  }, [gegevens])
 
   if (error) {
     return (
@@ -83,16 +32,13 @@ export default function InkooporderAfdruk() {
     )
   }
 
-  if (!order) {
+  if (!gegevens) {
     return (
       <div className="center-screen">
         <div className="spinner" />
       </div>
     )
   }
-
-  const plaatsregel = [leverancier?.postcode, leverancier?.plaats?.toUpperCase()].filter(Boolean).join(' ')
-  const totaal = regels.reduce((sum, r) => sum + (Number(r.aantal) || 0) * (Number(r.prijs) || 0), 0)
 
   return (
     <div className="afdruk-scherm">
@@ -102,116 +48,7 @@ export default function InkooporderAfdruk() {
         </button>
       </div>
 
-      <div className="afdruk-pagina">
-        <header className="afdruk-kop">
-          <img src="/fmid-logo.png" alt="FMID" className="afdruk-logo" />
-          <div className="afdruk-bedrijf">
-            <div>
-              <strong>{BEDRIJF.naam}</strong>
-              {BEDRIJF.adres.map((r) => (
-                <div key={r}>{r}</div>
-              ))}
-            </div>
-            <div>
-              <div>Tel: {BEDRIJF.telefoon}</div>
-              <div>Fax: {BEDRIJF.fax}</div>
-              <div>{BEDRIJF.email}</div>
-              <div>{BEDRIJF.website}</div>
-            </div>
-          </div>
-        </header>
-
-        <div className="afdruk-adres">
-          <div>{leverancier?.naam || order.leverancierNaam}</div>
-          {leverancier?.straat && <div>{leverancier.straat}</div>}
-          {plaatsregel && <div>{plaatsregel}</div>}
-          {leverancier?.land && !/^(nederland|the netherlands)$/i.test(leverancier.land) && (
-            <div>{leverancier.land.toUpperCase()}</div>
-          )}
-        </div>
-
-        <h1 className="afdruk-titel">Inkooporder</h1>
-
-        <div className="afdruk-gegevens">
-          <dl>
-            <dt>Uw referentie</dt>
-            <dd>{order.referentie}</dd>
-            <dt>Besteld door</dt>
-            <dd>{order.besteldDoor}</dd>
-            <dt>Leverancier</dt>
-            <dd>{order.leverancierscode}</dd>
-          </dl>
-          <dl>
-            <dt>
-              <strong>Inkoopordernr</strong>
-            </dt>
-            <dd>
-              <strong>{order.ordernummer}</strong>
-            </dd>
-            <dt>Besteldatum</dt>
-            <dd>{datumLang(order.besteldatum)}</dd>
-            <dt>Levering</dt>
-            <dd>{order.levering}</dd>
-          </dl>
-        </div>
-
-        <table className="afdruk-regels">
-          <thead>
-            <tr>
-              <th className="num">Aantal</th>
-              <th></th>
-              <th>
-                Artikelnummer
-                <br />
-                Omschrijving
-                <br />
-                Artikelnummer leverancier
-              </th>
-              <th className="num">
-                Netto prijs
-                <br />
-                EUR
-              </th>
-              <th className="num">Leverdatum</th>
-            </tr>
-          </thead>
-          <tbody>
-            {regels.map((r) => (
-              <tr key={r.id}>
-                <td className="num">{formatNumber(r.aantal)}</td>
-                <td>{r.eenheid}</td>
-                <td>
-                  <div>{r.artikelnummer}</div>
-                  <div>{r.artikelnaam}</div>
-                  {r.leverancierArtikelnummer && <div>{r.leverancierArtikelnummer}</div>}
-                </td>
-                <td className="num">{prijs(r.prijs)}</td>
-                <td className="num">{datumKort(r.leverdatum)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {totaal > 0 && (
-          <div className="afdruk-totaal">
-            Totaal excl. btw: <strong>EUR {prijs(totaal)}</strong>
-          </div>
-        )}
-
-        {order.opmerkingen && <p className="afdruk-opmerkingen">{order.opmerkingen}</p>}
-
-        <footer className="afdruk-voet">
-          <div className="afdruk-correspondentie">
-            <span>Gelieve bij alle correspondentie te vermelden:</span>
-            <strong>
-              {order.leverancierscode} - {order.ordernummer}
-            </strong>
-          </div>
-          <div className="afdruk-kleine-letters">
-            Deze bestelling is automatisch aangemaakt en daarom niet voorzien van een handtekening
-          </div>
-        </footer>
-      </div>
+      <InkooporderDocument {...gegevens} />
     </div>
   )
 }

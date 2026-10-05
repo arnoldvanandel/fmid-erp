@@ -11,6 +11,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
     naam: leverancier?.naam || '',
     contactpersoon: leverancier?.contactpersoon || '',
     email: leverancier?.email || '',
+    inkooporderEmails: (leverancier?.inkooporderEmails || []).join(', '),
     telefoon: leverancier?.telefoon || '',
     straat: leverancier?.straat || '',
     postcode: leverancier?.postcode || '',
@@ -42,6 +43,10 @@ export default function LeverancierForm({ leverancier, onDone }) {
       naam: form.naam.trim(),
       contactpersoon: form.contactpersoon.trim(),
       email: form.email.trim(),
+      inkooporderEmails: form.inkooporderEmails
+        .split(/[,;\s]+/)
+        .map((e) => e.trim())
+        .filter(Boolean),
       telefoon: form.telefoon.trim(),
       straat: form.straat.trim(),
       postcode: form.postcode.trim(),
@@ -131,6 +136,19 @@ export default function LeverancierForm({ leverancier, onDone }) {
       <div className="field">
         <label>E-mail</label>
         <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
+      </div>
+
+      <div className="field">
+        <label>E-mailadressen voor inkooporders</label>
+        <input
+          type="text"
+          value={form.inkooporderEmails}
+          onChange={(e) => set('inkooporderEmails', e.target.value)}
+          placeholder="inkoop@leverancier.nl, verkoop@leverancier.nl"
+        />
+        <span className="hint">
+          Meerdere adressen scheiden met een komma. Leeg = het algemene e-mailadres hierboven.
+        </span>
       </div>
 
       <div className="field">

@@ -1,8 +1,6 @@
 /* Printbare inkooporder: A4, huisstijlkleuren uit het FMID-logo. */
 
 .afdruk-scherm {
-  --fmid-blauw: #3a4899;
-  --fmid-groen: #5ab031;
   min-height: 100vh;
   background: #e6e8ec;
   padding: 24px 16px 48px;
@@ -16,6 +14,8 @@
 }
 
 .afdruk-pagina {
+  --fmid-blauw: #3a4899;
+  --fmid-groen: #5ab031;
   box-sizing: border-box;
   position: relative;
   width: 210mm;
