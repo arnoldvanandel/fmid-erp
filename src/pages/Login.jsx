@@ -24,8 +24,8 @@ export default function Login() {
     <div className="center-screen">
       <div className="card login-card">
         <div className="login-brand">
-          <div className="mark">FM</div>
-          <h1>FMID ERP</h1>
+          <img src="/fmid-logo.png" alt="FMID" className="login-logo" />
+          <h1>ERP</h1>
           <div className="page-header-sub">Log in met je bedrijfsaccount</div>
         </div>
 

@@ -26,8 +26,10 @@ export default function Layout({ children }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          FMID ERP
-          <small>Machinefabriek Van Andel</small>
+          <div className="sidebar-logo">
+            <img src="/fmid-logo.png" alt="FMID" />
+          </div>
+          <small>ERP · Machinefabriek Van Andel</small>
         </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => (

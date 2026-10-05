@@ -21,7 +21,8 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
   if (profile && !isActive) {
     return (
       <div className="center-screen">
-        <div className="card card-pad" style={{ maxWidth: 420, textAlign: 'center' }}>
+        <div className="card card-pad login-card" style={{ maxWidth: 420, textAlign: 'center' }}>
+          <img src="/fmid-logo.png" alt="FMID" className="login-logo" style={{ marginBottom: 18 }} />
           <h2>Wacht op goedkeuring</h2>
           <p className="page-header-sub">
             Je account ({profile.email}) is aangemaakt, maar moet nog door een beheerder worden

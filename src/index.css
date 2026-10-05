@@ -6,9 +6,13 @@
   --color-text: #1c232e;
   --color-text-muted: #5b6472;
   --color-text-faint: #8993a1;
-  --color-primary: #1f5cff;
-  --color-primary-hover: #1548d6;
-  --color-primary-tint: #eaf0ff;
+  /* Huisstijlkleuren uit het FMID-logo: blauw (zeshoek) en groen ("MID"). */
+  --fmid-blauw: #3a4899;
+  --fmid-blauw-licht: #4755a2;
+  --fmid-groen: #5ab031;
+  --color-primary: var(--fmid-blauw);
+  --color-primary-hover: #2f3b80;
+  --color-primary-tint: #eceefa;
   --color-danger: #d1393e;
   --color-danger-tint: #fdecec;
   --color-success: #1a8a53;
@@ -70,7 +74,7 @@ button, input, select, textarea {
 .sidebar {
   width: var(--sidebar-width);
   flex-shrink: 0;
-  background: #14192b;
+  background: #1b2150;
   color: #cdd3e0;
   display: flex;
   flex-direction: column;
@@ -79,19 +83,28 @@ button, input, select, textarea {
 }
 
 .sidebar-brand {
-  padding: 4px 20px 20px 20px;
-  color: #fff;
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: -0.01em;
+  padding: 0 14px 18px 14px;
+}
+
+.sidebar-logo {
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  border-bottom: 3px solid var(--fmid-groen);
+}
+
+.sidebar-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .sidebar-brand small {
   display: block;
-  font-weight: 400;
   font-size: 11px;
-  color: #8791ab;
-  margin-top: 2px;
+  color: #8f98c4;
+  margin-top: 8px;
+  padding-left: 2px;
 }
 
 .sidebar-nav {
@@ -117,18 +130,19 @@ button, input, select, textarea {
 }
 
 .sidebar-link:hover {
-  background: #1f2540;
+  background: #262d63;
   color: #fff;
 }
 
 .sidebar-link.active {
-  background: var(--color-primary);
+  background: var(--fmid-blauw-licht);
   color: #fff;
+  box-shadow: inset 3px 0 0 var(--fmid-groen);
 }
 
 .sidebar-footer {
   padding: 12px 20px 4px 20px;
-  border-top: 1px solid #262c47;
+  border-top: 1px solid #2d3570;
   margin-top: 8px;
   flex-shrink: 0;
 }
@@ -497,18 +511,22 @@ table.data-table {
   margin-bottom: 24px;
 }
 
-.login-brand div.mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: var(--color-primary);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 17px;
-  margin: 0 auto 12px auto;
+.login-logo {
+  display: block;
+  width: 200px;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 6px auto;
+}
+
+.login-brand h1 {
+  color: var(--fmid-blauw);
+  letter-spacing: 0.2em;
+  font-size: 15px;
+}
+
+.login-card {
+  border-top: 4px solid var(--fmid-groen);
 }
 
 .banner {
