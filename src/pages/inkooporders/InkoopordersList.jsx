@@ -162,7 +162,7 @@ export default function InkoopordersList() {
       )}
 
       {editing && (
-        <Modal title={`Inkooporder ${editing.ordernummer}`} onClose={() => setEditing(null)} width={900}>
+        <Modal title={`Inkooporder ${editing.ordernummer}`} onClose={() => setEditing(null)} width={1120}>
           <InkooporderForm inkooporder={editing} onDone={() => setEditing(null)} />
         </Modal>
       )}

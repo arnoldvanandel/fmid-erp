@@ -441,6 +441,122 @@ table.data-table {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Regeltabel (orderregels, zoals het regelraster in Axapta) ---------- */
+
+.regel-grid-kop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 8px;
+}
+
+.regel-grid-kop h3 {
+  margin: 0;
+}
+
+.regel-grid-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: var(--color-surface);
+}
+
+.regel-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.regel-grid th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: #f0f2f5;
+  padding: 5px 6px;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-strong);
+  white-space: nowrap;
+}
+
+.regel-grid td {
+  padding: 0;
+  height: 26px;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.regel-grid .num {
+  text-align: right;
+}
+
+.regel-grid td.alleen-lezen {
+  padding: 0 6px;
+}
+
+.regel-grid td input {
+  width: 100%;
+  min-width: 70px;
+  height: 25px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  padding: 0 6px;
+  font-size: 13px;
+  background: transparent;
+  color: inherit;
+  text-align: inherit;
+}
+
+.regel-grid td input[type='date'] {
+  min-width: 120px;
+}
+
+.regel-grid td input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+.regel-grid-selector {
+  width: 18px;
+  min-width: 18px;
+  text-align: center;
+  color: var(--color-text-muted);
+  background: #f0f2f5;
+  font-size: 11px;
+}
+
+.regel-grid tbody tr.geselecteerd td:not(.regel-grid-selector) {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.regel-grid tbody tr.geselecteerd td input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.regel-grid-nieuw td input::placeholder {
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+.regel-grid-leeg {
+  padding: 10px 6px !important;
+  color: var(--color-text-faint);
+}
+
+.regel-grid tfoot td {
+  padding: 0 6px;
+  height: 26px;
+  font-weight: 600;
+  background: #f7f8fa;
+  border-top: 1px solid var(--color-border-strong);
+}
+
 .data-table-toolbar {
   display: flex;
   align-items: center;

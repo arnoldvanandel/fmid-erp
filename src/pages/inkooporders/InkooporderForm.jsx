@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -62,23 +62,38 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     0
   )
 
-  const [artikelId, setArtikelId] = useState('')
-  const [aantal, setAantal] = useState('')
-  const [prijs, setPrijs] = useState('')
-  const [leverdatum, setLeverdatum] = useState('')
-  const [leverancierArtikelnummer, setLeverancierArtikelnummer] = useState('')
   const [regelSaving, setRegelSaving] = useState(false)
   const [regelError, setRegelError] = useState(null)
+  const [geselecteerdeRegel, setGeselecteerdeRegel] = useState(null)
 
-  function kiesArtikel(id) {
-    setArtikelId(id)
-    const artikel = artikelenById[id]
+  const artikelenByNummer = useMemo(() => {
+    const map = {}
+    for (const a of artikelen) map[(a.artikelnummer || '').toLowerCase()] = a
+    return map
+  }, [artikelen])
+
+  // De lege regel onderaan de tabel, voor een nieuw artikel. De waarden staan
+  // ook in een ref, zodat Enter direct na het verlaten van een cel de laatste
+  // invoer meeneemt.
+  const LEGE_REGEL = { artikelnummer: '', aantal: '', prijs: '', leverdatum: '', leverancierArtikelnummer: '' }
+  const [nieuweRegel, setNieuweRegelState] = useState(LEGE_REGEL)
+  const nieuweRegelRef = useRef(LEGE_REGEL)
+  function setNieuweRegel(updates) {
+    nieuweRegelRef.current = { ...nieuweRegelRef.current, ...updates }
+    setNieuweRegelState(nieuweRegelRef.current)
+  }
+  const nieuwArtikel = artikelenByNummer[nieuweRegel.artikelnummer.trim().toLowerCase()]
+
+  function kiesArtikel(artikelnummer) {
+    const artikel = artikelenByNummer[artikelnummer.trim().toLowerCase()]
+    const updates = { artikelnummer }
     // Inkoopprijzen uit Axapta gelden vaak per 100 of 1000 stuks; een
     // orderregel rekent met de prijs per stuk.
-    if (artikel) {
+    if (artikel && artikel !== nieuwArtikel) {
       const perStuk = (Number(artikel.inkoopprijs) || 0) / (Number(artikel.inkoopprijsHoeveelheid) || 1)
-      setPrijs(Math.round(perStuk * 10000) / 10000)
+      updates.prijs = Math.round(perStuk * 10000) / 10000
     }
+    setNieuweRegel(updates)
   }
 
   async function handleHeaderSubmit(e) {
@@ -146,12 +161,15 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     }
   }
 
-  async function handleRegelToevoegen(e) {
-    e.preventDefault()
+  async function handleRegelToevoegen() {
+    if (regelSaving) return
     setRegelError(null)
-    const artikel = artikelenById[artikelId]
+    const r = nieuweRegelRef.current
+    const artikel = artikelenByNummer[r.artikelnummer.trim().toLowerCase()]
     if (!artikel) {
-      setRegelError('Kies een artikel.')
+      setRegelError(
+        r.artikelnummer.trim() ? `Artikel "${r.artikelnummer.trim()}" bestaat niet.` : 'Vul een artikelnummer in.'
+      )
       return
     }
     setRegelSaving(true)
@@ -159,17 +177,13 @@ export default function InkooporderForm({ inkooporder, onDone }) {
       await voegInkooporderRegelToe({
         inkooporder: { ...inkooporder, verwachteLeverdatum },
         artikel,
-        aantal,
-        prijs,
-        leverdatum,
-        leverancierArtikelnummer,
+        aantal: r.aantal,
+        prijs: r.prijs === '' ? 0 : r.prijs,
+        leverdatum: r.leverdatum,
+        leverancierArtikelnummer: r.leverancierArtikelnummer,
         hoogsteRegelnummer,
       })
-      setArtikelId('')
-      setAantal('')
-      setPrijs('')
-      setLeverdatum('')
-      setLeverancierArtikelnummer('')
+      setNieuweRegel(LEGE_REGEL)
     } catch (err) {
       setRegelError(err.message)
     } finally {
@@ -188,6 +202,10 @@ export default function InkooporderForm({ inkooporder, onDone }) {
 
   async function handleRegelVeldChange(regel, veld, value) {
     if (value === '' || Number(value) === Number(regel[veld])) return
+    if (veld === 'aantal' && !(Number(value) > 0)) {
+      setRegelError('Hoeveelheid moet groter dan 0 zijn.')
+      return
+    }
     try {
       await wijzigInkooporderRegel(regel.id, { [veld]: Number(value) || 0 })
     } catch (err) {
@@ -199,6 +217,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     if (!confirm(`Regel ${regel.artikelnummer} verwijderen uit deze inkooporder?`)) return
     try {
       await verwijderInkooporderRegel(regel.id)
+      setGeselecteerdeRegel(null)
     } catch (err) {
       setRegelError(err.message)
     }
@@ -283,111 +302,94 @@ export default function InkooporderForm({ inkooporder, onDone }) {
 
       <MailStatus inkooporder={inkooporder} />
 
-      <h3 style={{ marginTop: 4 }}>Orderregels</h3>
-
-      {regelError && <div className="banner banner-danger">{regelError}</div>}
-
-      <div className="field-row" style={{ alignItems: 'flex-end' }}>
-        <div className="field" style={{ flex: 2 }}>
-          <label>Artikel</label>
-          <select value={artikelId} onChange={(e) => kiesArtikel(e.target.value)}>
-            <option value="">Kies artikel…</option>
-            {artikelen.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.artikelnummer} — {a.naam}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Aantal</label>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={aantal}
-            onChange={(e) => setAantal(e.target.value)}
-            style={{ maxWidth: 100 }}
-          />
-        </div>
-        <div className="field">
-          <label>Prijs per stuk</label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={prijs}
-            onChange={(e) => setPrijs(e.target.value)}
-            style={{ maxWidth: 120 }}
-          />
-        </div>
-        <div className="field">
-          <label>Leverdatum</label>
-          <input type="date" value={leverdatum} onChange={(e) => setLeverdatum(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Art.nr. leverancier</label>
-          <input
-            type="text"
-            value={leverancierArtikelnummer}
-            onChange={(e) => setLeverancierArtikelnummer(e.target.value)}
-            style={{ maxWidth: 140 }}
-          />
-        </div>
-        <div className="field" style={{ flex: 'none' }}>
-          <button type="button" className="btn btn-secondary" onClick={handleRegelToevoegen} disabled={regelSaving}>
-            {regelSaving ? 'Toevoegen…' : '+ Toevoegen'}
+      <div className="regel-grid-kop">
+        <h3>Orderregels</h3>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {isAdmin && (
+            <button
+              type="button"
+              className="btn btn-danger btn-sm"
+              disabled={!geselecteerdeRegel || geselecteerdeRegel === 'nieuw'}
+              onClick={() => {
+                const regel = regelsVoorOrder.find((r) => r.id === geselecteerdeRegel)
+                if (regel) handleRegelVerwijderen(regel)
+              }}
+            >
+              Regel verwijderen
+            </button>
+          )}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={handleRegelToevoegen} disabled={regelSaving}>
+            {regelSaving ? 'Toevoegen…' : '+ Regel toevoegen'}
           </button>
         </div>
       </div>
 
-      {loadingRegels ? (
-        <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }} /></div>
-      ) : regelsVoorOrder.length === 0 ? (
-        <div className="empty-state">Nog geen regels op deze inkooporder.</div>
-      ) : (
-        <>
-          <table className="data-table" style={{ marginTop: 8 }}>
-            <thead>
+      {regelError && <div className="banner banner-danger">{regelError}</div>}
+
+      <datalist id="inkooporder-artikelen">
+        {artikelen.map((a) => (
+          <option key={a.id} value={a.artikelnummer}>
+            {a.naam}
+          </option>
+        ))}
+      </datalist>
+
+      <div className="regel-grid-wrap">
+        <table className="regel-grid">
+          <thead>
+            <tr>
+              <th className="regel-grid-selector"></th>
+              <th>Artikelnummer</th>
+              <th className="num">Hoeveelheid</th>
+              <th>Eenheid</th>
+              <th className="num">Prijs per stuk</th>
+              <th className="num">Nettobedrag</th>
+              <th>Artikelnaam</th>
+              <th>Leveringsdatum</th>
+              <th>Art.nr. leverancier</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loadingRegels ? (
               <tr>
-                <th>Artikelnummer</th>
-                <th>Naam</th>
-                <th className="num">Aantal</th>
-                <th>Eenheid</th>
-                <th className="num">Prijs</th>
-                <th className="num">Subtotaal</th>
-                <th>Leverdatum</th>
-                <th>Art.nr. leverancier</th>
-                <th></th>
+                <td colSpan={9} className="regel-grid-leeg">
+                  Laden…
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {regelsVoorOrder.map((r) => (
-                <tr key={r.id} style={{ cursor: 'default' }}>
-                  <td>{r.artikelnummer}</td>
-                  <td>{r.artikelnaam}</td>
+            ) : (
+              regelsVoorOrder.map((r, i) => (
+                <tr
+                  key={r.id}
+                  className={geselecteerdeRegel === r.id ? 'geselecteerd' : ''}
+                  onFocus={() => setGeselecteerdeRegel(r.id)}
+                  onClick={() => setGeselecteerdeRegel(r.id)}
+                >
+                  <td className="regel-grid-selector">{geselecteerdeRegel === r.id ? '▸' : ''}</td>
+                  <td className="alleen-lezen">{r.artikelnummer}</td>
                   <td className="num">
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      defaultValue={r.aantal}
-                      onBlur={(e) => handleRegelVeldChange(r, 'aantal', e.target.value)}
-                      style={{ maxWidth: 80, textAlign: 'right' }}
+                    <GetalCel
+                      rij={i}
+                      kolom="aantal"
+                      value={r.aantal}
+                      decimalen={2}
+                      onCommit={(v) => handleRegelVeldChange(r, 'aantal', v)}
                     />
                   </td>
-                  <td>{r.eenheid}</td>
+                  <td className="alleen-lezen">{r.eenheid}</td>
                   <td className="num">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      defaultValue={r.prijs}
-                      onBlur={(e) => handleRegelVeldChange(r, 'prijs', e.target.value)}
-                      style={{ maxWidth: 100, textAlign: 'right' }}
+                    <GetalCel
+                      rij={i}
+                      kolom="prijs"
+                      value={r.prijs}
+                      decimalen={2}
+                      maxDecimalen={4}
+                      onCommit={(v) => handleRegelVeldChange(r, 'prijs', v)}
                     />
                   </td>
-                  <td className="num">{formatCurrency((Number(r.aantal) || 0) * (Number(r.prijs) || 0))}</td>
+                  <td className="num alleen-lezen">
+                    {formatNumber((Number(r.aantal) || 0) * (Number(r.prijs) || 0), 2)}
+                  </td>
+                  <td className="alleen-lezen">{r.artikelnaam}</td>
                   <td>
                     <input
                       type="date"
@@ -398,32 +400,102 @@ export default function InkooporderForm({ inkooporder, onDone }) {
                   <td>
                     <input
                       type="text"
+                      data-rij={i}
+                      data-kolom="leverancierArtikelnummer"
                       defaultValue={r.leverancierArtikelnummer || ''}
+                      onKeyDown={gridToets}
                       onBlur={(e) => handleRegelTekstChange(r, 'leverancierArtikelnummer', e.target.value)}
-                      style={{ maxWidth: 120 }}
                     />
                   </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-sm"
-                        onClick={() => handleRegelVerwijderen(r)}
-                      >
-                        Verwijderen
-                      </button>
-                    )}
-                  </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="hint" style={{ marginTop: 10 }}>
-            Totaalbedrag: <strong>{formatCurrency(totaalbedrag)}</strong> ({formatNumber(regelsVoorOrder.length)}{' '}
-            regels)
-          </p>
-        </>
-      )}
+              ))
+            )}
+
+            <tr
+              className={'regel-grid-nieuw' + (geselecteerdeRegel === 'nieuw' ? ' geselecteerd' : '')}
+              onFocus={() => setGeselecteerdeRegel('nieuw')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  e.target.blur()
+                  setTimeout(handleRegelToevoegen, 0)
+                }
+              }}
+            >
+              <td className="regel-grid-selector">*</td>
+              <td>
+                <input
+                  type="text"
+                  list="inkooporder-artikelen"
+                  data-rij={regelsVoorOrder.length}
+                  data-kolom="artikelnummer"
+                  placeholder="Nieuw artikel…"
+                  value={nieuweRegel.artikelnummer}
+                  onChange={(e) => kiesArtikel(e.target.value)}
+                  onKeyDown={gridToets}
+                />
+              </td>
+              <td className="num">
+                <GetalCel
+                  rij={regelsVoorOrder.length}
+                  kolom="aantal"
+                  value={nieuweRegel.aantal}
+                  decimalen={2}
+                  onCommit={(v) => setNieuweRegel({ aantal: v })}
+                />
+              </td>
+              <td className="alleen-lezen">{nieuwArtikel?.eenheid || ''}</td>
+              <td className="num">
+                <GetalCel
+                  rij={regelsVoorOrder.length}
+                  kolom="prijs"
+                  value={nieuweRegel.prijs}
+                  decimalen={2}
+                  maxDecimalen={4}
+                  onCommit={(v) => setNieuweRegel({ prijs: v })}
+                />
+              </td>
+              <td className="num alleen-lezen">
+                {nieuweRegel.aantal !== '' && nieuweRegel.prijs !== ''
+                  ? formatNumber(Number(nieuweRegel.aantal) * Number(nieuweRegel.prijs), 2)
+                  : ''}
+              </td>
+              <td className="alleen-lezen">{nieuwArtikel?.naam || ''}</td>
+              <td>
+                <input
+                  type="date"
+                  value={nieuweRegel.leverdatum}
+                  onChange={(e) => setNieuweRegel({ leverdatum: e.target.value })}
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  data-rij={regelsVoorOrder.length}
+                  data-kolom="leverancierArtikelnummer"
+                  value={nieuweRegel.leverancierArtikelnummer}
+                  onChange={(e) => setNieuweRegel({ leverancierArtikelnummer: e.target.value })}
+                  onKeyDown={gridToets}
+                />
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="regel-grid-selector"></td>
+              <td colSpan={4}>
+                {formatNumber(regelsVoorOrder.length)} {regelsVoorOrder.length === 1 ? 'regel' : 'regels'}
+              </td>
+              <td className="num">{formatNumber(totaalbedrag, 2)}</td>
+              <td colSpan={3}>Totaal nettobedrag ({formatCurrency(totaalbedrag)})</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p className="hint" style={{ marginTop: 6 }}>
+        Klik in een cel om te wijzigen; de wijziging wordt opgeslagen zodra je de cel verlaat. Nieuw artikel: vul de
+        onderste regel in en druk op Enter. Met ↑ en ↓ ga je naar de regel erboven of eronder.
+      </p>
 
       <div className="modal-actions" style={{ justifyContent: isAdmin ? 'space-between' : 'flex-end' }}>
         {isAdmin && (
@@ -436,6 +508,77 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         </button>
       </div>
     </div>
+  )
+}
+
+// ↑/↓ in de regeltabel: naar dezelfde kolom op de regel erboven/eronder.
+// Enter verlaat de cel, waardoor de wijziging wordt opgeslagen.
+function gridToets(e) {
+  const { rij, kolom } = e.currentTarget.dataset
+  if (e.key === 'Enter') {
+    e.currentTarget.blur()
+    return
+  }
+  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+  // In de artikellijst van de nieuwe regel kiezen de pijltjes een suggestie.
+  if (e.currentTarget.list) return
+  const doel = Number(rij) + (e.key === 'ArrowUp' ? -1 : 1)
+  const cel = e.currentTarget
+    .closest('table')
+    ?.querySelector(`[data-rij="${doel}"][data-kolom="${kolom}"]`)
+  if (cel) {
+    e.preventDefault()
+    cel.focus()
+    cel.select?.()
+  }
+}
+
+// "1.900,50" -> 1900.5. Zonder komma geldt een punt als duizendtal-scheiding
+// als het er zo uitziet ("1.900"), anders als decimaalteken ("0.05").
+function parseGetal(tekst) {
+  const t = String(tekst).trim().replace(/\s/g, '')
+  if (t === '') return ''
+  let n
+  if (t.includes(',')) n = Number(t.replace(/\./g, '').replace(',', '.'))
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) n = Number(t.replace(/\./g, ''))
+  else n = Number(t)
+  return Number.isFinite(n) ? n : null
+}
+
+// Getalcel zoals in Axapta: toont "1.900,00", bij het bewerken het kale getal.
+function GetalCel({ value, decimalen = 2, maxDecimalen = decimalen, onCommit, rij, kolom }) {
+  const [bewerken, setBewerken] = useState(null)
+  const leeg = value === '' || value == null
+  const weergave = leeg
+    ? ''
+    : Number(value).toLocaleString('nl-NL', { minimumFractionDigits: decimalen, maximumFractionDigits: maxDecimalen })
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      data-rij={rij}
+      data-kolom={kolom}
+      value={bewerken ?? weergave}
+      onFocus={(e) => {
+        setBewerken(leeg ? '' : String(value).replace('.', ','))
+        const el = e.currentTarget
+        setTimeout(() => el.select(), 0)
+      }}
+      onChange={(e) => setBewerken(e.target.value)}
+      onBlur={() => {
+        const n = parseGetal(bewerken ?? '')
+        setBewerken(null)
+        if (n !== null) onCommit(n)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          setBewerken(leeg ? '' : String(value).replace('.', ','))
+          return
+        }
+        gridToets(e)
+      }}
+    />
   )
 }
 
