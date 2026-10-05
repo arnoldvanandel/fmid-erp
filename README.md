@@ -4,6 +4,10 @@ Eerste versie van een eigen bedrijfsapp, als vervanging/aanvulling op onderdelen
 Axapta: inloggen met meerdere collega's, artikelbeheer en voorraadmutaties.
 Gebouwd met React + Firebase (Firestore + Authentication + Hosting).
 
+> **Huisstijl en werkafspraken:** lees [AGENTS.md](AGENTS.md) voordat je iets aan de
+> interface, PDF's of mails verandert: logo, kleuren en componenten liggen daar vast.
+> Dit geldt ook voor AI-assistenten (Claude leest het via `CLAUDE.md`).
+
 Dit project draait nog niet ergens — je moet het zelf aan een Firebase-project
 koppelen. Dat kost ongeveer 15 minuten. Volg de stappen hieronder in volgorde.
 
