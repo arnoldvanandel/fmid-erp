@@ -34,11 +34,83 @@ export async function maakPdfBase64(gegevens) {
   }
 }
 
+// Standaardhandtekening voor uitgaande mail. Een gebruiker kan een eigen
+// handtekening hebben (veld `handtekening` in users/{uid}); anders wordt deze
+// gebruikt met de naam van de afzender.
+export function standaardHandtekening(naam) {
+  return [
+    'Met vriendelijke groet / Best regards,',
+    '',
+    naam || 'F.M.I. Dussen B.V.',
+    '',
+    'F.M.I. Dussen B.V. / ANBO-Fittings',
+    'Loswal 5',
+    '4271 BA Dussen',
+    'Tel: +31 (0)416 39 22 33',
+    'Fax: +31 (0)416 39 21 26',
+    'www.fmid.nl',
+    'www.anbo-fittings.nl',
+    '',
+    'Op al onze transacties en werkzaamheden zijn uitsluitend onze leverings- en betalingsvoorwaarden van toepassing.',
+    'Anders luidende voorwaarden worden door ons nimmer aanvaard. De voorwaarden kunt u bekijken op:',
+    'www.fmid.nl/AlgemeneleveringsvoorwaardenFMID.pdf',
+  ].join('\n')
+}
+
+function escapeHtml(tekst) {
+  return tekst.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+// Lettertype van de mail, gelijk aan de handtekening in Outlook:
+// Aptos (Hoofdtekst) 12 pt, met terugval voor ontvangers zonder Aptos.
+const MAIL_FONT = "font-family:Aptos,'Aptos (Body)',Calibri,Arial,sans-serif;font-size:12pt"
+
+// Platte tekst -> eenvoudige HTML: regels behouden, webadressen en
+// e-mailadressen klikbaar.
+function tekstNaarHtml(tekst) {
+  return escapeHtml(tekst)
+    .split('\n')
+    .map((regel) =>
+      regel
+        .replace(/\b((?:https?:\/\/)?www\.[^\s<]+)/g, (url) => {
+          const href = url.startsWith('http') ? url : `https://${url}`
+          return `<a href="${href}" style="color:#3a4899">${url}</a>`
+        })
+        .replace(/([\w.+-]+@[\w-]+\.[\w.-]+)/g, '<a href="mailto:$1" style="color:#3a4899">$1</a>')
+    )
+    .join('<br>\n')
+}
+
+// Stelt het bericht op (onderwerp, tekst, HTML met handtekening en de PDF als
+// bijlage) zonder het te versturen.
+export async function maakInkooporderBericht({ gegevens, gebruiker, handtekening }) {
+  const { order } = gegevens
+  const tekst =
+    `Geachte heer/mevrouw${order.referentie ? ` ${order.referentie}` : ''},\n\n` +
+    `In de bijlage vindt u onze inkooporder ${order.ordernummer}.\n` +
+    `Gelieve bij alle correspondentie te vermelden: ${order.leverancierscode} - ${order.ordernummer}.\n\n` +
+    (handtekening?.trim() || standaardHandtekening(order.besteldDoor || gebruiker))
+
+  return {
+    subject: `Inkooporder ${order.ordernummer} - F.M.I. Dussen B.V.`,
+    text: tekst,
+    html: `<div style="${MAIL_FONT};color:#000">${tekstNaarHtml(tekst)}</div>`,
+    attachments: [
+      {
+        filename: `Inkooporder ${order.ordernummer}.pdf`,
+        content: await maakPdfBase64(gegevens),
+        encoding: 'base64',
+        contentType: 'application/pdf',
+      },
+    ],
+  }
+}
+
 // Zet een mail met de inkooporder als PDF-bijlage klaar in de collectie
 // `mail`. De Cloud Function `verstuurMail` (functions/index.js) pikt die op en
 // verstuurt 'm via SMTP; het resultaat (verzonden/fout) schrijft de functie
 // terug in het veld `delivery` van hetzelfde document.
-export async function mailInkooporder({ inkooporderId, gebruiker, gebruikerEmail, gegevens }) {
+export async function mailInkooporder({ inkooporderId, gebruiker, gebruikerEmail, handtekening, gegevens }) {
   if (!gegevens) gegevens = await laadInkooporderVoorAfdruk(inkooporderId)
   const { order, leverancier } = gegevens
   const aan = inkooporderEmailadressen(leverancier)
@@ -53,30 +125,10 @@ export async function mailInkooporder({ inkooporderId, gebruiker, gebruikerEmail
   // al als ontvanger op de mail staat.
   const cc = gebruikerEmail && !aan.includes(gebruikerEmail) ? [gebruikerEmail] : []
 
-  const pdf = await maakPdfBase64(gegevens)
-  const onderwerp = `Inkooporder ${order.ordernummer} - F.M.I. Dussen B.V.`
-  const tekst =
-    `Geachte heer/mevrouw${order.referentie ? ` ${order.referentie}` : ''},\n\n` +
-    `In de bijlage vindt u onze inkooporder ${order.ordernummer}.\n` +
-    `Gelieve bij alle correspondentie te vermelden: ${order.leverancierscode} - ${order.ordernummer}.\n\n` +
-    `Met vriendelijke groet,\n\n${order.besteldDoor || gebruiker || ''}\nF.M.I. Dussen B.V.\n` +
-    `Tel: +31 (0)416 39 22 33\ninfo@fmid.nl`
-
   const ref = await addDoc(collection(db, 'mail'), {
     to: aan,
     cc,
-    message: {
-      subject: onderwerp,
-      text: tekst,
-      attachments: [
-        {
-          filename: `Inkooporder ${order.ordernummer}.pdf`,
-          content: pdf,
-          encoding: 'base64',
-          contentType: 'application/pdf',
-        },
-      ],
-    },
+    message: await maakInkooporderBericht({ gegevens, gebruiker, handtekening }),
     inkooporderId,
     verzondenDoor: gebruiker || '',
     datum: serverTimestamp(),

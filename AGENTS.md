@@ -71,6 +71,9 @@ Gebruik de bestaande klassen uit `src/index.css` in plaats van nieuwe stijlen te
   omdat de PDF-bijlage buiten de app wordt gerenderd. Houd die waarden gelijk aan `src/index.css`.
 - Bedrijfsgegevens (F.M.I. Dussen B.V., Loswal 5, 4271 BA Dussen, tel./fax, info@fmid.nl,
   www.fmid.nl) staan in `BEDRIJF` in `InkooporderDocument.jsx`; hergebruik die.
+- Uitgaande mail gebruikt het lettertype **Aptos (Hoofdtekst) 12 pt**, gelijk aan Outlook
+  (`MAIL_FONT` in `src/lib/inkooporderMail.js`), en sluit af met de handtekening van de
+  afzender (`handtekening` in `users/{uid}`, anders `standaardHandtekening()`).
 - Nieuwe documentsoorten (bijv. verkooporder, pakbon) bouw je op dezelfde manier, zodat
   afdrukken en mailen (zie `src/lib/inkooporderMail.js`) hetzelfde blijven werken.
 

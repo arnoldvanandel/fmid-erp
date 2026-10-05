@@ -129,6 +129,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
       inkooporderId: inkooporder.id,
       gebruiker: profile?.naam || profile?.email,
       gebruikerEmail: profile?.email,
+      handtekening: profile?.handtekening,
       gegevens,
     })
   }
