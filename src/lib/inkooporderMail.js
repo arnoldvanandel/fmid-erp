@@ -81,18 +81,48 @@ function tekstNaarHtml(tekst) {
     .join('<br>\n')
 }
 
+// Talen voor de inkooporder-mail, in te stellen per leverancier (veld `taal`).
+export const MAIL_TALEN = { nl: 'Nederlands', de: 'Duits', en: 'Engels' }
+
+// Onderwerp, aanhef en tekst per taal. Met een contactpersoon (veld "Uw
+// referentie" op de order) wordt de aanhef persoonlijk; zonder naam algemeen.
+const MAIL_TEKSTEN = {
+  nl: {
+    onderwerp: (nr) => `Inkooporder ${nr} - F.M.I. Dussen B.V.`,
+    aanhef: (naam) => (naam ? `Beste ${naam},` : 'Geachte heer/mevrouw,'),
+    tekst: (nr, ref) =>
+      `In de bijlage vindt u onze inkooporder ${nr}.\n` +
+      `Gelieve bij alle correspondentie te vermelden: ${ref}.`,
+  },
+  de: {
+    onderwerp: (nr) => `Bestellung ${nr} - F.M.I. Dussen B.V.`,
+    aanhef: (naam) => (naam ? `Guten Tag ${naam},` : 'Sehr geehrte Damen und Herren,'),
+    tekst: (nr, ref) =>
+      `anbei erhalten Sie unsere Bestellung ${nr}.\n` +
+      `Bitte geben Sie bei jeglicher Korrespondenz folgende Referenz an: ${ref}.`,
+  },
+  en: {
+    onderwerp: (nr) => `Purchase order ${nr} - F.M.I. Dussen B.V.`,
+    aanhef: (naam) => (naam ? `Dear ${naam},` : 'Dear Sir or Madam,'),
+    tekst: (nr, ref) =>
+      `Please find attached our purchase order ${nr}.\n` +
+      `Please quote the following reference in all correspondence: ${ref}.`,
+  },
+}
+
 // Stelt het bericht op (onderwerp, tekst, HTML met handtekening en de PDF als
 // bijlage) zonder het te versturen.
 export async function maakInkooporderBericht({ gegevens, gebruiker, handtekening }) {
-  const { order } = gegevens
+  const { order, leverancier } = gegevens
+  const t = MAIL_TEKSTEN[leverancier?.taal] || MAIL_TEKSTEN.nl
+  const referentie = `${order.leverancierscode} - ${order.ordernummer}`
   const tekst =
-    `Geachte heer/mevrouw${order.referentie ? ` ${order.referentie}` : ''},\n\n` +
-    `In de bijlage vindt u onze inkooporder ${order.ordernummer}.\n` +
-    `Gelieve bij alle correspondentie te vermelden: ${order.leverancierscode} - ${order.ordernummer}.\n\n` +
+    `${t.aanhef(order.referentie?.trim())}\n\n` +
+    `${t.tekst(order.ordernummer, referentie)}\n\n` +
     (handtekening?.trim() || standaardHandtekening(order.besteldDoor || gebruiker))
 
   return {
-    subject: `Inkooporder ${order.ordernummer} - F.M.I. Dussen B.V.`,
+    subject: t.onderwerp(order.ordernummer),
     text: tekst,
     html: `<div style="${MAIL_FONT};color:#000">${tekstNaarHtml(tekst)}</div>`,
     attachments: [

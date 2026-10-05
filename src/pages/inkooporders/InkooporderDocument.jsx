@@ -33,6 +33,7 @@ function prijs(value) {
 export default function InkooporderDocument({ order, leverancier, regels }) {
   const plaatsregel = [leverancier?.postcode, leverancier?.plaats?.toUpperCase()].filter(Boolean).join(' ')
   const totaal = regels.reduce((sum, r) => sum + (Number(r.aantal) || 0) * (Number(r.prijs) || 0), 0)
+  const valuta = leverancier?.valuta || 'EUR'
 
   return (
     <div className="afdruk-pagina">
@@ -103,7 +104,7 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
             <th className="num">
               Netto prijs
               <br />
-              EUR
+              {valuta}
             </th>
             <th className="num">Leverdatum</th>
           </tr>
@@ -127,7 +128,7 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
 
       {totaal > 0 && (
         <div className="afdruk-totaal">
-          Totaal excl. btw: <strong>EUR {prijs(totaal)}</strong>
+          Totaal excl. btw: <strong>{valuta} {prijs(totaal)}</strong>
         </div>
       )}
 

@@ -2,6 +2,18 @@ import { useState } from 'react'
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
+import { MAIL_TALEN } from '../../lib/inkooporderMail'
+
+// BTW-groepen voor leveranciers, overgenomen uit Axapta.
+const BTW_GROEPEN = {
+  NL: 'BTW NL',
+  DE: 'Duitse BTW (16%)',
+  'EU-IC': 'BTW EU BTW nr. bekend',
+  'EU-belast': 'BTW EU BTW nr. onbekend',
+  'Non-EU': 'BTW buiten EU',
+}
+
+const VALUTA = ['EUR', 'USD', 'GBP', 'CHF']
 
 export default function LeverancierForm({ leverancier, onDone }) {
   const { isAdmin } = useAuth()
@@ -12,12 +24,15 @@ export default function LeverancierForm({ leverancier, onDone }) {
     contactpersoon: leverancier?.contactpersoon || '',
     email: leverancier?.email || '',
     inkooporderEmails: (leverancier?.inkooporderEmails || []).join(', '),
+    taal: leverancier?.taal || 'nl',
     telefoon: leverancier?.telefoon || '',
     straat: leverancier?.straat || '',
     postcode: leverancier?.postcode || '',
     plaats: leverancier?.plaats || '',
     land: leverancier?.land || 'Nederland',
     btwNummer: leverancier?.btwNummer || '',
+    btwGroep: leverancier?.btwGroep || 'NL',
+    valuta: leverancier?.valuta || 'EUR',
     kvkNummer: leverancier?.kvkNummer || '',
     betalingstermijn: leverancier?.betalingstermijn ?? 30,
     geblokkeerd: leverancier?.geblokkeerd || false,
@@ -37,6 +52,10 @@ export default function LeverancierForm({ leverancier, onDone }) {
       setError('Leverancierscode en naam zijn verplicht.')
       return
     }
+    if (form.btwGroep === 'EU-IC' && !form.btwNummer.trim()) {
+      setError('Bij BTW-groep EU-IC (BTW nr. bekend) is het BTW-nummer verplicht.')
+      return
+    }
 
     const payload = {
       leverancierscode: form.leverancierscode.trim(),
@@ -47,12 +66,15 @@ export default function LeverancierForm({ leverancier, onDone }) {
         .split(/[,;\s]+/)
         .map((e) => e.trim())
         .filter(Boolean),
+      taal: form.taal,
       telefoon: form.telefoon.trim(),
       straat: form.straat.trim(),
       postcode: form.postcode.trim(),
       plaats: form.plaats.trim(),
       land: form.land.trim(),
       btwNummer: form.btwNummer.trim(),
+      btwGroep: form.btwGroep,
+      valuta: form.valuta,
       kvkNummer: form.kvkNummer.trim(),
       betalingstermijn: Number(form.betalingstermijn) || 0,
       geblokkeerd: !!form.geblokkeerd,
@@ -138,17 +160,30 @@ export default function LeverancierForm({ leverancier, onDone }) {
         <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
       </div>
 
-      <div className="field">
-        <label>E-mailadressen voor inkooporders</label>
-        <input
-          type="text"
-          value={form.inkooporderEmails}
-          onChange={(e) => set('inkooporderEmails', e.target.value)}
-          placeholder="inkoop@leverancier.nl, verkoop@leverancier.nl"
-        />
-        <span className="hint">
-          Meerdere adressen scheiden met een komma. Leeg = het algemene e-mailadres hierboven.
-        </span>
+      <div className="field-row">
+        <div className="field" style={{ flex: 2 }}>
+          <label>E-mailadressen voor inkooporders</label>
+          <input
+            type="text"
+            value={form.inkooporderEmails}
+            onChange={(e) => set('inkooporderEmails', e.target.value)}
+            placeholder="inkoop@leverancier.nl, verkoop@leverancier.nl"
+          />
+          <span className="hint">
+            Meerdere adressen scheiden met een komma. Leeg = het algemene e-mailadres hierboven.
+          </span>
+        </div>
+        <div className="field">
+          <label>Taal van de mail</label>
+          <select value={form.taal} onChange={(e) => set('taal', e.target.value)}>
+            {Object.entries(MAIL_TALEN).map(([code, label]) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <span className="hint">Onderwerp, aanhef en tekst van de inkooporder-mail</span>
+        </div>
       </div>
 
       <div className="field">
@@ -173,9 +208,37 @@ export default function LeverancierForm({ leverancier, onDone }) {
 
       <div className="field-row">
         <div className="field">
-          <label>BTW-nummer</label>
-          <input type="text" value={form.btwNummer} onChange={(e) => set('btwNummer', e.target.value)} />
+          <label>BTW-groep</label>
+          <select value={form.btwGroep} onChange={(e) => set('btwGroep', e.target.value)}>
+            {Object.entries(BTW_GROEPEN).map(([code, omschrijving]) => (
+              <option key={code} value={code}>
+                {code} — {omschrijving}
+              </option>
+            ))}
+          </select>
         </div>
+        <div className="field">
+          <label>BTW-nummer</label>
+          <input
+            type="text"
+            value={form.btwNummer}
+            onChange={(e) => set('btwNummer', e.target.value)}
+            placeholder={form.btwGroep === 'EU-IC' ? 'Verplicht bij EU-IC' : ''}
+          />
+        </div>
+        <div className="field">
+          <label>Valuta</label>
+          <select value={form.valuta} onChange={(e) => set('valuta', e.target.value)}>
+            {VALUTA.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="field-row">
         <div className="field">
           <label>KvK-nummer</label>
           <input type="text" value={form.kvkNummer} onChange={(e) => set('kvkNummer', e.target.value)} />
