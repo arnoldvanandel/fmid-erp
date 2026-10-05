@@ -121,12 +121,14 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     const eerder = inkooporder.gemaildOp
       ? `\n\nLet op: deze order is al eerder gemaild (${formatDateTime(inkooporder.gemaildOp)}).`
       : ''
-    const vraag = `Inkooporder ${inkooporder.ordernummer} per mail versturen naar:\n\n${aan.join('\n')}${eerder}`
+    const cc = profile?.email && !aan.includes(profile.email) ? `\n\nKopie (cc) naar: ${profile.email}` : ''
+    const vraag = `Inkooporder ${inkooporder.ordernummer} per mail versturen naar:\n\n${aan.join('\n')}${cc}${eerder}`
     if (!confirm(vraag)) return
     setMailen(true)
     await mailInkooporder({
       inkooporderId: inkooporder.id,
       gebruiker: profile?.naam || profile?.email,
+      gebruikerEmail: profile?.email,
       gegevens,
     })
   }
@@ -462,7 +464,8 @@ function MailStatus({ inkooporder }) {
 
   return (
     <div className={'banner ' + (state === 'ERROR' ? 'banner-danger' : state === 'SUCCESS' ? 'banner-info' : 'banner-warning')}>
-      Gemaild naar {(inkooporder.gemaildNaar || []).join(', ')} op {formatDateTime(inkooporder.gemaildOp)} — {label}
+      Gemaild naar {(inkooporder.gemaildNaar || []).join(', ')}
+      {inkooporder.gemaildCc?.length ? ` (cc: ${inkooporder.gemaildCc.join(', ')})` : ''} op {formatDateTime(inkooporder.gemaildOp)} — {label}
     </div>
   )
 }

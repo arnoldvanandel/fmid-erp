@@ -38,7 +38,7 @@ export async function maakPdfBase64(gegevens) {
 // `mail`. De Cloud Function `verstuurMail` (functions/index.js) pikt die op en
 // verstuurt 'm via SMTP; het resultaat (verzonden/fout) schrijft de functie
 // terug in het veld `delivery` van hetzelfde document.
-export async function mailInkooporder({ inkooporderId, gebruiker, gegevens }) {
+export async function mailInkooporder({ inkooporderId, gebruiker, gebruikerEmail, gegevens }) {
   if (!gegevens) gegevens = await laadInkooporderVoorAfdruk(inkooporderId)
   const { order, leverancier } = gegevens
   const aan = inkooporderEmailadressen(leverancier)
@@ -48,6 +48,10 @@ export async function mailInkooporder({ inkooporderId, gebruiker, gegevens }) {
         'Vul dit in bij Leveranciers → E-mailadressen voor inkooporders.'
     )
   }
+
+  // De gebruiker die de order verstuurt krijgt een kopie (cc), tenzij die
+  // al als ontvanger op de mail staat.
+  const cc = gebruikerEmail && !aan.includes(gebruikerEmail) ? [gebruikerEmail] : []
 
   const pdf = await maakPdfBase64(gegevens)
   const onderwerp = `Inkooporder ${order.ordernummer} - F.M.I. Dussen B.V.`
@@ -60,6 +64,7 @@ export async function mailInkooporder({ inkooporderId, gebruiker, gegevens }) {
 
   const ref = await addDoc(collection(db, 'mail'), {
     to: aan,
+    cc,
     message: {
       subject: onderwerp,
       text: tekst,
@@ -79,10 +84,11 @@ export async function mailInkooporder({ inkooporderId, gebruiker, gegevens }) {
 
   await wijzigInkooporder(inkooporderId, {
     gemaildNaar: aan,
+    gemaildCc: cc,
     gemaildOp: serverTimestamp(),
     mailId: ref.id,
     ...(order.status === 'concept' ? { status: 'besteld' } : {}),
   })
 
-  return { aan, mailId: ref.id }
+  return { aan, cc, mailId: ref.id }
 }
