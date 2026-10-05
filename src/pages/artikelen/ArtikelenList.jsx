@@ -5,6 +5,12 @@ import { formatCurrency, formatNumber } from '../../lib/format'
 import Modal from '../../components/Modal'
 import ArtikelForm from './ArtikelForm'
 
+// Prijzen uit Axapta gelden soms per 100 of 1000 stuks; toon dat erbij.
+function prijsMetEenheid(prijs, hoeveelheid) {
+  const n = Number(hoeveelheid) || 1
+  return n === 1 ? formatCurrency(prijs) : `${formatCurrency(prijs)} / ${formatNumber(n)}`
+}
+
 export default function ArtikelenList() {
   const { data: artikelen, loading, error } = useCollection('artikelen', {
     orderByField: 'artikelnummer',
@@ -82,8 +88,8 @@ export default function ArtikelenList() {
                         )}
                       </td>
                       <td>{a.eenheid}</td>
-                      <td className="num">{formatCurrency(a.inkoopprijs)}</td>
-                      <td className="num">{formatCurrency(a.verkoopprijs)}</td>
+                      <td className="num">{prijsMetEenheid(a.inkoopprijs, a.inkoopprijsHoeveelheid)}</td>
+                      <td className="num">{prijsMetEenheid(a.verkoopprijs, a.verkoopprijsHoeveelheid)}</td>
                       <td className="num">
                         {formatNumber(totaal)}
                         {laag && (

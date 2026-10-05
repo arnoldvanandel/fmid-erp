@@ -73,7 +73,12 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   function kiesArtikel(id) {
     setArtikelId(id)
     const artikel = artikelenById[id]
-    if (artikel) setPrijs(artikel.inkoopprijs ?? '')
+    // Inkoopprijzen uit Axapta gelden vaak per 100 of 1000 stuks; een
+    // orderregel rekent met de prijs per stuk.
+    if (artikel) {
+      const perStuk = (Number(artikel.inkoopprijs) || 0) / (Number(artikel.inkoopprijsHoeveelheid) || 1)
+      setPrijs(Math.round(perStuk * 10000) / 10000)
+    }
   }
 
   async function handleHeaderSubmit(e) {
