@@ -1,0 +1,187 @@
+/* Printbare inkooporder: A4, huisstijlkleuren uit het FMID-logo. */
+
+.afdruk-scherm {
+  --fmid-blauw: #3a4899;
+  --fmid-groen: #5ab031;
+  min-height: 100vh;
+  background: #e6e8ec;
+  padding: 24px 16px 48px;
+}
+
+.afdruk-toolbar {
+  max-width: 210mm;
+  margin: 0 auto 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.afdruk-pagina {
+  box-sizing: border-box;
+  position: relative;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 14mm 16mm 40mm;
+  background: #fff;
+  color: #111;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10pt;
+  line-height: 1.35;
+  box-shadow: 0 4px 20px rgba(20, 24, 32, 0.15);
+}
+
+.afdruk-kop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10mm;
+  padding-bottom: 5mm;
+  border-bottom: 2px solid var(--fmid-blauw);
+}
+
+.afdruk-logo {
+  width: 62mm;
+  height: auto;
+}
+
+.afdruk-bedrijf {
+  display: flex;
+  gap: 8mm;
+  font-size: 9pt;
+}
+
+.afdruk-bedrijf strong {
+  color: var(--fmid-blauw);
+}
+
+.afdruk-adres {
+  margin: 12mm 0 0 95mm;
+  min-height: 22mm;
+  font-size: 11pt;
+}
+
+.afdruk-titel {
+  margin: 6mm 0 4mm;
+  font-size: 16pt;
+  font-weight: 700;
+  color: var(--fmid-blauw);
+}
+
+.afdruk-gegevens {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6mm;
+}
+
+.afdruk-gegevens dl {
+  display: grid;
+  grid-template-columns: 34mm auto;
+  margin: 0;
+  row-gap: 1mm;
+}
+
+.afdruk-gegevens dl:last-child {
+  width: 72mm;
+}
+
+.afdruk-gegevens dt::after {
+  content: ':';
+}
+
+.afdruk-gegevens dd {
+  margin: 0;
+}
+
+.afdruk-regels {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.afdruk-regels th {
+  text-align: left;
+  font-weight: 600;
+  vertical-align: bottom;
+  padding: 2mm 2mm 3mm;
+  border-bottom: 1.5px solid var(--fmid-blauw);
+}
+
+.afdruk-regels td {
+  vertical-align: top;
+  padding: 3mm 2mm 1mm;
+}
+
+.afdruk-regels th:first-child,
+.afdruk-regels td:first-child {
+  width: 22mm;
+}
+
+.afdruk-regels th:nth-child(2),
+.afdruk-regels td:nth-child(2) {
+  width: 14mm;
+}
+
+.afdruk-regels .num {
+  text-align: right;
+}
+
+.afdruk-regels tbody tr:first-child td {
+  padding-top: 5mm;
+}
+
+.afdruk-totaal {
+  margin-top: 4mm;
+  padding-top: 2mm;
+  border-top: 1px solid #c4cad3;
+  text-align: right;
+}
+
+.afdruk-opmerkingen {
+  margin: 8mm 0 0 4mm;
+  white-space: pre-wrap;
+}
+
+.afdruk-voet {
+  position: absolute;
+  left: 16mm;
+  right: 16mm;
+  bottom: 12mm;
+}
+
+.afdruk-correspondentie {
+  display: flex;
+  gap: 18mm;
+  padding-top: 3mm;
+  border-top: 2px solid var(--fmid-groen);
+}
+
+.afdruk-kleine-letters {
+  margin-top: 6mm;
+  text-align: center;
+  font-size: 7pt;
+  color: #555;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  .afdruk-scherm {
+    padding: 0;
+    background: #fff;
+  }
+
+  .afdruk-toolbar {
+    display: none;
+  }
+
+  .afdruk-pagina {
+    height: 297mm;
+    overflow: hidden;
+    margin: 0;
+    box-shadow: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -22,19 +22,28 @@ async function volgendOrdernummer() {
 export async function maakInkooporder({ leverancier, gebruiker }) {
   if (!leverancier?.id) throw new Error('Geen leverancier gekozen.')
 
+  const vandaag = new Date().toISOString().slice(0, 10)
+
   const ordernummer = await volgendOrdernummer()
-  const ref = await addDoc(collection(db, 'inkooporders'), {
+  const order = {
     ordernummer,
     leverancierId: leverancier.id,
     leverancierscode: leverancier.leverancierscode || '',
     leverancierNaam: leverancier.naam || '',
     status: 'concept',
+    besteldatum: vandaag,
     verwachteLeverdatum: '',
+    // Kopvelden zoals op de Axapta-inkooporder: "Uw referentie" (contact bij
+    // de leverancier), "Besteld door" en de leveringsvoorwaarde.
+    referentie: leverancier.contactpersoon || '',
+    besteldDoor: gebruiker || '',
+    levering: '',
     opmerkingen: '',
     aangemaaktDoor: gebruiker || '',
     datum: serverTimestamp(),
-  })
-  return { id: ref.id, ordernummer }
+  }
+  const ref = await addDoc(collection(db, 'inkooporders'), order)
+  return { ...order, id: ref.id, datum: new Date() }
 }
 
 export async function wijzigInkooporder(inkooporderId, updates) {
@@ -48,7 +57,15 @@ export async function verwijderInkooporder(inkooporderId) {
 // Voegt een regel (artikel + aantal + inkoopprijs) toe aan een inkooporder.
 // Regelnummers lopen op in stappen van 10, zodat er later tussen bestaande
 // regels in genummerd kan worden — zelfde patroon als routeregels.
-export async function voegInkooporderRegelToe({ inkooporder, artikel, aantal, prijs, hoogsteRegelnummer = 0 }) {
+export async function voegInkooporderRegelToe({
+  inkooporder,
+  artikel,
+  aantal,
+  prijs,
+  leverdatum = '',
+  leverancierArtikelnummer = '',
+  hoogsteRegelnummer = 0,
+}) {
   if (!artikel?.id) throw new Error('Kies een artikel.')
   const n = Number(aantal)
   if (!Number.isFinite(n) || n <= 0) {
@@ -68,6 +85,8 @@ export async function voegInkooporderRegelToe({ inkooporder, artikel, aantal, pr
     eenheid: artikel.eenheid || '',
     aantal: n,
     prijs: p,
+    leverdatum: leverdatum || inkooporder.verwachteLeverdatum || '',
+    leverancierArtikelnummer: (leverancierArtikelnummer || '').trim(),
   })
 }
 

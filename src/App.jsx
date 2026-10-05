@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import ArtikelenList from './pages/artikelen/ArtikelenList'
 import LeveranciersList from './pages/leveranciers/LeveranciersList'
 import InkoopordersList from './pages/inkooporders/InkoopordersList'
+import InkooporderAfdruk from './pages/inkooporders/InkooporderAfdruk'
 import VoorraadOverzicht from './pages/voorraad/VoorraadOverzicht'
 import ProductieordersList from './pages/productieorders/ProductieordersList'
 import LocatiesBeheer from './pages/locaties/LocatiesBeheer'
@@ -68,6 +69,14 @@ export default function App() {
                 <Layout>
                   <InkoopordersList />
                 </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inkooporders/:id/afdruk"
+            element={
+              <ProtectedRoute>
+                <InkooporderAfdruk />
               </ProtectedRoute>
             }
           />

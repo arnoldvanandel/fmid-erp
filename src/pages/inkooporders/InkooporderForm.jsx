@@ -22,6 +22,10 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const { isAdmin } = useAuth()
   const [status, setStatus] = useState(inkooporder.status || 'concept')
   const [verwachteLeverdatum, setVerwachteLeverdatum] = useState(inkooporder.verwachteLeverdatum || '')
+  const [besteldatum, setBesteldatum] = useState(inkooporder.besteldatum || '')
+  const [referentie, setReferentie] = useState(inkooporder.referentie || '')
+  const [besteldDoor, setBesteldDoor] = useState(inkooporder.besteldDoor || '')
+  const [levering, setLevering] = useState(inkooporder.levering || '')
   const [opmerkingen, setOpmerkingen] = useState(inkooporder.opmerkingen || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -55,6 +59,8 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const [artikelId, setArtikelId] = useState('')
   const [aantal, setAantal] = useState('')
   const [prijs, setPrijs] = useState('')
+  const [leverdatum, setLeverdatum] = useState('')
+  const [leverancierArtikelnummer, setLeverancierArtikelnummer] = useState('')
   const [regelSaving, setRegelSaving] = useState(false)
   const [regelError, setRegelError] = useState(null)
 
@@ -71,7 +77,11 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     try {
       await wijzigInkooporder(inkooporder.id, {
         status,
+        besteldatum,
         verwachteLeverdatum,
+        referentie: referentie.trim(),
+        besteldDoor: besteldDoor.trim(),
+        levering: levering.trim(),
         opmerkingen: opmerkingen.trim(),
       })
       onDone?.()
@@ -104,14 +114,33 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     }
     setRegelSaving(true)
     try {
-      await voegInkooporderRegelToe({ inkooporder, artikel, aantal, prijs, hoogsteRegelnummer })
+      await voegInkooporderRegelToe({
+        inkooporder: { ...inkooporder, verwachteLeverdatum },
+        artikel,
+        aantal,
+        prijs,
+        leverdatum,
+        leverancierArtikelnummer,
+        hoogsteRegelnummer,
+      })
       setArtikelId('')
       setAantal('')
       setPrijs('')
+      setLeverdatum('')
+      setLeverancierArtikelnummer('')
     } catch (err) {
       setRegelError(err.message)
     } finally {
       setRegelSaving(false)
+    }
+  }
+
+  async function handleRegelTekstChange(regel, veld, value) {
+    if (value === (regel[veld] || '')) return
+    try {
+      await wijzigInkooporderRegel(regel.id, { [veld]: value.trim() })
+    } catch (err) {
+      setRegelError(err.message)
     }
   }
 
@@ -162,12 +191,49 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         </div>
       </div>
 
+      <div className="field-row">
+        <div className="field">
+          <label>Besteldatum</label>
+          <input type="date" value={besteldatum} onChange={(e) => setBesteldatum(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Uw referentie</label>
+          <input
+            type="text"
+            value={referentie}
+            onChange={(e) => setReferentie(e.target.value)}
+            placeholder="Contactpersoon leverancier"
+          />
+        </div>
+        <div className="field">
+          <label>Besteld door</label>
+          <input type="text" value={besteldDoor} onChange={(e) => setBesteldDoor(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Levering</label>
+          <input
+            type="text"
+            value={levering}
+            onChange={(e) => setLevering(e.target.value)}
+            placeholder="bijv. franco huis"
+          />
+        </div>
+      </div>
+
       <div className="field">
-        <label>Opmerkingen</label>
+        <label>Opmerkingen (komen onder de regels op de inkooporder)</label>
         <textarea rows={2} value={opmerkingen} onChange={(e) => setOpmerkingen(e.target.value)} />
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 18 }}>
+        <a
+          className="btn btn-secondary btn-sm"
+          href={`/inkooporders/${inkooporder.id}/afdruk`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          PDF / afdrukken
+        </a>
         <button type="button" className="btn btn-primary btn-sm" onClick={handleHeaderSubmit} disabled={saving}>
           {saving ? 'Opslaan…' : 'Kopgegevens opslaan'}
         </button>
@@ -211,6 +277,19 @@ export default function InkooporderForm({ inkooporder, onDone }) {
             style={{ maxWidth: 120 }}
           />
         </div>
+        <div className="field">
+          <label>Leverdatum</label>
+          <input type="date" value={leverdatum} onChange={(e) => setLeverdatum(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Art.nr. leverancier</label>
+          <input
+            type="text"
+            value={leverancierArtikelnummer}
+            onChange={(e) => setLeverancierArtikelnummer(e.target.value)}
+            style={{ maxWidth: 140 }}
+          />
+        </div>
         <div className="field" style={{ flex: 'none' }}>
           <button type="button" className="btn btn-secondary" onClick={handleRegelToevoegen} disabled={regelSaving}>
             {regelSaving ? 'Toevoegen…' : '+ Toevoegen'}
@@ -233,6 +312,8 @@ export default function InkooporderForm({ inkooporder, onDone }) {
                 <th>Eenheid</th>
                 <th className="num">Prijs</th>
                 <th className="num">Subtotaal</th>
+                <th>Leverdatum</th>
+                <th>Art.nr. leverancier</th>
                 <th></th>
               </tr>
             </thead>
@@ -263,6 +344,21 @@ export default function InkooporderForm({ inkooporder, onDone }) {
                     />
                   </td>
                   <td className="num">{formatCurrency((Number(r.aantal) || 0) * (Number(r.prijs) || 0))}</td>
+                  <td>
+                    <input
+                      type="date"
+                      defaultValue={r.leverdatum || ''}
+                      onBlur={(e) => handleRegelTekstChange(r, 'leverdatum', e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      defaultValue={r.leverancierArtikelnummer || ''}
+                      onBlur={(e) => handleRegelTekstChange(r, 'leverancierArtikelnummer', e.target.value)}
+                      style={{ maxWidth: 120 }}
+                    />
+                  </td>
                   <td style={{ textAlign: 'right' }}>
                     {isAdmin && (
                       <button

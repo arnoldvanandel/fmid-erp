@@ -32,11 +32,11 @@ function NieuweInkooporderForm({ onCreated, onCancel }) {
     }
     setSaving(true)
     try {
-      const { id, ordernummer } = await maakInkooporder({
+      const order = await maakInkooporder({
         leverancier,
         gebruiker: profile?.naam || profile?.email,
       })
-      onCreated({ id, ordernummer, leverancierId: leverancier.id, leverancierscode: leverancier.leverancierscode, leverancierNaam: leverancier.naam, status: 'concept', verwachteLeverdatum: '', opmerkingen: '' })
+      onCreated(order)
     } catch (err) {
       setError(err.message)
     } finally {
