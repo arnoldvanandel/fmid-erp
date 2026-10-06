@@ -15,6 +15,15 @@ const BTW_GROEPEN = {
 
 const VALUTA = ['EUR', 'USD', 'GBP', 'CHF']
 
+// Tabbladen zoals bij de leverancier in Axapta.
+const TABS = [
+  { id: 'algemeen', label: 'Algemeen' },
+  { id: 'adres', label: 'Adres' },
+  { id: 'contact', label: 'Contactgegevens' },
+  { id: 'inkooporder', label: 'Inkooporder' },
+  { id: 'betaling', label: 'Betaling' },
+]
+
 export default function LeverancierForm({ leverancier, onDone }) {
   const { isAdmin } = useAuth()
   const isNew = !leverancier?.id
@@ -39,6 +48,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState('algemeen')
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -54,6 +64,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
     }
     if (form.btwGroep === 'EU-IC' && !form.btwNummer.trim()) {
       setError('Bij BTW-groep EU-IC (BTW nr. bekend) is het BTW-nummer verplicht.')
+      setActiveTab('betaling')
       return
     }
 
@@ -113,146 +124,179 @@ export default function LeverancierForm({ leverancier, onDone }) {
       {error && <div className="banner banner-danger">{error}</div>}
 
       <div className="field-row">
-        <div className="field">
-          <label>Leverancierscode</label>
+        <div className="field" style={{ maxWidth: 160 }}>
+          <label>Leverancier</label>
           <input
             type="text"
             value={form.leverancierscode}
             onChange={(e) => set('leverancierscode', e.target.value)}
-            placeholder="bijv. LEV001"
+            placeholder="bijv. 7001"
           />
         </div>
-        <div className="field" style={{ justifyContent: 'flex-end' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 0 }}>
-            <input
-              type="checkbox"
-              checked={form.geblokkeerd}
-              onChange={(e) => set('geblokkeerd', e.target.checked)}
-            />
-            Geblokkeerd
-          </label>
-          <span className="hint">Niet meer inkopen bij deze leverancier</span>
+        <div className="field" style={{ flex: 3 }}>
+          <label>Naam</label>
+          <input type="text" value={form.naam} onChange={(e) => set('naam', e.target.value)} />
         </div>
       </div>
 
-      <div className="field">
-        <label>Naam</label>
-        <input type="text" value={form.naam} onChange={(e) => set('naam', e.target.value)} />
+      <div className="tab-row">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={'tab-btn' + (activeTab === t.id ? ' active' : '')}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      <div className="field-row">
-        <div className="field">
-          <label>Contactpersoon</label>
-          <input
-            type="text"
-            value={form.contactpersoon}
-            onChange={(e) => set('contactpersoon', e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label>Telefoon</label>
-          <input type="text" value={form.telefoon} onChange={(e) => set('telefoon', e.target.value)} />
-        </div>
-      </div>
+      <div className="tab-paneel">
+        {activeTab === 'algemeen' && (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>KvK-nummer</label>
+                <input type="text" value={form.kvkNummer} onChange={(e) => set('kvkNummer', e.target.value)} />
+              </div>
+              <div className="field" style={{ justifyContent: 'flex-end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.geblokkeerd}
+                    onChange={(e) => set('geblokkeerd', e.target.checked)}
+                  />
+                  Geblokkeerd
+                </label>
+                <span className="hint">Niet meer inkopen bij deze leverancier</span>
+              </div>
+            </div>
+          </>
+        )}
 
-      <div className="field">
-        <label>E-mail</label>
-        <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
-      </div>
+        {activeTab === 'adres' && (
+          <>
+            <div className="field">
+              <label>Straat + huisnummer</label>
+              <input type="text" value={form.straat} onChange={(e) => set('straat', e.target.value)} />
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Postcode</label>
+                <input type="text" value={form.postcode} onChange={(e) => set('postcode', e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Plaats</label>
+                <input type="text" value={form.plaats} onChange={(e) => set('plaats', e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Land</label>
+                <input type="text" value={form.land} onChange={(e) => set('land', e.target.value)} />
+              </div>
+            </div>
+          </>
+        )}
 
-      <div className="field-row">
-        <div className="field" style={{ flex: 2 }}>
-          <label>E-mailadressen voor inkooporders</label>
-          <input
-            type="text"
-            value={form.inkooporderEmails}
-            onChange={(e) => set('inkooporderEmails', e.target.value)}
-            placeholder="inkoop@leverancier.nl, verkoop@leverancier.nl"
-          />
-          <span className="hint">
-            Meerdere adressen scheiden met een komma. Leeg = het algemene e-mailadres hierboven.
-          </span>
-        </div>
-        <div className="field">
-          <label>Taal van de mail</label>
-          <select value={form.taal} onChange={(e) => set('taal', e.target.value)}>
-            {Object.entries(MAIL_TALEN).map(([code, label]) => (
-              <option key={code} value={code}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <span className="hint">Onderwerp, aanhef en tekst van de inkooporder-mail</span>
-        </div>
-      </div>
+        {activeTab === 'contact' && (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Contactpersoon</label>
+                <input
+                  type="text"
+                  value={form.contactpersoon}
+                  onChange={(e) => set('contactpersoon', e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Telefoon</label>
+                <input type="text" value={form.telefoon} onChange={(e) => set('telefoon', e.target.value)} />
+              </div>
+            </div>
+            <div className="field">
+              <label>E-mail</label>
+              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
+            </div>
+          </>
+        )}
 
-      <div className="field">
-        <label>Straat + huisnummer</label>
-        <input type="text" value={form.straat} onChange={(e) => set('straat', e.target.value)} />
-      </div>
+        {activeTab === 'inkooporder' && (
+          <div className="field-row">
+            <div className="field" style={{ flex: 2 }}>
+              <label>E-mailadressen voor inkooporders</label>
+              <input
+                type="text"
+                value={form.inkooporderEmails}
+                onChange={(e) => set('inkooporderEmails', e.target.value)}
+                placeholder="inkoop@leverancier.nl, verkoop@leverancier.nl"
+              />
+              <span className="hint">
+                Meerdere adressen scheiden met een komma. Leeg = het algemene e-mailadres (tabblad
+                Contactgegevens).
+              </span>
+            </div>
+            <div className="field">
+              <label>Taal van de mail</label>
+              <select value={form.taal} onChange={(e) => set('taal', e.target.value)}>
+                {Object.entries(MAIL_TALEN).map(([code, label]) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <span className="hint">Onderwerp, aanhef en tekst van de inkooporder-mail</span>
+            </div>
+          </div>
+        )}
 
-      <div className="field-row">
-        <div className="field">
-          <label>Postcode</label>
-          <input type="text" value={form.postcode} onChange={(e) => set('postcode', e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Plaats</label>
-          <input type="text" value={form.plaats} onChange={(e) => set('plaats', e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Land</label>
-          <input type="text" value={form.land} onChange={(e) => set('land', e.target.value)} />
-        </div>
-      </div>
-
-      <div className="field-row">
-        <div className="field">
-          <label>BTW-groep</label>
-          <select value={form.btwGroep} onChange={(e) => set('btwGroep', e.target.value)}>
-            {Object.entries(BTW_GROEPEN).map(([code, omschrijving]) => (
-              <option key={code} value={code}>
-                {code} — {omschrijving}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>BTW-nummer</label>
-          <input
-            type="text"
-            value={form.btwNummer}
-            onChange={(e) => set('btwNummer', e.target.value)}
-            placeholder={form.btwGroep === 'EU-IC' ? 'Verplicht bij EU-IC' : ''}
-          />
-        </div>
-        <div className="field">
-          <label>Valuta</label>
-          <select value={form.valuta} onChange={(e) => set('valuta', e.target.value)}>
-            {VALUTA.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="field-row">
-        <div className="field">
-          <label>KvK-nummer</label>
-          <input type="text" value={form.kvkNummer} onChange={(e) => set('kvkNummer', e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Betalingstermijn (dagen)</label>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={form.betalingstermijn}
-            onChange={(e) => set('betalingstermijn', e.target.value)}
-          />
-        </div>
+        {activeTab === 'betaling' && (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>BTW-groep</label>
+                <select value={form.btwGroep} onChange={(e) => set('btwGroep', e.target.value)}>
+                  {Object.entries(BTW_GROEPEN).map(([code, omschrijving]) => (
+                    <option key={code} value={code}>
+                      {code} — {omschrijving}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>BTW-nummer</label>
+                <input
+                  type="text"
+                  value={form.btwNummer}
+                  onChange={(e) => set('btwNummer', e.target.value)}
+                  placeholder={form.btwGroep === 'EU-IC' ? 'Verplicht bij EU-IC' : ''}
+                />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Valuta</label>
+                <select value={form.valuta} onChange={(e) => set('valuta', e.target.value)}>
+                  {VALUTA.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Betalingstermijn (dagen)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.betalingstermijn}
+                  onChange={(e) => set('betalingstermijn', e.target.value)}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="modal-actions" style={{ justifyContent: !isNew && isAdmin ? 'space-between' : 'flex-end' }}>

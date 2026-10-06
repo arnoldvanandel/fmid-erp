@@ -401,6 +401,12 @@ input.invalid, select.invalid {
   border-bottom-color: var(--color-primary);
 }
 
+/* Vaste hoogte voor de inhoud van een tabblad, zodat een dialoog niet
+   verspringt bij het wisselen van tabblad. */
+.tab-paneel {
+  min-height: 150px;
+}
+
 /* ---------- Tables ---------- */
 
 table.data-table {
