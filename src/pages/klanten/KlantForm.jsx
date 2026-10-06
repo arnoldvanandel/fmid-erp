@@ -3,38 +3,46 @@ import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from '
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import { MAIL_TALEN } from '../../lib/inkooporderMail'
-import { BTW_GROEPEN, VALUTA } from '../../lib/stamgegevens'
+import { BTW_GROEPEN, KLANTGROEPEN, LEVERINGSVOORWAARDEN, VALUTA } from '../../lib/stamgegevens'
 
-// Tabbladen zoals bij de leverancier in Axapta.
+// Tabbladen zoals bij de klant in Axapta; zelfde opzet als LeverancierForm.
 const TABS = [
   { id: 'algemeen', label: 'Algemeen' },
   { id: 'adres', label: 'Adres' },
   { id: 'contact', label: 'Contactgegevens' },
-  { id: 'inkooporder', label: 'Inkooporder' },
+  { id: 'levering', label: 'Levering' },
   { id: 'betaling', label: 'Betaling' },
 ]
 
-export default function LeverancierForm({ leverancier, onDone }) {
+export default function KlantForm({ klant, onDone }) {
   const { isAdmin } = useAuth()
-  const isNew = !leverancier?.id
+  const isNew = !klant?.id
   const [form, setForm] = useState({
-    leverancierscode: leverancier?.leverancierscode || '',
-    naam: leverancier?.naam || '',
-    contactpersoon: leverancier?.contactpersoon || '',
-    email: leverancier?.email || '',
-    inkooporderEmails: (leverancier?.inkooporderEmails || []).join(', '),
-    taal: leverancier?.taal || 'nl',
-    telefoon: leverancier?.telefoon || '',
-    straat: leverancier?.straat || '',
-    postcode: leverancier?.postcode || '',
-    plaats: leverancier?.plaats || '',
-    land: leverancier?.land || 'Nederland',
-    btwNummer: leverancier?.btwNummer || '',
-    btwGroep: leverancier?.btwGroep || 'NL',
-    valuta: leverancier?.valuta || 'EUR',
-    kvkNummer: leverancier?.kvkNummer || '',
-    betalingstermijn: leverancier?.betalingstermijn ?? 30,
-    geblokkeerd: leverancier?.geblokkeerd || false,
+    klantcode: klant?.klantcode || '',
+    naam: klant?.naam || '',
+    zoeknaam: klant?.zoeknaam || '',
+    klantgroep: klant?.klantgroep || 'NL',
+    contactpersoon: klant?.contactpersoon || '',
+    telefoon: klant?.telefoon || '',
+    mobiel: klant?.mobiel || '',
+    fax: klant?.fax || '',
+    email: klant?.email || '',
+    website: klant?.website || '',
+    straat: klant?.straat || '',
+    postcode: klant?.postcode || '',
+    plaats: klant?.plaats || '',
+    land: klant?.land || 'Nederland',
+    adresControleren: klant?.adresControleren || false,
+    leveringsvoorwaarde: klant?.leveringsvoorwaarde || '',
+    leveringswijze: klant?.leveringswijze || '',
+    taal: klant?.taal || 'nl',
+    btwGroep: klant?.btwGroep || 'NL',
+    btwNummer: klant?.btwNummer || '',
+    valuta: klant?.valuta || 'EUR',
+    betalingstermijn: klant?.betalingstermijn ?? 30,
+    inclBtw: klant?.inclBtw || false,
+    kvkNummer: klant?.kvkNummer || '',
+    geblokkeerd: klant?.geblokkeerd || false,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -48,8 +56,8 @@ export default function LeverancierForm({ leverancier, onDone }) {
     e.preventDefault()
     setError(null)
 
-    if (!form.leverancierscode.trim() || !form.naam.trim()) {
-      setError('Leverancierscode en naam zijn verplicht.')
+    if (!form.klantcode.trim() || !form.naam.trim()) {
+      setError('Klantnummer en naam zijn verplicht.')
       return
     }
     if (form.btwGroep === 'EU-IC' && !form.btwNummer.trim()) {
@@ -59,25 +67,30 @@ export default function LeverancierForm({ leverancier, onDone }) {
     }
 
     const payload = {
-      leverancierscode: form.leverancierscode.trim(),
+      klantcode: form.klantcode.trim(),
       naam: form.naam.trim(),
+      zoeknaam: form.zoeknaam.trim(),
+      klantgroep: form.klantgroep,
       contactpersoon: form.contactpersoon.trim(),
-      email: form.email.trim(),
-      inkooporderEmails: form.inkooporderEmails
-        .split(/[,;\s]+/)
-        .map((e) => e.trim())
-        .filter(Boolean),
-      taal: form.taal,
       telefoon: form.telefoon.trim(),
+      mobiel: form.mobiel.trim(),
+      fax: form.fax.trim(),
+      email: form.email.trim(),
+      website: form.website.trim(),
       straat: form.straat.trim(),
       postcode: form.postcode.trim(),
       plaats: form.plaats.trim(),
       land: form.land.trim(),
-      btwNummer: form.btwNummer.trim(),
+      adresControleren: !!form.adresControleren,
+      leveringsvoorwaarde: form.leveringsvoorwaarde,
+      leveringswijze: form.leveringswijze.trim(),
+      taal: form.taal,
       btwGroep: form.btwGroep,
+      btwNummer: form.btwNummer.trim(),
       valuta: form.valuta,
-      kvkNummer: form.kvkNummer.trim(),
       betalingstermijn: Number(form.betalingstermijn) || 0,
+      inclBtw: !!form.inclBtw,
+      kvkNummer: form.kvkNummer.trim(),
       geblokkeerd: !!form.geblokkeerd,
     }
 
@@ -85,9 +98,9 @@ export default function LeverancierForm({ leverancier, onDone }) {
     try {
       if (isNew) {
         payload.createdAt = serverTimestamp()
-        await addDoc(collection(db, 'leveranciers'), payload)
+        await addDoc(collection(db, 'klanten'), payload)
       } else {
-        await updateDoc(doc(db, 'leveranciers', leverancier.id), payload)
+        await updateDoc(doc(db, 'klanten', klant.id), payload)
       }
       onDone?.()
     } catch (e) {
@@ -98,10 +111,10 @@ export default function LeverancierForm({ leverancier, onDone }) {
   }
 
   async function handleDelete() {
-    if (!confirm(`Leverancier ${leverancier.leverancierscode} verwijderen?`)) return
+    if (!confirm(`Klant ${klant.klantcode} verwijderen?`)) return
     setSaving(true)
     try {
-      await deleteDoc(doc(db, 'leveranciers', leverancier.id))
+      await deleteDoc(doc(db, 'klanten', klant.id))
       onDone?.()
     } catch (e) {
       setError(e.message)
@@ -115,12 +128,12 @@ export default function LeverancierForm({ leverancier, onDone }) {
 
       <div className="field-row">
         <div className="field" style={{ maxWidth: 160 }}>
-          <label>Leverancier</label>
+          <label>Klant</label>
           <input
             type="text"
-            value={form.leverancierscode}
-            onChange={(e) => set('leverancierscode', e.target.value)}
-            placeholder="bijv. 7001"
+            value={form.klantcode}
+            onChange={(e) => set('klantcode', e.target.value)}
+            placeholder="bijv. 5000"
           />
         </div>
         <div className="field" style={{ flex: 3 }}>
@@ -138,6 +151,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
             onClick={() => setActiveTab(t.id)}
           >
             {t.label}
+            {t.id === 'adres' && form.adresControleren && ' ⚠'}
           </button>
         ))}
       </div>
@@ -145,6 +159,22 @@ export default function LeverancierForm({ leverancier, onDone }) {
       <div className="tab-paneel">
         {activeTab === 'algemeen' && (
           <>
+            <div className="field-row">
+              <div className="field">
+                <label>Zoeknaam</label>
+                <input type="text" value={form.zoeknaam} onChange={(e) => set('zoeknaam', e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Klantgroep</label>
+                <select value={form.klantgroep} onChange={(e) => set('klantgroep', e.target.value)}>
+                  {KLANTGROEPEN.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="field-row">
               <div className="field">
                 <label>KvK-nummer</label>
@@ -159,7 +189,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
                   />
                   Geblokkeerd
                 </label>
-                <span className="hint">Niet meer inkopen bij deze leverancier</span>
+                <span className="hint">Niet meer aan deze klant verkopen</span>
               </div>
             </div>
           </>
@@ -167,6 +197,22 @@ export default function LeverancierForm({ leverancier, onDone }) {
 
         {activeTab === 'adres' && (
           <>
+            {form.adresControleren && (
+              <div className="banner banner-warning">
+                <div>
+                  Dit adres kon bij de import uit Axapta niet automatisch worden opgesplitst. Origineel:{' '}
+                  <strong>{klant?.adresAxapta || '(leeg)'}</strong>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={!form.adresControleren}
+                      onChange={(e) => set('adresControleren', !e.target.checked)}
+                    />
+                    Adres is gecontroleerd
+                  </label>
+                </div>
+              </div>
+            )}
             <div className="field">
               <label>Straat + huisnummer</label>
               <input type="text" value={form.straat} onChange={(e) => set('straat', e.target.value)} />
@@ -203,31 +249,55 @@ export default function LeverancierForm({ leverancier, onDone }) {
                 <label>Telefoon</label>
                 <input type="text" value={form.telefoon} onChange={(e) => set('telefoon', e.target.value)} />
               </div>
+              <div className="field">
+                <label>Mobiel</label>
+                <input type="text" value={form.mobiel} onChange={(e) => set('mobiel', e.target.value)} />
+              </div>
             </div>
-            <div className="field">
-              <label>E-mail</label>
-              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
+            <div className="field-row">
+              <div className="field">
+                <label>E-mail</label>
+                <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Website</label>
+                <input type="text" value={form.website} onChange={(e) => set('website', e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Fax</label>
+                <input type="text" value={form.fax} onChange={(e) => set('fax', e.target.value)} />
+              </div>
             </div>
           </>
         )}
 
-        {activeTab === 'inkooporder' && (
+        {activeTab === 'levering' && (
           <div className="field-row">
-            <div className="field" style={{ flex: 2 }}>
-              <label>E-mailadressen voor inkooporders</label>
-              <input
-                type="text"
-                value={form.inkooporderEmails}
-                onChange={(e) => set('inkooporderEmails', e.target.value)}
-                placeholder="inkoop@leverancier.nl, verkoop@leverancier.nl"
-              />
-              <span className="hint">
-                Meerdere adressen scheiden met een komma. Leeg = het algemene e-mailadres (tabblad
-                Contactgegevens).
-              </span>
+            <div className="field">
+              <label>Leveringsvoorwaarde</label>
+              <select
+                value={form.leveringsvoorwaarde}
+                onChange={(e) => set('leveringsvoorwaarde', e.target.value)}
+              >
+                <option value="">—</option>
+                {Object.entries(LEVERINGSVOORWAARDEN).map(([code, omschrijving]) => (
+                  <option key={code} value={code}>
+                    {code} — {omschrijving}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="field">
-              <label>Taal van de mail</label>
+              <label>Leveringswijze</label>
+              <input
+                type="text"
+                value={form.leveringswijze}
+                onChange={(e) => set('leveringswijze', e.target.value)}
+                placeholder="bijv. TNT, Afhalen"
+              />
+            </div>
+            <div className="field">
+              <label>Taal</label>
               <select value={form.taal} onChange={(e) => set('taal', e.target.value)}>
                 {Object.entries(MAIL_TALEN).map(([code, label]) => (
                   <option key={code} value={code}>
@@ -235,7 +305,6 @@ export default function LeverancierForm({ leverancier, onDone }) {
                   </option>
                 ))}
               </select>
-              <span className="hint">Onderwerp, aanhef en tekst van de inkooporder-mail</span>
             </div>
           </div>
         )}
@@ -283,6 +352,12 @@ export default function LeverancierForm({ leverancier, onDone }) {
                   value={form.betalingstermijn}
                   onChange={(e) => set('betalingstermijn', e.target.value)}
                 />
+              </div>
+              <div className="field" style={{ justifyContent: 'flex-end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 0 }}>
+                  <input type="checkbox" checked={form.inclBtw} onChange={(e) => set('inclBtw', e.target.checked)} />
+                  Prijzen incl. BTW
+                </label>
               </div>
             </div>
           </>

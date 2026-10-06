@@ -4,6 +4,7 @@ import { useAuth, ROL_LABELS } from '../contexts/AuthContext'
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/artikelen', label: 'Artikelen' },
+  { to: '/klanten', label: 'Klanten' },
   { to: '/leveranciers', label: 'Leveranciers' },
   { to: '/inkooporders', label: 'Inkooporders' },
   { to: '/voorraad', label: 'Voorraad' },

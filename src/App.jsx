@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ArtikelenList from './pages/artikelen/ArtikelenList'
 import LeveranciersList from './pages/leveranciers/LeveranciersList'
+import KlantenList from './pages/klanten/KlantenList'
 import InkoopordersList from './pages/inkooporders/InkoopordersList'
 import InkooporderAfdruk from './pages/inkooporders/InkooporderAfdruk'
 import VoorraadOverzicht from './pages/voorraad/VoorraadOverzicht'
@@ -48,6 +49,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <ArtikelenList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/klanten"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <KlantenList />
                 </Layout>
               </ProtectedRoute>
             }
