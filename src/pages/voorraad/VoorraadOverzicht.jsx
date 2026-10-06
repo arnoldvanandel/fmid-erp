@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useCollection } from '../../hooks/useCollection'
-import { useVoorraadTotals } from '../../hooks/useVoorraadTotals'
+import { useVoorraadArtikelen } from '../../hooks/useVoorraadArtikelen'
+import { telArtikelen, useArtikelZoeken } from '../../lib/artikelZoeken'
 import { formatDateTime, formatNumber } from '../../lib/format'
 import Modal from '../../components/Modal'
 import MutatieForm from './MutatieForm'
@@ -9,41 +10,51 @@ const TYPE_LABEL = { in: 'In', uit: 'Uit', correctie: 'Correctie' }
 const TYPE_BADGE = { in: 'badge-success', uit: 'badge-danger', correctie: 'badge-neutral' }
 
 export default function VoorraadOverzicht() {
-  const { data: artikelen, loading: loadingArtikelen } = useCollection('artikelen', {
-    orderByField: 'artikelnummer',
-  })
+  // Zonder zoekterm: alleen artikelen met voorraad of een minimumvoorraad.
+  // Met zoekterm: zoeken in alle artikelen (bijv. om een eerste mutatie te boeken).
+  const {
+    artikelen: voorraadArtikelen,
+    laag,
+    totalenPerArtikel,
+    standenPerArtikel,
+    loading: loadingVoorraad,
+  } = useVoorraadArtikelen()
   const { data: mutaties, loading: loadingMutaties } = useCollection('voorraadmutaties', {
     orderByField: 'datum',
     orderDirection: 'desc',
   })
-  const { totalenPerArtikel, standenPerArtikel } = useVoorraadTotals()
 
   const [search, setSearch] = useState('')
   const [alleenLaag, setAlleenLaag] = useState(false)
   const [mutatieVoor, setMutatieVoor] = useState(null)
+  const [aantalArtikelen, setAantalArtikelen] = useState(null)
+  const zoeken = search.trim() !== ''
+  const { artikelen: zoekResultaten, loading: loadingZoeken } = useArtikelZoeken(zoeken ? search : '', {
+    max: 100,
+  })
+
+  useEffect(() => {
+    telArtikelen()
+      .then(setAantalArtikelen)
+      .catch(() => setAantalArtikelen(null))
+  }, [])
+
+  const loadingArtikelen = zoeken ? loadingZoeken : loadingVoorraad
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return artikelen.filter((a) => {
-      if (
-        q &&
-        !a.artikelnummer?.toLowerCase().includes(q) &&
-        !a.naam?.toLowerCase().includes(q) &&
-        !a.zoeknaam?.toLowerCase().includes(q)
-      ) {
-        return false
-      }
-      const totaal = totalenPerArtikel[a.id] || 0
-      if (alleenLaag && !(totaal <= Number(a.minVoorraad || 0))) return false
-      return true
-    })
-  }, [artikelen, search, alleenLaag, totalenPerArtikel])
+    const bron = alleenLaag ? laag : zoeken ? zoekResultaten : voorraadArtikelen
+    if (!alleenLaag || !zoeken) return bron
+    const ids = new Set(zoekResultaten.map((a) => a.id))
+    return bron.filter((a) => ids.has(a.id))
+  }, [alleenLaag, laag, zoeken, zoekResultaten, voorraadArtikelen])
 
-  const laagAantal = artikelen.filter(
-    (a) => (totalenPerArtikel[a.id] || 0) <= Number(a.minVoorraad || 0)
-  ).length
-  const voorraadWaarde = artikelen.reduce(
-    (sum, a) => sum + (totalenPerArtikel[a.id] || 0) * (Number(a.inkoopprijs) || 0),
+  const laagAantal = laag.length
+  // Inkoopprijs geldt per inkoopprijsHoeveelheid (bijv. per 100 stuks).
+  const voorraadWaarde = voorraadArtikelen.reduce(
+    (sum, a) =>
+      sum +
+      (totalenPerArtikel[a.id] || 0) *
+        ((Number(a.inkoopprijs) || 0) / (Number(a.inkoopprijsHoeveelheid) || 1)),
     0
   )
 
@@ -59,7 +70,7 @@ export default function VoorraadOverzicht() {
       <div className="stat-row">
         <div className="card stat-card">
           <div className="label">Aantal artikelen</div>
-          <div className="value">{artikelen.length}</div>
+          <div className="value">{aantalArtikelen === null ? '…' : formatNumber(aantalArtikelen)}</div>
         </div>
         <div className="card stat-card">
           <div className="label">Laag in voorraad</div>
@@ -100,7 +111,11 @@ export default function VoorraadOverzicht() {
         {loadingArtikelen ? (
           <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }} /></div>
         ) : filtered.length === 0 ? (
-          <div className="empty-state">Geen artikelen gevonden.</div>
+          <div className="empty-state">
+            {zoeken
+              ? 'Geen artikelen gevonden.'
+              : 'Nog geen artikelen met voorraad. Zoek hierboven een artikel om een mutatie te boeken.'}
+          </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -118,7 +133,7 @@ export default function VoorraadOverzicht() {
                 {filtered.map((a) => {
                   const totaal = totalenPerArtikel[a.id] || 0
                   const standen = standenPerArtikel[a.id] || []
-                  const laag = totaal <= Number(a.minVoorraad || 0)
+                  const isLaag = Number(a.minVoorraad) > 0 && totaal <= Number(a.minVoorraad)
                   return (
                     <tr key={a.id}>
                       <td>{a.artikelnummer}</td>
@@ -130,7 +145,7 @@ export default function VoorraadOverzicht() {
                       </td>
                       <td className="num">
                         {formatNumber(totaal)} {a.eenheid}
-                        {laag && (
+                        {isLaag && (
                           <span className="badge badge-warning" style={{ marginLeft: 8 }}>
                             laag
                           </span>

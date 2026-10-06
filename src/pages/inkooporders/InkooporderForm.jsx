@@ -5,6 +5,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
 import { formatCurrency, formatDateTime, formatNumber } from '../../lib/format'
 import { mailInkooporder } from '../../lib/inkooporderMail'
+import { haalArtikelOpNummer } from '../../lib/artikelZoeken'
+import ArtikelKiezer from '../../components/ArtikelKiezer'
 import {
   inkooporderEmailadressen,
   laadInkooporderVoorAfdruk,
@@ -36,14 +38,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const [mailen, setMailen] = useState(false)
   const [error, setError] = useState(null)
 
-  const { data: artikelen } = useCollection('artikelen', { orderByField: 'artikelnummer' })
   const { data: regels, loading: loadingRegels } = useCollection('inkooporderregels')
-
-  const artikelenById = useMemo(() => {
-    const map = {}
-    for (const a of artikelen) map[a.id] = a
-    return map
-  }, [artikelen])
 
   const regelsVoorOrder = useMemo(
     () =>
@@ -66,30 +61,32 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const [regelError, setRegelError] = useState(null)
   const [geselecteerdeRegel, setGeselecteerdeRegel] = useState(null)
 
-  const artikelenByNummer = useMemo(() => {
-    const map = {}
-    for (const a of artikelen) map[(a.artikelnummer || '').toLowerCase()] = a
-    return map
-  }, [artikelen])
-
   // De lege regel onderaan de tabel, voor een nieuw artikel. De waarden staan
   // ook in een ref, zodat Enter direct na het verlaten van een cel de laatste
   // invoer meeneemt.
-  const LEGE_REGEL = { artikelnummer: '', aantal: '', prijs: '', leverdatum: '', leverancierArtikelnummer: '' }
+  const LEGE_REGEL = {
+    artikelnummer: '',
+    artikel: null,
+    aantal: '',
+    prijs: '',
+    leverdatum: '',
+    leverancierArtikelnummer: '',
+  }
   const [nieuweRegel, setNieuweRegelState] = useState(LEGE_REGEL)
   const nieuweRegelRef = useRef(LEGE_REGEL)
   function setNieuweRegel(updates) {
     nieuweRegelRef.current = { ...nieuweRegelRef.current, ...updates }
     setNieuweRegelState(nieuweRegelRef.current)
   }
-  const nieuwArtikel = artikelenByNummer[nieuweRegel.artikelnummer.trim().toLowerCase()]
+  const nieuwArtikel = nieuweRegel.artikel
 
-  function kiesArtikel(artikelnummer) {
-    const artikel = artikelenByNummer[artikelnummer.trim().toLowerCase()]
-    const updates = { artikelnummer }
+  // Aangeroepen door ArtikelKiezer zodra de ingetypte tekst een bestaand
+  // artikelnummer is (of juist niet meer).
+  function kiesArtikel(artikel) {
+    const updates = { artikel }
     // Inkoopprijzen uit Axapta gelden vaak per 100 of 1000 stuks; een
     // orderregel rekent met de prijs per stuk.
-    if (artikel && artikel !== nieuwArtikel) {
+    if (artikel) {
       const perStuk = (Number(artikel.inkoopprijs) || 0) / (Number(artikel.inkoopprijsHoeveelheid) || 1)
       updates.prijs = Math.round(perStuk * 10000) / 10000
     }
@@ -165,7 +162,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     if (regelSaving) return
     setRegelError(null)
     const r = nieuweRegelRef.current
-    const artikel = artikelenByNummer[r.artikelnummer.trim().toLowerCase()]
+    const artikel = r.artikel || (await haalArtikelOpNummer(r.artikelnummer))
     if (!artikel) {
       setRegelError(
         r.artikelnummer.trim() ? `Artikel "${r.artikelnummer.trim()}" bestaat niet.` : 'Vul een artikelnummer in.'
@@ -326,13 +323,6 @@ export default function InkooporderForm({ inkooporder, onDone }) {
 
       {regelError && <div className="banner banner-danger">{regelError}</div>}
 
-      <datalist id="inkooporder-artikelen">
-        {artikelen.map((a) => (
-          <option key={a.id} value={a.artikelnummer}>
-            {a.naam}
-          </option>
-        ))}
-      </datalist>
 
       <div className="regel-grid-wrap">
         <table className="regel-grid">
@@ -424,14 +414,13 @@ export default function InkooporderForm({ inkooporder, onDone }) {
             >
               <td className="regel-grid-selector">*</td>
               <td>
-                <input
-                  type="text"
-                  list="inkooporder-artikelen"
+                <ArtikelKiezer
                   data-rij={regelsVoorOrder.length}
                   data-kolom="artikelnummer"
                   placeholder="Nieuw artikel…"
                   value={nieuweRegel.artikelnummer}
-                  onChange={(e) => kiesArtikel(e.target.value)}
+                  onChange={(artikelnummer) => setNieuweRegel({ artikelnummer })}
+                  onKies={kiesArtikel}
                   onKeyDown={gridToets}
                 />
               </td>

@@ -1,16 +1,21 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useCollection } from '../hooks/useCollection'
-import { useVoorraadTotals } from '../hooks/useVoorraadTotals'
+import { useVoorraadArtikelen } from '../hooks/useVoorraadArtikelen'
 import { useAuth } from '../contexts/AuthContext'
+import { formatNumber } from '../lib/format'
+import { telArtikelen } from '../lib/artikelZoeken'
 
 export default function Dashboard() {
   const { profile } = useAuth()
-  const { data: artikelen, loading } = useCollection('artikelen')
-  const { totalenPerArtikel } = useVoorraadTotals()
+  const [aantalArtikelen, setAantalArtikelen] = useState(null)
+  const { laag, loading } = useVoorraadArtikelen()
+  const laagAantal = laag.length
 
-  const laagAantal = artikelen.filter(
-    (a) => (totalenPerArtikel[a.id] || 0) <= Number(a.minVoorraad || 0)
-  ).length
+  useEffect(() => {
+    telArtikelen()
+      .then(setAantalArtikelen)
+      .catch(() => setAantalArtikelen(null))
+  }, [])
 
   return (
     <div className="content">
@@ -24,7 +29,7 @@ export default function Dashboard() {
       <div className="stat-row">
         <div className="card stat-card">
           <div className="label">Aantal artikelen</div>
-          <div className="value">{loading ? '…' : artikelen.length}</div>
+          <div className="value">{aantalArtikelen === null ? '…' : formatNumber(aantalArtikelen)}</div>
         </div>
         <div className="card stat-card">
           <div className="label">Laag in voorraad</div>

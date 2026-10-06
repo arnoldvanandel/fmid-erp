@@ -12,10 +12,12 @@ import {
   wijzigStuklijstRegelAantal,
 } from '../../lib/stuklijst'
 import { verwijderRouteRegel, voegRouteRegelToe, wijzigRouteRegel } from '../../lib/route'
+import { useArtikelenOpId, zoekTermen } from '../../lib/artikelZoeken'
 import Modal from '../../components/Modal'
+import ArtikelKiezer from '../../components/ArtikelKiezer'
 import MutatieForm from '../voorraad/MutatieForm'
 
-const EENHEDEN = ['Stuks', 'Meter', 'Kg', 'Doos', 'Rol', 'Set']
+const EENHEDEN = ['Stuks', 'Meter', 'Kg', 'Liter', 'm²', 'Doos', 'Rol', 'Set']
 
 // Overgenomen uit de Axapta-tabellen inventtable (artikeltype) en
 // InventTableModule (TaxItemGroupId) — zo sluiten nieuwe artikelen aan bij
@@ -119,6 +121,7 @@ export default function ArtikelForm({ artikel, onDone }) {
       breedte: form.breedte === '' ? null : Number(form.breedte) || 0,
       diepte: form.diepte === '' ? null : Number(form.diepte) || 0,
     }
+    payload.zoek = zoekTermen({ ...payload, zoeknaam: artikel?.zoeknaam })
 
     setSaving(true)
     try {
@@ -646,32 +649,25 @@ function DocumentenTab({ artikel }) {
 // zelfde patroon als Voorraad/Documenten hierboven.
 function StuklijstTab({ artikel }) {
   const { isAdmin } = useAuth()
-  const { data: artikelen } = useCollection('artikelen', { orderByField: 'artikelnummer' })
   const { data: regels, loading } = useCollection('stuklijstregels')
-  const [componentId, setComponentId] = useState('')
+  const [componentTekst, setComponentTekst] = useState('')
+  const [componentArtikel, setComponentArtikel] = useState(null)
   const [aantal, setAantal] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-
-  const artikelenById = useMemo(() => {
-    const map = {}
-    for (const a of artikelen) map[a.id] = a
-    return map
-  }, [artikelen])
-
-  const componenten = useMemo(
-    () => artikelen.filter((a) => a.id !== artikel.id),
-    [artikelen, artikel.id]
-  )
 
   const regelsVoorStuklijst = useMemo(
     () => regels.filter((r) => r.stuklijstArtikelId === artikel.id),
     [regels, artikel.id]
   )
 
+  // Alleen de componenten van deze stuklijst ophalen, voor de kostprijs.
+  const artikelenById = useArtikelenOpId(regelsVoorStuklijst.map((r) => r.componentArtikelId))
+
   const kostprijs = regelsVoorStuklijst.reduce((sum, r) => {
     const component = artikelenById[r.componentArtikelId]
-    const prijs = Number(component?.inkoopprijs) || 0
+    // Inkoopprijs geldt per inkoopprijsHoeveelheid (bijv. per 100 stuks).
+    const prijs = (Number(component?.inkoopprijs) || 0) / (Number(component?.inkoopprijsHoeveelheid) || 1)
     const korting = Number(component?.inkoopkorting) || 0
     return sum + prijs * (1 - korting / 100) * (Number(r.aantal) || 0)
   }, 0)
@@ -679,15 +675,15 @@ function StuklijstTab({ artikel }) {
   async function handleToevoegen(e) {
     e.preventDefault()
     setError(null)
-    const componentArtikel = artikelenById[componentId]
     if (!componentArtikel) {
-      setError('Kies een component.')
+      setError(componentTekst.trim() ? `Artikel "${componentTekst.trim()}" bestaat niet.` : 'Kies een component.')
       return
     }
     setSaving(true)
     try {
       await voegStuklijstRegelToe({ stuklijstArtikel: artikel, componentArtikel, aantal })
-      setComponentId('')
+      setComponentTekst('')
+      setComponentArtikel(null)
       setAantal('')
     } catch (err) {
       setError(err.message)
@@ -723,14 +719,14 @@ function StuklijstTab({ artikel }) {
       <div className="field-row" style={{ alignItems: 'flex-end' }}>
         <div className="field" style={{ flex: 2 }}>
           <label>Component</label>
-          <select value={componentId} onChange={(e) => setComponentId(e.target.value)}>
-            <option value="">Kies artikel…</option>
-            {componenten.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.artikelnummer} — {a.naam}
-              </option>
-            ))}
-          </select>
+          <ArtikelKiezer
+            value={componentTekst}
+            onChange={setComponentTekst}
+            onKies={setComponentArtikel}
+            filter={(a) => a.id !== artikel.id}
+            placeholder="Typ artikelnummer of naam…"
+          />
+          {componentArtikel && <span className="hint">{componentArtikel.naam}</span>}
         </div>
         <div className="field">
           <label>Aantal</label>
