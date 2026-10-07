@@ -140,10 +140,23 @@ export async function maakInkooporderBericht({ gegevens, gebruiker, handtekening
 // `mail`. De Cloud Function `verstuurMail` (functions/index.js) pikt die op en
 // verstuurt 'm via SMTP; het resultaat (verzonden/fout) schrijft de functie
 // terug in het veld `delivery` van hetzelfde document.
-export async function mailInkooporder({ inkooporderId, gebruiker, gebruikerEmail, handtekening, gegevens }) {
+//
+// `ontvangers` is optioneel: een eigen lijst adressen voor deze ene mail (bijv.
+// aangevuld in het verstuurvenster). Zonder lijst gaan we naar de adressen die
+// bij de leverancier zijn ingesteld.
+export async function mailInkooporder({
+  inkooporderId,
+  gebruiker,
+  gebruikerEmail,
+  handtekening,
+  gegevens,
+  ontvangers,
+}) {
   if (!gegevens) gegevens = await laadInkooporderVoorAfdruk(inkooporderId)
   const { order, leverancier } = gegevens
-  const aan = inkooporderEmailadressen(leverancier)
+  const aan = ontvangers
+    ? [...new Set(ontvangers.map((e) => e.trim()).filter(Boolean))]
+    : inkooporderEmailadressen(leverancier)
   if (aan.length === 0) {
     throw new Error(
       `Er is geen e-mailadres ingesteld bij leverancier ${order.leverancierscode}. ` +

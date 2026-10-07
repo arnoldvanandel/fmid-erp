@@ -7,6 +7,7 @@ import { formatCurrency, formatDateTime, formatNumber } from '../../lib/format'
 import { mailInkooporder } from '../../lib/inkooporderMail'
 import { haalArtikelOpNummer } from '../../lib/artikelZoeken'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
+import Modal from '../../components/Modal'
 import {
   inkooporderEmailadressen,
   laadInkooporderVoorAfdruk,
@@ -36,6 +37,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const [opmerkingen, setOpmerkingen] = useState(inkooporder.opmerkingen || '')
   const [saving, setSaving] = useState(false)
   const [mailen, setMailen] = useState(false)
+  const [mailGegevens, setMailGegevens] = useState(null)
   const [error, setError] = useState(null)
 
   const { data: regels, loading: loadingRegels } = useCollection('inkooporderregels')
@@ -107,43 +109,33 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         levering: levering.trim(),
         opmerkingen: opmerkingen.trim(),
       })
-      await vraagOmTeMailen()
-      onDone?.()
+      // Na het opslaan vragen of de order gemaild moet worden (MailVenster).
+      // Zonder regels valt er niets te mailen.
+      const gegevens = await laadInkooporderVoorAfdruk(inkooporder.id)
+      if (gegevens.regels.length === 0) onDone?.()
+      else setMailGegevens(gegevens)
     } catch (err) {
       setError(err.message)
     } finally {
       setSaving(false)
-      setMailen(false)
     }
   }
 
-  // Na het opslaan vragen of de order naar de leverancier gemaild moet
-  // worden, naar de adressen die bij de leverancier zijn ingesteld.
-  async function vraagOmTeMailen() {
-    const gegevens = await laadInkooporderVoorAfdruk(inkooporder.id)
-    const aan = inkooporderEmailadressen(gegevens.leverancier)
-    if (gegevens.regels.length === 0) return
-    if (aan.length === 0) {
-      alert(
-        'Opgeslagen. Er is nog geen e-mailadres ingesteld bij deze leverancier, ' +
-          'dus de inkooporder kan niet per mail verstuurd worden.'
-      )
-      return
-    }
-    const eerder = inkooporder.gemaildOp
-      ? `\n\nLet op: deze order is al eerder gemaild (${formatDateTime(inkooporder.gemaildOp)}).`
-      : ''
-    const cc = profile?.email && !aan.includes(profile.email) ? `\n\nKopie (cc) naar: ${profile.email}` : ''
-    const vraag = `Inkooporder ${inkooporder.ordernummer} per mail versturen naar:\n\n${aan.join('\n')}${cc}${eerder}`
-    if (!confirm(vraag)) return
+  async function verstuurMail(ontvangers) {
     setMailen(true)
-    await mailInkooporder({
-      inkooporderId: inkooporder.id,
-      gebruiker: profile?.naam || profile?.email,
-      gebruikerEmail: profile?.email,
-      handtekening: profile?.handtekening,
-      gegevens,
-    })
+    try {
+      await mailInkooporder({
+        inkooporderId: inkooporder.id,
+        gebruiker: profile?.naam || profile?.email,
+        gebruikerEmail: profile?.email,
+        handtekening: profile?.handtekening,
+        gegevens: mailGegevens,
+        ontvangers,
+      })
+      onDone?.()
+    } finally {
+      setMailen(false)
+    }
   }
 
   async function handleDelete() {
@@ -293,9 +285,23 @@ export default function InkooporderForm({ inkooporder, onDone }) {
           PDF / afdrukken
         </a>
         <button type="button" className="btn btn-primary btn-sm" onClick={handleHeaderSubmit} disabled={saving}>
-          {mailen ? 'Versturen…' : saving ? 'Opslaan…' : 'Opslaan'}
+          {saving ? 'Opslaan…' : 'Opslaan'}
         </button>
       </div>
+
+      {mailGegevens && (
+        <MailVenster
+          inkooporder={inkooporder}
+          leverancier={mailGegevens.leverancier}
+          gebruikerEmail={profile?.email}
+          bezig={mailen}
+          onVersturen={verstuurMail}
+          onNietMailen={() => {
+            setMailGegevens(null)
+            onDone?.()
+          }}
+        />
+      )}
 
       <MailStatus inkooporder={inkooporder} />
 
@@ -568,6 +574,76 @@ function GetalCel({ value, decimalen = 2, maxDecimalen = decimalen, onCommit, ri
         gridToets(e)
       }}
     />
+  )
+}
+
+// Na het opslaan: de order mailen naar de adressen van de leverancier. Voor
+// deze ene mail kun je adressen toevoegen of weghalen; de vaste adressen
+// blijven bij de leverancier (tabblad Inkooporder).
+function MailVenster({ inkooporder, leverancier, gebruikerEmail, bezig, onVersturen, onNietMailen }) {
+  const [aanTekst, setAanTekst] = useState(inkooporderEmailadressen(leverancier).join(', '))
+  const [fout, setFout] = useState(null)
+
+  const aan = aanTekst
+    .split(/[,;\s]+/)
+    .map((e) => e.trim())
+    .filter(Boolean)
+  const ongeldig = aan.filter((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))
+  const cc = gebruikerEmail && !aan.includes(gebruikerEmail) ? gebruikerEmail : null
+
+  async function handleVersturen() {
+    setFout(null)
+    if (aan.length === 0) {
+      setFout('Vul minimaal één e-mailadres in.')
+      return
+    }
+    if (ongeldig.length) {
+      setFout(`Geen geldig e-mailadres: ${ongeldig.join(', ')}`)
+      return
+    }
+    try {
+      await onVersturen(aan)
+    } catch (err) {
+      setFout(err.message)
+    }
+  }
+
+  return (
+    <Modal
+      title={`Inkooporder ${inkooporder.ordernummer} mailen`}
+      onClose={bezig ? undefined : onNietMailen}
+      width={520}
+    >
+      {fout && <div className="banner banner-danger">{fout}</div>}
+      {inkooporder.gemaildOp && (
+        <div className="banner banner-warning">
+          Let op: deze order is al eerder gemaild ({formatDateTime(inkooporder.gemaildOp)}).
+        </div>
+      )}
+      <div className="field">
+        <label>Aan</label>
+        <textarea
+          rows={3}
+          value={aanTekst}
+          onChange={(e) => setAanTekst(e.target.value)}
+          placeholder="inkoop@leverancier.nl, verkoop@leverancier.nl"
+          autoFocus
+        />
+        <span className="hint">
+          Meerdere adressen scheiden met een komma. Wat je hier toevoegt geldt alleen voor deze mail; vaste
+          adressen stel je in bij de leverancier (tabblad Inkooporder).
+        </span>
+      </div>
+      {cc && <p className="hint">Kopie (cc) naar: {cc}</p>}
+      <div className="modal-actions">
+        <button type="button" className="btn btn-secondary" onClick={onNietMailen} disabled={bezig}>
+          Niet mailen
+        </button>
+        <button type="button" className="btn btn-primary" onClick={handleVersturen} disabled={bezig}>
+          {bezig ? 'Versturen…' : `Versturen${aan.length > 1 ? ` (${aan.length} adressen)` : ''}`}
+        </button>
+      </div>
+    </Modal>
   )
 }
 
