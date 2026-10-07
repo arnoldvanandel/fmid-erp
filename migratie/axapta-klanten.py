@@ -5,6 +5,11 @@ Waar Axapta straat/postcode/plaats los heeft, gebruiken we die; anders splitsen 
 het adres op de postcode. Lukt dat niet, dan krijgt de klant `adresControleren: true`
 en staat het oorspronkelijke adres in `adresAxapta`.
 
+Staat er een tabblad "Alternatieve adressen" (Axapta-tabel Address) in het bestand, dan
+komen die adressen als `adressen` bij de klant. Koppeling in Axapta: AddrTableId 77 is
+CustTable en AddrRecId is de RecId van de klant. Adressen van verwijderde klanten
+(RecId niet meer in de klantentabel) en van andere tabellen (505 = leveranciers) slaan we over.
+
 Gebruik:  python migratie/axapta-klanten.py "<Klantentabel.xlsx>"
 """
 import json
@@ -98,32 +103,77 @@ def splits_adres(adres):
     return s, '', '', land, False
 
 
-def main(pad):
-    ws = openpyxl.load_workbook(pad, read_only=True, data_only=True).active
+# Adressoort (veld "type" in Axapta) -> `type` in fmid-erp, zie ADRES_TYPES in src/lib/stamgegevens.js.
+ADRES_TYPES = {'Levering': 'levering', 'Factuur': 'factuur', 'Alternatief afleveradres': 'alternatief'}
+TABEL_KLANTEN = 77
+
+
+def lees_tabblad(ws):
+    """Geeft (rijen, v) met v(rij, veldnaam) -> tekst; bij dubbele kolomnamen telt de eerste."""
     rijen = ws.iter_rows(values_only=True)
-    kop = list(next(rijen))
     ix = {}
-    for i, k in enumerate(kop):
+    for i, k in enumerate(next(rijen)):
         if k and k not in ix:
             ix[k] = i
 
     def v(r, veld):
         return tekst(r[ix[veld]]) if veld in ix else ''
 
+    return rijen, v
+
+
+def adres_uit(v, r, standaard_land=''):
+    """Straat/postcode/plaats/land uit een Axapta-rij met Address, Street, ZipCode, City, Country."""
+    adres = v(r, 'Address')
+    if v(r, 'ZipCode') and v(r, 'City'):
+        straat, postcode, plaats = v(r, 'Street'), v(r, 'ZipCode'), v(r, 'City')
+        land = LANDCODES.get(v(r, 'Country').upper(), '') or haal_land_eraf(adres)[1]
+        gelukt = True
+    else:
+        straat, postcode, plaats, land, gelukt = splits_adres(adres)
+    if not land:
+        land = LANDCODES.get(v(r, 'Country').upper(), '') or standaard_land
+    return adres, straat, postcode, plaats, land, gelukt
+
+
+def lees_alternatieve_adressen(ws):
+    """Geeft {RecId klant: [adres, ...]}."""
+    rijen, v = lees_tabblad(ws)
+    per_klant = {}
+    for r in rijen:
+        if v(r, 'AddrTableId') != str(TABEL_KLANTEN):
+            continue
+        if not (v(r, 'Address') or v(r, 'Street')):
+            continue  # alleen een naam en geen adres: maakt Axapta vaak zelf aan bij factuur
+        adres, straat, postcode, plaats, land, gelukt = adres_uit(v, r)
+        per_klant.setdefault(v(r, 'AddrRecId'), []).append({
+            'type': ADRES_TYPES.get(v(r, 'type'), 'overig'),
+            'naam': v(r, 'Name'),
+            'straat': straat,
+            'postcode': postcode,
+            'plaats': plaats,
+            'land': land,
+            'telefoon': v(r, 'Phone'),
+            'email': v(r, 'Email'),
+            'adresAxapta': adres,
+            'adresControleren': not gelukt,
+        })
+    return per_klant
+
+
+def main(pad):
+    wb = openpyxl.load_workbook(pad, read_only=True, data_only=True)
+    ws = wb['Klantentabel'] if 'Klantentabel' in wb.sheetnames else wb.active
+    rijen, v = lees_tabblad(ws)
+    alt = lees_alternatieve_adressen(wb['Alternatieve adressen']) if 'Alternatieve adressen' in wb.sheetnames else {}
+
     uit = []
     for r in rijen:
         code = v(r, 'AccountNum')
         if not code:
             continue
-        adres = v(r, 'Address')
-        if v(r, 'ZipCode') and v(r, 'City'):
-            straat, postcode, plaats = v(r, 'Street'), v(r, 'ZipCode'), v(r, 'City')
-            land = LANDCODES.get(v(r, 'Country').upper(), '') or haal_land_eraf(adres)[1]
-            gelukt = True
-        else:
-            straat, postcode, plaats, land, gelukt = splits_adres(adres)
-        if not land:
-            land = LANDCODES.get(v(r, 'Country').upper(), '') or ('Nederland' if v(r, 'CustGroup') == 'NL' else '')
+        adres, straat, postcode, plaats, land, gelukt = adres_uit(
+            v, r, 'Nederland' if v(r, 'CustGroup') == 'NL' else '')
 
         btw_nummer = v(r, 'VATNum')
         if '?' in btw_nummer or '*' in btw_nummer:
@@ -160,6 +210,8 @@ def main(pad):
             'taal': TAAL.get(v(r, 'LanguageId').lower(), 'nl'),
             'kvkNummer': '',
             'geblokkeerd': v(r, 'Blocked') == 'Ja',
+            # Land onbekend bij een alternatief adres: dan meestal hetzelfde land als de klant.
+            'adressen': [{**a, 'land': a['land'] or land} for a in alt.get(v(r, 'RecId'), [])],
         })
 
     with open('migratie/klanten-import.json', 'w', encoding='utf-8') as f:
@@ -170,6 +222,10 @@ def main(pad):
     print('landen:', Counter(k['land'] for k in uit))
     print('btw-groepen:', Counter(k['btwGroep'] for k in uit))
     print('talen:', Counter(k['taal'] for k in uit))
+    adressen = [a for k in uit for a in k['adressen']]
+    print('alternatieve adressen:', len(adressen), Counter(a['type'] for a in adressen))
+    print('  bij klanten:', sum(1 for k in uit if k['adressen']),
+          '· na te kijken:', sum(a['adresControleren'] for a in adressen))
     for k in uit:
         if k['adresControleren']:
             print('  NAKIJKEN', k['klantcode'], k['naam'], '|', k['adresAxapta'])

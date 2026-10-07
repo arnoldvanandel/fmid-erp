@@ -3,16 +3,29 @@ import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from '
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import { MAIL_TALEN } from '../../lib/inkooporderMail'
-import { BTW_GROEPEN, KLANTGROEPEN, LEVERINGSVOORWAARDEN, VALUTA } from '../../lib/stamgegevens'
+import { ADRES_TYPES, BTW_GROEPEN, KLANTGROEPEN, LEVERINGSVOORWAARDEN, VALUTA } from '../../lib/stamgegevens'
 
 // Tabbladen zoals bij de klant in Axapta; zelfde opzet als LeverancierForm.
 const TABS = [
   { id: 'algemeen', label: 'Algemeen' },
   { id: 'adres', label: 'Adres' },
+  { id: 'adressen', label: 'Alternatieve adressen' },
   { id: 'contact', label: 'Contactgegevens' },
   { id: 'levering', label: 'Levering' },
   { id: 'betaling', label: 'Betaling' },
 ]
+
+const LEEG_ADRES = {
+  type: 'levering',
+  naam: '',
+  straat: '',
+  postcode: '',
+  plaats: '',
+  land: '',
+  telefoon: '',
+  email: '',
+  adresControleren: false,
+}
 
 export default function KlantForm({ klant, onDone }) {
   const { isAdmin } = useAuth()
@@ -33,6 +46,7 @@ export default function KlantForm({ klant, onDone }) {
     plaats: klant?.plaats || '',
     land: klant?.land || 'Nederland',
     adresControleren: klant?.adresControleren || false,
+    adressen: (klant?.adressen || []).map((a) => ({ ...LEEG_ADRES, ...a })),
     leveringsvoorwaarde: klant?.leveringsvoorwaarde || '',
     leveringswijze: klant?.leveringswijze || '',
     taal: klant?.taal || 'nl',
@@ -50,6 +64,22 @@ export default function KlantForm({ klant, onDone }) {
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
+  }
+
+  function setAdres(index, field, value) {
+    setForm((f) => ({
+      ...f,
+      adressen: f.adressen.map((a, i) => (i === index ? { ...a, [field]: value } : a)),
+    }))
+  }
+
+  function voegAdresToe() {
+    // Naam en land van de klant als begin; meestal is alleen het adres anders.
+    setForm((f) => ({ ...f, adressen: [...f.adressen, { ...LEEG_ADRES, naam: f.naam, land: f.land }] }))
+  }
+
+  function verwijderAdres(index) {
+    setForm((f) => ({ ...f, adressen: f.adressen.filter((_, i) => i !== index) }))
   }
 
   async function handleSubmit(e) {
@@ -82,6 +112,19 @@ export default function KlantForm({ klant, onDone }) {
       plaats: form.plaats.trim(),
       land: form.land.trim(),
       adresControleren: !!form.adresControleren,
+      adressen: form.adressen
+        .map((a) => ({
+          ...a,
+          naam: a.naam.trim(),
+          straat: a.straat.trim(),
+          postcode: a.postcode.trim(),
+          plaats: a.plaats.trim(),
+          land: a.land.trim(),
+          telefoon: a.telefoon.trim(),
+          email: a.email.trim(),
+          adresControleren: !!a.adresControleren,
+        }))
+        .filter((a) => a.naam || a.straat || a.plaats),
       leveringsvoorwaarde: form.leveringsvoorwaarde,
       leveringswijze: form.leveringswijze.trim(),
       taal: form.taal,
@@ -152,6 +195,8 @@ export default function KlantForm({ klant, onDone }) {
           >
             {t.label}
             {t.id === 'adres' && form.adresControleren && ' ⚠'}
+            {t.id === 'adressen' && form.adressen.length > 0 && ` (${form.adressen.length})`}
+            {t.id === 'adressen' && form.adressen.some((a) => a.adresControleren) && ' ⚠'}
           </button>
         ))}
       </div>
@@ -231,6 +276,97 @@ export default function KlantForm({ klant, onDone }) {
                 <input type="text" value={form.land} onChange={(e) => set('land', e.target.value)} />
               </div>
             </div>
+          </>
+        )}
+
+        {activeTab === 'adressen' && (
+          <>
+            {form.adressen.length === 0 && (
+              <p className="hint" style={{ marginTop: 0 }}>
+                Nog geen alternatieve adressen. Voeg bijvoorbeeld een apart leveradres of factuuradres toe.
+              </p>
+            )}
+            {form.adressen.map((a, i) => (
+              <div key={i} className="adres-blok">
+                <div className="adres-blok-kop">
+                  <strong>{ADRES_TYPES[a.type] || 'Adres'}</strong>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => verwijderAdres(i)}>
+                    Verwijderen
+                  </button>
+                </div>
+                {a.adresControleren && (
+                  <div className="banner banner-warning">
+                    <div>
+                      Dit adres kon bij de import uit Axapta niet automatisch worden opgesplitst. Origineel:{' '}
+                      <strong>{a.adresAxapta || '(leeg)'}</strong>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                        <input
+                          type="checkbox"
+                          checked={!a.adresControleren}
+                          onChange={(e) => setAdres(i, 'adresControleren', !e.target.checked)}
+                        />
+                        Adres is gecontroleerd
+                      </label>
+                    </div>
+                  </div>
+                )}
+                <div className="field-row">
+                  <div className="field" style={{ maxWidth: 200 }}>
+                    <label>Soort</label>
+                    <select value={a.type} onChange={(e) => setAdres(i, 'type', e.target.value)}>
+                      {Object.entries(ADRES_TYPES).map(([code, label]) => (
+                        <option key={code} value={code}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="field" style={{ flex: 2 }}>
+                    <label>Naam</label>
+                    <input type="text" value={a.naam} onChange={(e) => setAdres(i, 'naam', e.target.value)} />
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Straat + huisnummer</label>
+                  <input type="text" value={a.straat} onChange={(e) => setAdres(i, 'straat', e.target.value)} />
+                </div>
+                <div className="field-row">
+                  <div className="field">
+                    <label>Postcode</label>
+                    <input
+                      type="text"
+                      value={a.postcode}
+                      onChange={(e) => setAdres(i, 'postcode', e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Plaats</label>
+                    <input type="text" value={a.plaats} onChange={(e) => setAdres(i, 'plaats', e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label>Land</label>
+                    <input type="text" value={a.land} onChange={(e) => setAdres(i, 'land', e.target.value)} />
+                  </div>
+                </div>
+                <div className="field-row">
+                  <div className="field">
+                    <label>Telefoon</label>
+                    <input
+                      type="text"
+                      value={a.telefoon}
+                      onChange={(e) => setAdres(i, 'telefoon', e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>E-mail</label>
+                    <input type="email" value={a.email} onChange={(e) => setAdres(i, 'email', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button type="button" className="btn btn-secondary btn-sm" onClick={voegAdresToe}>
+              + Adres toevoegen
+            </button>
           </>
         )}
 

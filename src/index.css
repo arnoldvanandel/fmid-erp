@@ -407,6 +407,22 @@ input.invalid, select.invalid {
   min-height: 150px;
 }
 
+/* Alternatief adres bij een klant (tabblad Adressen). */
+.adres-blok {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 14px 2px;
+  margin-bottom: 12px;
+}
+
+.adres-blok-kop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13.5px;
+}
+
 /* ---------- Tables ---------- */
 
 table.data-table {

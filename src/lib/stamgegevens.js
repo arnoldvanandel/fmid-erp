@@ -22,3 +22,11 @@ export const LEVERINGSVOORWAARDEN = {
   DDU: 'Delivered Duty Unpaid',
   PICKUP: 'Wordt afgehaald',
 }
+
+// Soorten alternatieve adressen bij een klant (veld "type" in de Axapta-tabel Address).
+export const ADRES_TYPES = {
+  levering: 'Leveradres',
+  factuur: 'Factuuradres',
+  alternatief: 'Alternatief afleveradres',
+  overig: 'Overig',
+}
