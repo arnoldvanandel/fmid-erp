@@ -27,6 +27,82 @@ const LEEG_ADRES = {
   adresControleren: false,
 }
 
+// Velden van het gekozen alternatieve adres (tabblad Alternatieve adressen).
+function AdresVelden({ adres: a, onChange }) {
+  return (
+    <div className="adres-blok">
+      {a.adresControleren && (
+        <div className="banner banner-warning">
+          <div>
+            Dit adres kon bij de import uit Axapta niet automatisch worden opgesplitst. Origineel:{' '}
+            <strong>{a.adresAxapta || '(leeg)'}</strong>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+              <input
+                type="checkbox"
+                checked={!a.adresControleren}
+                onChange={(e) => onChange('adresControleren', !e.target.checked)}
+              />
+              Adres is gecontroleerd
+            </label>
+          </div>
+        </div>
+      )}
+      <div className="field-row">
+        <div className="field" style={{ maxWidth: 200 }}>
+          <label>Soort</label>
+          <select value={a.type} onChange={(e) => onChange('type', e.target.value)}>
+            {Object.entries(ADRES_TYPES).map(([code, label]) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field" style={{ flex: 2 }}>
+          <label>Naam</label>
+          <input type="text" value={a.naam} onChange={(e) => onChange('naam', e.target.value)} />
+        </div>
+      </div>
+      <div className="field">
+        <label>Straat + huisnummer</label>
+        <input type="text" value={a.straat} onChange={(e) => onChange('straat', e.target.value)} />
+      </div>
+      <div className="field-row">
+        <div className="field">
+          <label>Postcode</label>
+          <input
+            type="text"
+            value={a.postcode}
+            onChange={(e) => onChange('postcode', e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label>Plaats</label>
+          <input type="text" value={a.plaats} onChange={(e) => onChange('plaats', e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Land</label>
+          <input type="text" value={a.land} onChange={(e) => onChange('land', e.target.value)} />
+        </div>
+      </div>
+      <div className="field-row">
+        <div className="field">
+          <label>Telefoon</label>
+          <input
+            type="text"
+            value={a.telefoon}
+            onChange={(e) => onChange('telefoon', e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label>E-mail</label>
+          <input type="email" value={a.email} onChange={(e) => onChange('email', e.target.value)} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function KlantForm({ klant, onDone }) {
   const { isAdmin } = useAuth()
   const isNew = !klant?.id
@@ -61,6 +137,8 @@ export default function KlantForm({ klant, onDone }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('algemeen')
+  const [gekozenAdres, setGekozenAdres] = useState(0)
+  const adres = form.adressen[gekozenAdres]
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -76,10 +154,12 @@ export default function KlantForm({ klant, onDone }) {
   function voegAdresToe() {
     // Naam en land van de klant als begin; meestal is alleen het adres anders.
     setForm((f) => ({ ...f, adressen: [...f.adressen, { ...LEEG_ADRES, naam: f.naam, land: f.land }] }))
+    setGekozenAdres(form.adressen.length)
   }
 
   function verwijderAdres(index) {
     setForm((f) => ({ ...f, adressen: f.adressen.filter((_, i) => i !== index) }))
+    setGekozenAdres((g) => Math.max(0, g >= index ? g - 1 : g))
   }
 
   async function handleSubmit(e) {
@@ -281,92 +361,59 @@ export default function KlantForm({ klant, onDone }) {
 
         {activeTab === 'adressen' && (
           <>
-            {form.adressen.length === 0 && (
+            {form.adressen.length === 0 ? (
               <p className="hint" style={{ marginTop: 0 }}>
                 Nog geen alternatieve adressen. Voeg bijvoorbeeld een apart leveradres of factuuradres toe.
               </p>
-            )}
-            {form.adressen.map((a, i) => (
-              <div key={i} className="adres-blok">
-                <div className="adres-blok-kop">
-                  <strong>{ADRES_TYPES[a.type] || 'Adres'}</strong>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => verwijderAdres(i)}>
-                    Verwijderen
-                  </button>
-                </div>
-                {a.adresControleren && (
-                  <div className="banner banner-warning">
-                    <div>
-                      Dit adres kon bij de import uit Axapta niet automatisch worden opgesplitst. Origineel:{' '}
-                      <strong>{a.adresAxapta || '(leeg)'}</strong>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                        <input
-                          type="checkbox"
-                          checked={!a.adresControleren}
-                          onChange={(e) => setAdres(i, 'adresControleren', !e.target.checked)}
-                        />
-                        Adres is gecontroleerd
-                      </label>
-                    </div>
-                  </div>
-                )}
-                <div className="field-row">
-                  <div className="field" style={{ maxWidth: 200 }}>
-                    <label>Soort</label>
-                    <select value={a.type} onChange={(e) => setAdres(i, 'type', e.target.value)}>
-                      {Object.entries(ADRES_TYPES).map(([code, label]) => (
-                        <option key={code} value={code}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field" style={{ flex: 2 }}>
-                    <label>Naam</label>
-                    <input type="text" value={a.naam} onChange={(e) => setAdres(i, 'naam', e.target.value)} />
-                  </div>
-                </div>
-                <div className="field">
-                  <label>Straat + huisnummer</label>
-                  <input type="text" value={a.straat} onChange={(e) => setAdres(i, 'straat', e.target.value)} />
-                </div>
-                <div className="field-row">
-                  <div className="field">
-                    <label>Postcode</label>
-                    <input
-                      type="text"
-                      value={a.postcode}
-                      onChange={(e) => setAdres(i, 'postcode', e.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>Plaats</label>
-                    <input type="text" value={a.plaats} onChange={(e) => setAdres(i, 'plaats', e.target.value)} />
-                  </div>
-                  <div className="field">
-                    <label>Land</label>
-                    <input type="text" value={a.land} onChange={(e) => setAdres(i, 'land', e.target.value)} />
-                  </div>
-                </div>
-                <div className="field-row">
-                  <div className="field">
-                    <label>Telefoon</label>
-                    <input
-                      type="text"
-                      value={a.telefoon}
-                      onChange={(e) => setAdres(i, 'telefoon', e.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>E-mail</label>
-                    <input type="email" value={a.email} onChange={(e) => setAdres(i, 'email', e.target.value)} />
-                  </div>
-                </div>
+            ) : (
+              <div className="adressen-tabel-wrap">
+                <table className="data-table adressen-tabel">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '24%' }}>Soort</th>
+                      <th style={{ width: '28%' }}>Naam</th>
+                      <th style={{ width: '30%' }}>Adres</th>
+                      <th style={{ width: '18%' }}>Plaats</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.adressen.map((a, i) => (
+                      <tr
+                        key={i}
+                        className={i === gekozenAdres ? 'geselecteerd' : ''}
+                        onClick={() => setGekozenAdres(i)}
+                        title={[a.naam, a.straat, a.postcode, a.plaats].filter(Boolean).join(', ')}
+                      >
+                        <td>
+                          {ADRES_TYPES[a.type] || a.type}
+                          {a.adresControleren && ' ⚠'}
+                        </td>
+                        <td>{a.naam || '-'}</td>
+                        <td>{a.straat || '-'}</td>
+                        <td>{a.plaats || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={voegAdresToe}>
-              + Adres toevoegen
-            </button>
+            )}
+            <div style={{ display: 'flex', gap: 8, margin: '10px 0 14px' }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={voegAdresToe}>
+                + Adres toevoegen
+              </button>
+              {adres && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => verwijderAdres(gekozenAdres)}
+                >
+                  Gekozen adres verwijderen
+                </button>
+              )}
+            </div>
+            {adres && (
+              <AdresVelden adres={adres} onChange={(field, value) => setAdres(gekozenAdres, field, value)} />
+            )}
           </>
         )}
 
