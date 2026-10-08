@@ -1,4 +1,4 @@
-import { formatNumber } from '../../lib/format'
+import { formatNumber, formatPrijs } from '../../lib/format'
 import { adresLabel, berekenTotalen, btwPercentage, btwVermelding } from '../../lib/verkooporders'
 import { BEDRIJF, datumKort, datumLang } from '../inkooporders/bedrijf'
 import Briefpapier from '../inkooporders/Briefpapier'
@@ -297,7 +297,7 @@ export default function VerkoopDocument({ soort, order, klant, regels, document:
                 </>
               ) : (
                 <>
-                  <td className="num">{formatNumber(r.prijs, 2)}</td>
+                  <td className="num">{formatPrijs(r.prijs)}</td>
                   <td className="num">{bedrag((Number(r.aantal) || 0) * (Number(r.prijs) || 0))}</td>
                   {soort === 'factuur' ? (
                     <td className="num">{r.btwPercentage}%</td>

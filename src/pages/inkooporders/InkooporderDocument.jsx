@@ -1,4 +1,4 @@
-import { formatNumber } from '../../lib/format'
+import { formatNumber, formatPrijs } from '../../lib/format'
 import Briefpapier from './Briefpapier'
 import { datumKort, datumLang } from './bedrijf'
 import './afdruk.css'
@@ -83,7 +83,7 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
                 <div>{r.artikelnaam}</div>
                 {r.leverancierArtikelnummer && <div>{r.leverancierArtikelnummer}</div>}
               </td>
-              <td className="num">{prijs(r.prijs)}</td>
+              <td className="num">{formatPrijs(r.prijs)}</td>
               <td className="num">{datumKort(r.leverdatum)}</td>
             </tr>
           ))}

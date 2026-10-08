@@ -13,6 +13,13 @@ export function formatNumber(value, decimals = 0) {
   })
 }
 
+// Stuksprijs: minimaal 2, maximaal 4 decimalen ("2,74", "2,7406"), zoals in de regeltabel.
+export function formatPrijs(value) {
+  const n = Number(value)
+  if (Number.isNaN(n)) return '-'
+  return n.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+}
+
 export function formatDate(value) {
   if (!value) return '-'
   const d = value?.toDate ? value.toDate() : new Date(value)
