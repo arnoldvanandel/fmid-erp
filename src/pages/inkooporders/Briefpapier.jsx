@@ -23,9 +23,7 @@ export default function Briefpapier({ children }) {
     ...BEDRIJF.adres.map((r) => [r, '']),
     [BEDRIJF.telefoon, 'Tel'],
     [BEDRIJF.fax, 'Fax'],
-    ['', ''],
     [BEDRIJF.email, 'Mail'],
-    ['', ''],
     [BEDRIJF.website, 'Web'],
   ]
   const voet = [

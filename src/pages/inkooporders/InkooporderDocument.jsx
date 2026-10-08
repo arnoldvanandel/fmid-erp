@@ -23,7 +23,8 @@ const T = {
     valuta: 'Valuta',
     afleveradres: 'Afleveradres',
     pos: 'Pos.',
-    artikel: 'Artikel',
+    artikel: 'Artikelnr.',
+    omschrijving: 'Omschrijving',
     uwArtikel: 'Uw art.nr.',
     aantal: 'Aantal',
     eenheid: 'Eenh.',
@@ -53,7 +54,8 @@ const T = {
     valuta: 'Währung',
     afleveradres: 'Lieferadresse',
     pos: 'Pos.',
-    artikel: 'Artikel',
+    artikel: 'Artikel-Nr.',
+    omschrijving: 'Bezeichnung',
     uwArtikel: 'Ihre Art.-Nr.',
     aantal: 'Menge',
     eenheid: 'Einh.',
@@ -83,7 +85,8 @@ const T = {
     valuta: 'Currency',
     afleveradres: 'Delivery address',
     pos: 'Pos.',
-    artikel: 'Item',
+    artikel: 'Item no.',
+    omschrijving: 'Description',
     uwArtikel: 'Your item no.',
     aantal: 'Qty',
     eenheid: 'Unit',
@@ -168,12 +171,12 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
         <Veld label={t.offerte}>{order.offertenummer}</Veld>
         <Veld label={t.besteldDoor}>
           {order.besteldDoor}
-          {order.besteldDoorEmail && <div className="io-klein">{order.besteldDoorEmail}</div>}
+          {order.besteldDoorEmail && <span className="io-klein"> · {order.besteldDoorEmail}</span>}
         </Veld>
+        <Veld label={t.valuta}>{valuta}</Veld>
         <Veld label={t.leverdatum}>{datumLang(order.verwachteLeverdatum)}</Veld>
         <Veld label={t.levering}>{leveringTekst(order.levering)}</Veld>
         <Veld label={t.betaling}>{termijn != null && termijn !== '' ? t.betalingTekst(termijn) : ''}</Veld>
-        <Veld label={t.valuta}>{valuta}</Veld>
         <div className="io-veld io-veld-breed">
           <div className="io-label">{t.afleveradres}</div>
           <div className="io-waarde">
@@ -187,14 +190,12 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
           <tr>
             <th className="io-pos">{t.pos}</th>
             <th>{t.artikel}</th>
+            <th>{t.omschrijving}</th>
+            <th>{t.uwArtikel}</th>
             <th className="num">{t.aantal}</th>
             <th>{t.eenheid}</th>
-            <th className="num">
-              {t.prijs} ({valuta})
-            </th>
-            <th className="num">
-              {t.bedrag} ({valuta})
-            </th>
+            <th className="num">{t.prijs}</th>
+            <th className="num">{t.bedrag}</th>
             <th className="num">{t.leverdatumKort}</th>
           </tr>
         </thead>
@@ -202,17 +203,11 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
           {regels.map((r, i) => (
             <tr key={r.id}>
               <td className="io-pos">{r.regelnummer || (i + 1) * 10}</td>
-              <td>
-                <div className="io-artikelnummer">{r.artikelnummer}</div>
-                <div>{r.artikelnaam}</div>
-                {r.leverancierArtikelnummer && (
-                  <div className="io-klein">
-                    {t.uwArtikel} {r.leverancierArtikelnummer}
-                  </div>
-                )}
-              </td>
+              <td className="io-artikelnummer io-nowrap">{r.artikelnummer}</td>
+              <td>{r.artikelnaam}</td>
+              <td className="io-nowrap">{r.leverancierArtikelnummer}</td>
               <td className="num">{formatNumber(r.aantal, Number.isInteger(Number(r.aantal)) ? 0 : 2)}</td>
-              <td>{eenheid(r.eenheid, taal)}</td>
+              <td className="io-nowrap">{eenheid(r.eenheid, taal)}</td>
               <td className="num">{formatPrijs(r.prijs)}</td>
               <td className="num">{formatNumber(bedrag(r), 2)}</td>
               <td className="num">{datumKort(r.leverdatum)}</td>
@@ -222,7 +217,9 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
         <tfoot>
           <tr>
             <td></td>
-            <td className="io-klein">{t.regels(regels.length)}</td>
+            <td colSpan={3} className="io-klein">
+              {t.regels(regels.length)}
+            </td>
             <td colSpan={3} className="num io-totaal-label">
               {t.totaal}
             </td>
