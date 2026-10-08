@@ -21,6 +21,7 @@ De huisstijl komt uit het FMID-logo: een **blauwe zeshoek met witte "F"** en **"
 | `public/fmid-logo.png` | Volledig logo (zeshoek + "MID"), transparante achtergrond. Inlogscherm, zijbalk, PDF's. |
 | `public/favicon.png` | Alleen de zeshoek, 64×64. Browsertabblad. |
 | `public/apple-touch-icon.png` | Alleen de zeshoek, 180×180. Beginscherm op telefoon/tablet. |
+| `public/briefpapier-voet.jpg` | Foto (draaibank) uit de voet van het briefpapier. Alleen voor documenten. |
 
 - Gebruik altijd deze bestanden; maak geen eigen variant of nagetekend logo.
 - Toon het logo op een **witte (lichte) achtergrond**. Op een donkere achtergrond (zoals de
@@ -63,14 +64,16 @@ Gebruik de bestaande klassen uit `src/index.css` in plaats van nieuwe stijlen te
 
 ### Documenten (PDF's en mails)
 
-- Inkooporders en andere documenten volgen de opmaak van
-  `src/pages/inkooporders/InkooporderDocument.jsx` + `afdruk.css`: A4, logo linksboven,
-  bedrijfsgegevens rechtsboven, blauwe lijn onder de kop en de kolomkoppen, groene lijn
-  boven de voettekst.
+- Alle documenten (inkooporder, orderbevestiging, pakbon, factuur) staan op het
+  FMID-briefpapier: `src/pages/inkooporders/Briefpapier.jsx` + `afdruk.css` (`.brief-*`),
+  nagebouwd naar het drukwerk `Brief_FMID_voorzijde` (map Huisstijl FMI Dussen/Drukwerk).
+  Logo linksboven, bedrijfsgegevens rechtsboven (grijs, labels in FMID-blauw, Gill Sans),
+  onderaan groene band met blauwe balk, de foto `public/briefpapier-voet.jpg` en de
+  bankgegevens. De inhoud gebruikt Arial, met een blauwe lijn onder de kolomkoppen.
 - `afdruk.css` definieert `--fmid-blauw` en `--fmid-groen` opnieuw op `.afdruk-pagina`,
   omdat de PDF-bijlage buiten de app wordt gerenderd. Houd die waarden gelijk aan `src/index.css`.
-- Bedrijfsgegevens (F.M.I. Dussen B.V., Loswal 5, 4271 BA Dussen, tel./fax, info@fmid.nl,
-  www.fmid.nl) staan in `BEDRIJF` in `InkooporderDocument.jsx`; hergebruik die.
+- Bedrijfsgegevens (adres, tel./fax, mail, web, bank, IBAN/BIC, KvK, BTW-nummer) staan in
+  `BEDRIJF` in `src/pages/inkooporders/bedrijf.js`; hergebruik die.
 - Uitgaande mail gebruikt het lettertype **Aptos (Hoofdtekst) 12 pt**, gelijk aan Outlook
   (`MAIL_FONT` in `src/lib/inkooporderMail.js`), en sluit af met de handtekening van de
   afzender (`handtekening` in `users/{uid}`, anders `standaardHandtekening()`).

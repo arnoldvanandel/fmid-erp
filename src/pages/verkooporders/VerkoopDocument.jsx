@@ -1,6 +1,7 @@
 import { formatNumber } from '../../lib/format'
 import { adresLabel, berekenTotalen, btwPercentage, btwVermelding } from '../../lib/verkooporders'
-import { BEDRIJF, datumKort, datumLang } from '../inkooporders/InkooporderDocument'
+import { BEDRIJF, datumKort, datumLang } from '../inkooporders/bedrijf'
+import Briefpapier from '../inkooporders/Briefpapier'
 import '../inkooporders/afdruk.css'
 
 // Teksten op de documenten, in de taal van de klant (veld `taal`).
@@ -162,25 +163,7 @@ export default function VerkoopDocument({ soort, order, klant, regels, document:
   const vermelding = soort !== 'pakbon' ? btwVermelding(btwGroep, taal) : ''
 
   return (
-    <div className="afdruk-pagina">
-      <header className="afdruk-kop">
-        <img src="/fmid-logo.png" alt="FMID" className="afdruk-logo" />
-        <div className="afdruk-bedrijf">
-          <div>
-            <strong>{BEDRIJF.naam}</strong>
-            {BEDRIJF.adres.map((r) => (
-              <div key={r}>{r}</div>
-            ))}
-          </div>
-          <div>
-            <div>Tel: {BEDRIJF.telefoon}</div>
-            <div>Fax: {BEDRIJF.fax}</div>
-            <div>{BEDRIJF.email}</div>
-            <div>{BEDRIJF.website}</div>
-          </div>
-        </div>
-      </header>
-
+    <Briefpapier>
       <div className="afdruk-adres">
         <Adres adres={adres} />
       </div>
@@ -376,18 +359,8 @@ export default function VerkoopDocument({ soort, order, klant, regels, document:
             {d?.klantcode || order?.klantcode} - {nummer}
           </strong>
         </div>
-        <div className="afdruk-kleine-letters">
-          {[
-            BEDRIJF.kvkNummer && `KvK ${BEDRIJF.kvkNummer}`,
-            BEDRIJF.btwNummer && `BTW ${BEDRIJF.btwNummer}`,
-            BEDRIJF.iban && `IBAN ${BEDRIJF.iban}`,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-          {(BEDRIJF.kvkNummer || BEDRIJF.btwNummer || BEDRIJF.iban) && <br />}
-          {t.voorwaarden}
-        </div>
+        <div className="afdruk-kleine-letters">{t.voorwaarden}</div>
       </footer>
-    </div>
+    </Briefpapier>
   )
 }

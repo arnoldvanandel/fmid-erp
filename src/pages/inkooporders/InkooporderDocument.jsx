@@ -1,34 +1,10 @@
 import { formatNumber } from '../../lib/format'
+import Briefpapier from './Briefpapier'
+import { datumKort, datumLang } from './bedrijf'
 import './afdruk.css'
 
-// Bedrijfsgegevens zoals ze op de Axapta-inkooporder stonden. Ook gebruikt
-// door de verkoopdocumenten (orderbevestiging, pakbon, factuur).
-export const BEDRIJF = {
-  naam: 'F.M.I. Dussen B.V.',
-  adres: ['Loswal 5', '4271 BA  Dussen', 'The Netherlands'],
-  telefoon: '+31 (0)416 39 22 33',
-  fax: '+31 (0)416 39 21 26',
-  email: 'info@fmid.nl',
-  website: 'www.fmid.nl',
-  // Verplicht op een factuur. Nog in te vullen; lege velden worden niet getoond.
-  btwNummer: '',
-  kvkNummer: '',
-  iban: '',
-  bic: '',
-}
-
-// "2026-10-01" -> "1-10-2026" (kop) of "01-10-26" (regels), zoals op de oude order.
-export function datumLang(iso) {
-  if (!iso) return ''
-  const [j, m, d] = iso.split('-')
-  return `${Number(d)}-${Number(m)}-${j}`
-}
-
-export function datumKort(iso) {
-  if (!iso) return ''
-  const [j, m, d] = iso.split('-')
-  return `${d}-${m}-${j.slice(2)}`
-}
+// Voor bestaande imports elders.
+export { BEDRIJF, datumKort, datumLang } from './bedrijf'
 
 function prijs(value) {
   return formatNumber(value, 2)
@@ -42,25 +18,7 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
   const valuta = leverancier?.valuta || 'EUR'
 
   return (
-    <div className="afdruk-pagina">
-      <header className="afdruk-kop">
-        <img src="/fmid-logo.png" alt="FMID" className="afdruk-logo" />
-        <div className="afdruk-bedrijf">
-          <div>
-            <strong>{BEDRIJF.naam}</strong>
-            {BEDRIJF.adres.map((r) => (
-              <div key={r}>{r}</div>
-            ))}
-          </div>
-          <div>
-            <div>Tel: {BEDRIJF.telefoon}</div>
-            <div>Fax: {BEDRIJF.fax}</div>
-            <div>{BEDRIJF.email}</div>
-            <div>{BEDRIJF.website}</div>
-          </div>
-        </div>
-      </header>
-
+    <Briefpapier>
       <div className="afdruk-adres">
         <div>{leverancier?.naam || order.leverancierNaam}</div>
         {leverancier?.straat && <div>{leverancier.straat}</div>}
@@ -151,6 +109,6 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
           Deze bestelling is automatisch aangemaakt en daarom niet voorzien van een handtekening
         </div>
       </footer>
-    </div>
+    </Briefpapier>
   )
 }

@@ -1,5 +1,5 @@
-/* Printbare inkooporder, orderbevestiging, pakbon en factuur: A4,
-   huisstijlkleuren uit het FMID-logo. */
+/* Printbare inkooporder, orderbevestiging, pakbon en factuur: A4 op het
+   FMID-briefpapier (Briefpapier.jsx), huisstijlkleuren uit het FMID-logo. */
 
 .afdruk-scherm {
   min-height: 100vh;
@@ -22,7 +22,9 @@
   width: 210mm;
   min-height: 297mm;
   margin: 0 auto;
-  padding: 14mm 16mm 40mm;
+  /* Boven: ruimte voor logo en bedrijfsgegevens; onder: voor de voet van het
+     briefpapier (band, foto, bankgegevens) en de correspondentieregel. */
+  padding: 50mm 16mm 64mm;
   background: #fff;
   color: #111;
   font-family: Arial, Helvetica, sans-serif;
@@ -31,32 +33,91 @@
   box-shadow: 0 4px 20px rgba(20, 24, 32, 0.15);
 }
 
-.afdruk-kop {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10mm;
-  padding-bottom: 5mm;
-  border-bottom: 2px solid var(--fmid-blauw);
+/* ---------- Briefpapier ----------
+   Posities overgenomen uit Brief_FMID_voorzijde (A4). De voet staat vast
+   tegen de onderkant van het document. */
+
+.afdruk-pagina {
+  --brief-font: 'Gill Sans MT', 'Gill Sans', Calibri, Arial, sans-serif;
+  --brief-grijs: #4d4d4f;
 }
 
-.afdruk-logo {
-  width: 62mm;
+.brief-logo {
+  position: absolute;
+  left: 10mm;
+  top: 10mm;
+  width: 64mm;
   height: auto;
 }
 
-.afdruk-bedrijf {
-  display: flex;
-  gap: 8mm;
-  font-size: 9pt;
+.brief-gegevens {
+  position: absolute;
+  top: 10.5mm;
+  right: 11mm;
+  font-family: var(--brief-font);
+  font-size: 8.5pt;
+  line-height: 3.55mm;
+  color: var(--brief-grijs);
 }
 
-.afdruk-bedrijf strong {
+.brief-regel {
+  display: grid;
+  grid-template-columns: 62mm 16mm;
+  column-gap: 5mm;
+  min-height: 3.55mm;
+}
+
+.brief-regel > span:first-child {
+  text-align: right;
+}
+
+.brief-label {
   color: var(--fmid-blauw);
 }
 
+.brief-voet-foto {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 170mm;
+  height: 45mm;
+  object-fit: cover;
+  object-position: left top;
+}
+
+/* Blauwe balk die onder de groene band uitsteekt, met afgeronde hoek. */
+.brief-voet-blauw {
+  position: absolute;
+  left: 0;
+  bottom: 33.8mm;
+  width: 72.2mm;
+  height: 10mm;
+  background: var(--fmid-blauw);
+  border-bottom-right-radius: 2.3mm;
+}
+
+.brief-voet-groen {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 36.1mm;
+  height: 9.3mm;
+  background: var(--fmid-groen);
+}
+
+.brief-bank {
+  top: auto;
+  bottom: 9mm;
+  font-size: 9pt;
+  line-height: 4.55mm;
+}
+
+.brief-bank .brief-regel {
+  min-height: 4.55mm;
+}
+
 .afdruk-adres {
-  margin: 12mm 0 0 95mm;
+  margin: 0 0 0 95mm;
   min-height: 22mm;
   font-size: 11pt;
 }
@@ -173,22 +234,23 @@
   white-space: pre-wrap;
 }
 
+/* Correspondentieregel en kleine letters, net boven de groene band. */
 .afdruk-voet {
   position: absolute;
   left: 16mm;
   right: 16mm;
-  bottom: 12mm;
+  bottom: 49mm;
 }
 
 .afdruk-correspondentie {
   display: flex;
   gap: 18mm;
-  padding-top: 3mm;
-  border-top: 2px solid var(--fmid-groen);
+  padding-top: 2.5mm;
+  border-top: 1px solid #c4cad3;
 }
 
 .afdruk-kleine-letters {
-  margin-top: 6mm;
+  margin-top: 2.5mm;
   text-align: center;
   font-size: 7pt;
   color: #555;

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { formatCurrency, formatNumber } from '../../lib/format'
 import { berekenTotalen, btwPercentage, btwVermelding, maakFactuur } from '../../lib/verkooporders'
-import { BEDRIJF } from '../inkooporders/InkooporderDocument'
+import { BEDRIJF } from '../inkooporders/bedrijf'
 import Modal from '../../components/Modal'
 import { GetalCel } from '../../components/RegelGrid'
 
@@ -61,7 +61,7 @@ export default function FactuurVenster({ order, regels, gebruiker, onKlaar }) {
       {bedrijfsgegevensOntbreken && (
         <div className="banner banner-warning">
           Het BTW-nummer, KvK-nummer en/of IBAN van FMID staan nog niet in de app en komen dus niet op de factuur.
-          Laat ze invullen in BEDRIJF (src/pages/inkooporders/InkooporderDocument.jsx).
+          Laat ze invullen in BEDRIJF (src/pages/inkooporders/bedrijf.js).
         </div>
       )}
 
