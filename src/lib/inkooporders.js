@@ -31,7 +31,7 @@ async function volgendOrdernummer() {
 // Maakt de kop van een inkooporder aan voor een leverancier. Orderregels
 // worden er daarna los aan toegevoegd (zie voegInkooporderRegelToe), net
 // zoals stuklijstregels bij een artikel.
-export async function maakInkooporder({ leverancier, gebruiker }) {
+export async function maakInkooporder({ leverancier, gebruiker, gebruikerEmail }) {
   if (!leverancier?.id) throw new Error('Geen leverancier gekozen.')
 
   const vandaag = new Date().toISOString().slice(0, 10)
@@ -49,6 +49,8 @@ export async function maakInkooporder({ leverancier, gebruiker }) {
     // de leverancier), "Besteld door" en de leveringsvoorwaarde.
     referentie: leverancier.contactpersoon || '',
     besteldDoor: gebruiker || '',
+    besteldDoorEmail: gebruikerEmail || '',
+    offertenummer: '',
     levering: '',
     opmerkingen: '',
     aangemaaktDoor: gebruiker || '',

@@ -256,6 +256,151 @@
   color: #555;
 }
 
+/* ---------- Inkooporder (InkooporderDocument.jsx) ---------- */
+
+.afdruk-pagina {
+  --io-tint: #f1f3fa;
+  --io-lijn: #dfe3ea;
+  --io-grijs: #6b7280;
+}
+
+.io-kop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  min-height: 27mm;
+}
+
+.io-titel {
+  margin: 0;
+  font-size: 19pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--fmid-blauw);
+}
+
+.io-nummer {
+  margin-top: 1mm;
+  font-size: 13pt;
+  font-weight: 700;
+}
+
+.io-datum {
+  color: var(--io-grijs);
+}
+
+.io-adres {
+  width: 80mm;
+  font-size: 10.5pt;
+  line-height: 1.4;
+}
+
+.io-adres-naam {
+  font-weight: 700;
+}
+
+/* Ordergegevens in een blok van 4 kolommen. */
+.io-gegevens {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2.5mm 4mm;
+  margin: 5mm 0 6mm;
+  padding: 3.5mm 4mm;
+  background: var(--io-tint);
+  border-left: 1.2mm solid var(--fmid-blauw);
+  border-radius: 1mm;
+}
+
+.io-veld-breed {
+  grid-column: 1 / -1;
+}
+
+.io-label {
+  font-size: 7pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fmid-blauw);
+}
+
+.io-waarde {
+  font-size: 9.5pt;
+}
+
+.io-klein {
+  font-size: 8pt;
+  color: var(--io-grijs);
+}
+
+.io-regels {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+
+.io-regels th {
+  padding: 2mm 1.5mm;
+  font-size: 7.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  color: #fff;
+  background: var(--fmid-blauw);
+}
+
+.io-regels td {
+  padding: 2.2mm 1.5mm;
+  vertical-align: top;
+  border-bottom: 1px solid var(--io-lijn);
+}
+
+.io-regels .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.io-regels th.io-pos {
+  width: 9mm;
+}
+
+.io-regels td.io-pos {
+  color: var(--io-grijs);
+}
+
+.io-artikelnummer {
+  font-weight: 700;
+}
+
+.io-regels tfoot td {
+  border-bottom: none;
+  padding-top: 3mm;
+}
+
+.io-totaal-label {
+  font-weight: 700;
+}
+
+.io-totaal {
+  font-weight: 700;
+  font-size: 10.5pt;
+  border-top: 1.5px solid var(--fmid-blauw);
+}
+
+.io-opmerkingen {
+  margin-top: 5mm;
+  padding: 3mm 4mm;
+  border: 1px solid var(--io-lijn);
+  border-radius: 1mm;
+  white-space: pre-wrap;
+}
+
+.io-instructie {
+  margin: 5mm 0 0;
+  font-size: 8.5pt;
+  color: var(--io-grijs);
+}
+
 @page {
   size: A4;
   margin: 0;

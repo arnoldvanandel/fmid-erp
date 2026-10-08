@@ -35,6 +35,7 @@ function NieuweInkooporderForm({ onCreated, onCancel }) {
       const order = await maakInkooporder({
         leverancier,
         gebruiker: profile?.naam || profile?.email,
+        gebruikerEmail: profile?.email,
       })
       onCreated(order)
     } catch (err) {

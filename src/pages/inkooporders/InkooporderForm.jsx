@@ -31,6 +31,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const [verwachteLeverdatum, setVerwachteLeverdatum] = useState(inkooporder.verwachteLeverdatum || '')
   const [besteldatum, setBesteldatum] = useState(inkooporder.besteldatum || '')
   const [referentie, setReferentie] = useState(inkooporder.referentie || '')
+  const [offertenummer, setOffertenummer] = useState(inkooporder.offertenummer || '')
   const [besteldDoor, setBesteldDoor] = useState(inkooporder.besteldDoor || '')
   const [levering, setLevering] = useState(inkooporder.levering || '')
   const [opmerkingen, setOpmerkingen] = useState(inkooporder.opmerkingen || '')
@@ -104,6 +105,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         besteldatum,
         verwachteLeverdatum,
         referentie: referentie.trim(),
+        offertenummer: offertenummer.trim(),
         besteldDoor: besteldDoor.trim(),
         levering: levering.trim(),
         opmerkingen: opmerkingen.trim(),
@@ -255,6 +257,15 @@ export default function InkooporderForm({ inkooporder, onDone }) {
           />
         </div>
         <div className="field">
+          <label>Uw offerte</label>
+          <input
+            type="text"
+            value={offertenummer}
+            onChange={(e) => setOffertenummer(e.target.value)}
+            placeholder="Offertenummer leverancier"
+          />
+        </div>
+        <div className="field">
           <label>Besteld door</label>
           <input type="text" value={besteldDoor} onChange={(e) => setBesteldDoor(e.target.value)} />
         </div>
@@ -264,7 +275,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
             type="text"
             value={levering}
             onChange={(e) => setLevering(e.target.value)}
-            placeholder="bijv. franco huis"
+            placeholder="bijv. DAP, EXW of franco huis"
           />
         </div>
       </div>
