@@ -1,6 +1,6 @@
 import { formatNumber, formatPrijs } from '../../lib/format'
-import { LEVERINGSVOORWAARDEN } from '../../lib/stamgegevens'
 import Briefpapier from './Briefpapier'
+import { NEDERLAND, Veld, eenheid, landRegel, leveringTekst } from './documentDelen'
 import { BEDRIJF, datumKort, datumLang } from './bedrijf'
 import './afdruk.css'
 
@@ -104,32 +104,6 @@ const T = {
   },
 }
 
-// Eenheden en ons land in de taal van de leverancier.
-const EENHEDEN = {
-  de: { stuks: 'Stk.', meter: 'm', kg: 'kg', set: 'Satz' },
-  en: { stuks: 'pcs', meter: 'm', kg: 'kg', set: 'set' },
-}
-const NEDERLAND = { nl: 'Nederland', de: 'Niederlande', en: 'the Netherlands' }
-
-function eenheid(tekst, taal) {
-  return EENHEDEN[taal]?.[String(tekst || '').toLowerCase()] || tekst
-}
-
-// "DAP" -> "DAP — Delivered at Place"; vrije tekst blijft zoals hij is.
-function leveringTekst(levering) {
-  const code = String(levering || '').trim()
-  return LEVERINGSVOORWAARDEN[code.toUpperCase()] ? `${code.toUpperCase()} — ${LEVERINGSVOORWAARDEN[code.toUpperCase()]}` : code
-}
-
-function Veld({ label, children }) {
-  return (
-    <div className="io-veld">
-      <div className="io-label">{label}</div>
-      <div className="io-waarde">{children || '—'}</div>
-    </div>
-  )
-}
-
 // De A4-pagina van een inkooporder. Wordt gebruikt voor de afdrukpagina én
 // voor de PDF-bijlage bij het mailen (zie lib/inkooporderMail.js).
 export default function InkooporderDocument({ order, leverancier, regels }) {
@@ -144,14 +118,14 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
 
   return (
     <Briefpapier>
-      <div className="io-kop">
-        <div className="io-titelblok">
-          <h1 className="io-titel">{t.titel}</h1>
-          <div className="io-nummer">{order.ordernummer}</div>
-          <div className="io-datum">{datumLang(order.besteldatum)}</div>
+      <div className="doc-kop">
+        <div className="doc-titelblok">
+          <h1 className="doc-titel">{t.titel}</h1>
+          <div className="doc-nummer">{order.ordernummer}</div>
+          <div className="doc-datum">{datumLang(order.besteldatum)}</div>
         </div>
-        <div className="io-adres">
-          <div className="io-adres-naam">{leverancier?.naam || order.leverancierNaam}</div>
+        <div className="doc-adres">
+          <div className="doc-adres-naam">{leverancier?.naam || order.leverancierNaam}</div>
           {contact && (
             <div>
               {t.tav} {contact}
@@ -159,36 +133,34 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
           )}
           {leverancier?.straat && <div>{leverancier.straat}</div>}
           {plaatsregel && <div>{plaatsregel}</div>}
-          {leverancier?.land && !/^(nederland|the netherlands)$/i.test(leverancier.land) && (
-            <div>{leverancier.land.toUpperCase()}</div>
-          )}
+          {landRegel(leverancier?.land, taal) && <div>{landRegel(leverancier?.land, taal)}</div>}
         </div>
       </div>
 
-      <div className="io-gegevens">
+      <div className="doc-gegevens">
         <Veld label={t.besteldatum}>{datumLang(order.besteldatum)}</Veld>
         <Veld label={t.leverancier}>{order.leverancierscode}</Veld>
         <Veld label={t.offerte}>{order.offertenummer}</Veld>
         <Veld label={t.besteldDoor}>
           {order.besteldDoor}
-          {order.besteldDoorEmail && <span className="io-klein"> · {order.besteldDoorEmail}</span>}
+          {order.besteldDoorEmail && <span className="doc-klein"> · {order.besteldDoorEmail}</span>}
         </Veld>
         <Veld label={t.valuta}>{valuta}</Veld>
         <Veld label={t.leverdatum}>{datumLang(order.verwachteLeverdatum)}</Veld>
         <Veld label={t.levering}>{leveringTekst(order.levering)}</Veld>
         <Veld label={t.betaling}>{termijn != null && termijn !== '' ? t.betalingTekst(termijn) : ''}</Veld>
-        <div className="io-veld io-veld-breed">
-          <div className="io-label">{t.afleveradres}</div>
-          <div className="io-waarde">
+        <div className="doc-veld doc-veld-breed">
+          <div className="doc-label">{t.afleveradres}</div>
+          <div className="doc-waarde">
             {BEDRIJF.naam}, {BEDRIJF.adres.slice(0, 2).join(', ').replace(/\s{2,}/g, ' ')}, {NEDERLAND[taal]}
           </div>
         </div>
       </div>
 
-      <table className="io-regels">
+      <table className="doc-regels">
         <thead>
           <tr>
-            <th className="io-pos">{t.pos}</th>
+            <th className="doc-pos">{t.pos}</th>
             <th>{t.artikel}</th>
             <th>{t.omschrijving}</th>
             <th>{t.uwArtikel}</th>
@@ -202,12 +174,12 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
         <tbody>
           {regels.map((r, i) => (
             <tr key={r.id}>
-              <td className="io-pos">{r.regelnummer || (i + 1) * 10}</td>
-              <td className="io-artikelnummer io-nowrap">{r.artikelnummer}</td>
+              <td className="doc-pos">{r.regelnummer || (i + 1) * 10}</td>
+              <td className="doc-artikelnummer doc-nowrap">{r.artikelnummer}</td>
               <td>{r.artikelnaam}</td>
-              <td className="io-nowrap">{r.leverancierArtikelnummer}</td>
+              <td className="doc-nowrap">{r.leverancierArtikelnummer}</td>
               <td className="num">{formatNumber(r.aantal, Number.isInteger(Number(r.aantal)) ? 0 : 2)}</td>
-              <td className="io-nowrap">{eenheid(r.eenheid, taal)}</td>
+              <td className="doc-nowrap">{eenheid(r.eenheid, taal)}</td>
               <td className="num">{formatPrijs(r.prijs)}</td>
               <td className="num">{formatNumber(bedrag(r), 2)}</td>
               <td className="num">{datumKort(r.leverdatum)}</td>
@@ -217,13 +189,13 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
         <tfoot>
           <tr>
             <td></td>
-            <td colSpan={3} className="io-klein">
+            <td colSpan={3} className="doc-klein">
               {t.regels(regels.length)}
             </td>
-            <td colSpan={3} className="num io-totaal-label">
+            <td colSpan={3} className="num doc-totaal-label">
               {t.totaal}
             </td>
-            <td className="num io-totaal">
+            <td className="num doc-totaal">
               {valuta} {formatNumber(totaal, 2)}
             </td>
             <td></td>
@@ -232,13 +204,13 @@ export default function InkooporderDocument({ order, leverancier, regels }) {
       </table>
 
       {order.opmerkingen && (
-        <div className="io-opmerkingen">
-          <div className="io-label">{t.opmerkingen}</div>
+        <div className="doc-opmerkingen">
+          <div className="doc-label">{t.opmerkingen}</div>
           <div>{order.opmerkingen}</div>
         </div>
       )}
 
-      <p className="io-instructie">{t.instructie(order.ordernummer)}</p>
+      <p className="doc-instructie">{t.instructie(order.ordernummer)}</p>
 
       <footer className="afdruk-voet">
         <div className="afdruk-correspondentie">

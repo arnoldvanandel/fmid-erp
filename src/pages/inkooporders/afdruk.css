@@ -114,124 +114,6 @@
   min-height: 3.1mm;
 }
 
-.afdruk-adres {
-  margin: 0 0 0 95mm;
-  min-height: 22mm;
-  font-size: 11pt;
-}
-
-.afdruk-titel {
-  margin: 6mm 0 4mm;
-  font-size: 16pt;
-  font-weight: 700;
-  color: var(--fmid-blauw);
-}
-
-.afdruk-gegevens {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 6mm;
-}
-
-.afdruk-gegevens dl {
-  display: grid;
-  grid-template-columns: 34mm auto;
-  margin: 0;
-  row-gap: 1mm;
-}
-
-.afdruk-gegevens dl:last-child {
-  width: 72mm;
-}
-
-.afdruk-gegevens dt::after {
-  content: ':';
-}
-
-.afdruk-gegevens dd {
-  margin: 0;
-}
-
-.afdruk-regels {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.afdruk-regels th {
-  text-align: left;
-  font-weight: 600;
-  vertical-align: bottom;
-  padding: 2mm 2mm 3mm;
-  border-bottom: 1.5px solid var(--fmid-blauw);
-}
-
-.afdruk-regels td {
-  vertical-align: top;
-  padding: 3mm 2mm 1mm;
-}
-
-.afdruk-regels th:first-child,
-.afdruk-regels td:first-child {
-  width: 22mm;
-}
-
-.afdruk-regels th:nth-child(2),
-.afdruk-regels td:nth-child(2) {
-  width: 14mm;
-}
-
-.afdruk-regels .num {
-  text-align: right;
-}
-
-.afdruk-regels tbody tr:first-child td {
-  padding-top: 5mm;
-}
-
-.afdruk-totaal {
-  margin-top: 4mm;
-  padding-top: 2mm;
-  border-top: 1px solid #c4cad3;
-  text-align: right;
-}
-
-.afdruk-totalen {
-  margin: 4mm 0 0 auto;
-  width: 95mm;
-  padding-top: 2mm;
-  border-top: 1px solid #c4cad3;
-}
-
-.afdruk-totalen div {
-  display: flex;
-  justify-content: space-between;
-  gap: 6mm;
-  padding: 0.6mm 2mm;
-}
-
-.afdruk-totalen .afdruk-totalen-eind {
-  margin-top: 1mm;
-  padding-top: 1.5mm;
-  border-top: 1.5px solid var(--fmid-blauw);
-  font-weight: 700;
-}
-
-.afdruk-leveradres {
-  margin-bottom: 4mm;
-}
-
-.afdruk-ontvangen {
-  margin: 14mm 0 0 4mm;
-  padding-bottom: 14mm;
-  border-bottom: 1px dotted #888;
-  width: 110mm;
-}
-
-.afdruk-opmerkingen {
-  margin: 8mm 0 0 4mm;
-  white-space: pre-wrap;
-}
-
 /* Correspondentieregel en kleine letters, net boven de groene band. */
 .afdruk-voet {
   position: absolute;
@@ -255,22 +137,22 @@
   color: #555;
 }
 
-/* ---------- Inkooporder (InkooporderDocument.jsx) ---------- */
+/* ---------- Documentinhoud (inkooporder, orderbevestiging, pakbon, factuur) ---------- */
 
 .afdruk-pagina {
-  --io-tint: #f1f3fa;
-  --io-lijn: #dfe3ea;
-  --io-grijs: #6b7280;
+  --doc-tint: #f1f3fa;
+  --doc-lijn: #dfe3ea;
+  --doc-grijs: #6b7280;
 }
 
-.io-kop {
+.doc-kop {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   min-height: 19mm;
 }
 
-.io-titel {
+.doc-titel {
   margin: 0;
   font-size: 14pt;
   font-weight: 700;
@@ -278,43 +160,43 @@
   color: var(--fmid-blauw);
 }
 
-.io-nummer {
+.doc-nummer {
   margin-top: 0.5mm;
   font-size: 10.5pt;
   font-weight: 700;
 }
 
-.io-datum {
-  color: var(--io-grijs);
+.doc-datum {
+  color: var(--doc-grijs);
 }
 
-.io-adres {
+.doc-adres {
   width: 80mm;
   font-size: 9pt;
   line-height: 1.3;
 }
 
-.io-adres-naam {
+.doc-adres-naam {
   font-weight: 700;
 }
 
-/* Ordergegevens in een blok van 4 kolommen. */
-.io-gegevens {
+/* Ordergegevens in een blok van 5 kolommen. */
+.doc-gegevens {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 1.5mm 3mm;
   margin: 3mm 0 4mm;
   padding: 2mm 3mm;
-  background: var(--io-tint);
+  background: var(--doc-tint);
   border-left: 1.2mm solid var(--fmid-blauw);
   border-radius: 1mm;
 }
 
-.io-veld-breed {
+.doc-veld-breed {
   grid-column: span 2;
 }
 
-.io-label {
+.doc-label {
   font-size: 6pt;
   font-weight: 700;
   text-transform: uppercase;
@@ -322,23 +204,23 @@
   color: var(--fmid-blauw);
 }
 
-.io-waarde {
+.doc-waarde {
   font-size: 8pt;
 }
 
-.io-klein {
+.doc-klein {
   font-size: 7pt;
-  color: var(--io-grijs);
+  color: var(--doc-grijs);
 }
 
-.io-regels {
+.doc-regels {
   width: 100%;
   border-collapse: collapse;
   font-size: 8pt;
   line-height: 1.2;
 }
 
-.io-regels th {
+.doc-regels th {
   padding: 1.2mm 1.2mm;
   white-space: nowrap;
   font-size: 6.5pt;
@@ -350,60 +232,101 @@
   background: var(--fmid-blauw);
 }
 
-.io-regels td {
+.doc-regels td {
   padding: 0.8mm 1.2mm;
   vertical-align: top;
-  border-bottom: 1px solid var(--io-lijn);
+  border-bottom: 1px solid var(--doc-lijn);
 }
 
-.io-regels .num {
+.doc-regels .num {
   text-align: right;
   white-space: nowrap;
 }
 
-.io-regels th.io-pos {
+.doc-regels th.doc-pos {
   width: 7mm;
 }
 
-.io-regels .io-nowrap {
+.doc-regels .doc-nowrap {
   white-space: nowrap;
 }
 
-.io-regels td.io-pos {
-  color: var(--io-grijs);
+.doc-regels td.doc-pos {
+  color: var(--doc-grijs);
 }
 
-.io-artikelnummer {
+.doc-artikelnummer {
   font-weight: 700;
 }
 
-.io-regels tfoot td {
+.doc-regels tfoot td {
   border-bottom: none;
   padding-top: 1.5mm;
 }
 
-.io-totaal-label {
+.doc-totaal-label {
   font-weight: 700;
 }
 
-.io-totaal {
+.doc-totaal {
   font-weight: 700;
   font-size: 9pt;
   border-top: 1.5px solid var(--fmid-blauw);
 }
 
-.io-opmerkingen {
+.doc-opmerkingen {
   margin-top: 3mm;
   padding: 1.5mm 3mm;
-  border: 1px solid var(--io-lijn);
+  border: 1px solid var(--doc-lijn);
   border-radius: 1mm;
   white-space: pre-wrap;
 }
 
-.io-instructie {
+.doc-instructie {
   margin: 3mm 0 0;
   font-size: 7.5pt;
-  color: var(--io-grijs);
+  color: var(--doc-grijs);
+}
+
+/* Totalen (orderbevestiging, factuur), rechts onder de regels. */
+.doc-totalen {
+  margin: 1mm 0 0 auto;
+  width: 82mm;
+  font-size: 8pt;
+}
+
+.doc-totalen div {
+  display: flex;
+  justify-content: space-between;
+  gap: 4mm;
+  padding: 0.5mm 1.2mm;
+}
+
+.doc-totalen .doc-totalen-eind {
+  margin-top: 0.8mm;
+  padding-top: 1.2mm;
+  border-top: 1.5px solid var(--fmid-blauw);
+  font-size: 9pt;
+  font-weight: 700;
+}
+
+/* BTW verlegd / export: valt op, want verplicht op de factuur. */
+.doc-vermelding {
+  margin: 3mm 0 0;
+  font-size: 8pt;
+  font-weight: 700;
+}
+
+.doc-betaling {
+  color: inherit;
+}
+
+.doc-ontvangen {
+  margin: 8mm 0 0;
+  padding-bottom: 10mm;
+  width: 110mm;
+  border-bottom: 1px dotted #888;
+  font-size: 8pt;
 }
 
 @page {

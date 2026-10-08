@@ -69,7 +69,12 @@ Gebruik de bestaande klassen uit `src/index.css` in plaats van nieuwe stijlen te
   nagebouwd naar het drukwerk `Brief_FMID_voorzijde` (map Huisstijl FMI Dussen/Drukwerk).
   Logo linksboven, bedrijfsgegevens rechtsboven (grijs, labels in FMID-blauw, Gill Sans),
   onderaan groene band met blauwe balk, de foto `public/briefpapier-voet.jpg` en de
-  bankgegevens. De inhoud gebruikt Arial, met een blauwe lijn onder de kolomkoppen.
+  bankgegevens. De inhoud is compact (Arial 8–8,5 pt) en voor alle documenten gelijk:
+  titel + nummer links met het adres rechts, een gegevensblok (`.doc-gegevens`) en een
+  regeltabel met blauwe kopregel (`.doc-regels`), zodat er ±29 regels op één A4 passen.
+  Gedeelde onderdelen (gegevensveld, eenheden, landnamen, leveringsconditie) staan in
+  `src/pages/inkooporders/documentDelen.jsx`. Documenten zijn in de taal van de
+  leverancier/klant (NL/DE/EN).
 - `afdruk.css` definieert `--fmid-blauw` en `--fmid-groen` opnieuw op `.afdruk-pagina`,
   omdat de PDF-bijlage buiten de app wordt gerenderd. Houd die waarden gelijk aan `src/index.css`.
 - Bedrijfsgegevens (adres, tel./fax, mail, web, bank, IBAN/BIC, KvK, BTW-nummer) staan in
