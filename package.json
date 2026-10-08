@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "emulators": "firebase emulators:start --only auth,firestore --project demo-fmid-erp",
+    "dev:emulator": "vite --mode emulator --port 5174",
+    "seed:emulator": "node scripts/emulator-seed.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build && firebase deploy"

@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { doc, onSnapshot } from 'firebase/firestore'
-import { db } from '../../firebase'
+import { useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
-import { formatCurrency, formatDateTime, formatNumber } from '../../lib/format'
+import { formatCurrency, formatNumber } from '../../lib/format'
 import { mailInkooporder } from '../../lib/inkooporderMail'
 import { haalArtikelOpNummer } from '../../lib/artikelZoeken'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
-import Modal from '../../components/Modal'
+import MailVenster, { MailStatus } from '../../components/MailVenster'
+import { GetalCel, gridToets } from '../../components/RegelGrid'
 import {
   inkooporderEmailadressen,
   laadInkooporderVoorAfdruk,
@@ -291,19 +290,22 @@ export default function InkooporderForm({ inkooporder, onDone }) {
 
       {mailGegevens && (
         <MailVenster
-          inkooporder={inkooporder}
-          leverancier={mailGegevens.leverancier}
+          titel={`Inkooporder ${inkooporder.ordernummer} mailen`}
+          standaardAdressen={inkooporderEmailadressen(mailGegevens.leverancier)}
+          eerderGemaildOp={inkooporder.gemaildOp}
+          adressenHint="vaste adressen stel je in bij de leverancier (tabblad Inkooporder)"
           gebruikerEmail={profile?.email}
           bezig={mailen}
+          annulerenLabel="Niet mailen"
           onVersturen={verstuurMail}
-          onNietMailen={() => {
+          onAnnuleren={() => {
             setMailGegevens(null)
             onDone?.()
           }}
         />
       )}
 
-      <MailStatus inkooporder={inkooporder} />
+      <MailStatus document={inkooporder} />
 
       <div className="regel-grid-kop">
         <h3>Orderregels</h3>
@@ -502,179 +504,6 @@ export default function InkooporderForm({ inkooporder, onDone }) {
           Sluiten
         </button>
       </div>
-    </div>
-  )
-}
-
-// ↑/↓ in de regeltabel: naar dezelfde kolom op de regel erboven/eronder.
-// Enter verlaat de cel, waardoor de wijziging wordt opgeslagen.
-function gridToets(e) {
-  const { rij, kolom } = e.currentTarget.dataset
-  if (e.key === 'Enter') {
-    e.currentTarget.blur()
-    return
-  }
-  if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
-  // In de artikellijst van de nieuwe regel kiezen de pijltjes een suggestie.
-  if (e.currentTarget.list) return
-  const doel = Number(rij) + (e.key === 'ArrowUp' ? -1 : 1)
-  const cel = e.currentTarget
-    .closest('table')
-    ?.querySelector(`[data-rij="${doel}"][data-kolom="${kolom}"]`)
-  if (cel) {
-    e.preventDefault()
-    cel.focus()
-    cel.select?.()
-  }
-}
-
-// "1.900,50" -> 1900.5. Zonder komma geldt een punt als duizendtal-scheiding
-// als het er zo uitziet ("1.900"), anders als decimaalteken ("0.05").
-function parseGetal(tekst) {
-  const t = String(tekst).trim().replace(/\s/g, '')
-  if (t === '') return ''
-  let n
-  if (t.includes(',')) n = Number(t.replace(/\./g, '').replace(',', '.'))
-  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) n = Number(t.replace(/\./g, ''))
-  else n = Number(t)
-  return Number.isFinite(n) ? n : null
-}
-
-// Getalcel zoals in Axapta: toont "1.900,00", bij het bewerken het kale getal.
-function GetalCel({ value, decimalen = 2, maxDecimalen = decimalen, onCommit, rij, kolom }) {
-  const [bewerken, setBewerken] = useState(null)
-  const leeg = value === '' || value == null
-  const weergave = leeg
-    ? ''
-    : Number(value).toLocaleString('nl-NL', { minimumFractionDigits: decimalen, maximumFractionDigits: maxDecimalen })
-
-  return (
-    <input
-      type="text"
-      inputMode="decimal"
-      data-rij={rij}
-      data-kolom={kolom}
-      value={bewerken ?? weergave}
-      onFocus={(e) => {
-        setBewerken(leeg ? '' : String(value).replace('.', ','))
-        const el = e.currentTarget
-        setTimeout(() => el.select(), 0)
-      }}
-      onChange={(e) => setBewerken(e.target.value)}
-      onBlur={() => {
-        const n = parseGetal(bewerken ?? '')
-        setBewerken(null)
-        if (n !== null) onCommit(n)
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          setBewerken(leeg ? '' : String(value).replace('.', ','))
-          return
-        }
-        gridToets(e)
-      }}
-    />
-  )
-}
-
-// Na het opslaan: de order mailen naar de adressen van de leverancier. Voor
-// deze ene mail kun je adressen toevoegen of weghalen; de vaste adressen
-// blijven bij de leverancier (tabblad Inkooporder).
-function MailVenster({ inkooporder, leverancier, gebruikerEmail, bezig, onVersturen, onNietMailen }) {
-  const [aanTekst, setAanTekst] = useState(inkooporderEmailadressen(leverancier).join(', '))
-  const [fout, setFout] = useState(null)
-
-  const aan = aanTekst
-    .split(/[,;\s]+/)
-    .map((e) => e.trim())
-    .filter(Boolean)
-  const ongeldig = aan.filter((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))
-  const cc = gebruikerEmail && !aan.includes(gebruikerEmail) ? gebruikerEmail : null
-
-  async function handleVersturen() {
-    setFout(null)
-    if (aan.length === 0) {
-      setFout('Vul minimaal één e-mailadres in.')
-      return
-    }
-    if (ongeldig.length) {
-      setFout(`Geen geldig e-mailadres: ${ongeldig.join(', ')}`)
-      return
-    }
-    try {
-      await onVersturen(aan)
-    } catch (err) {
-      setFout(err.message)
-    }
-  }
-
-  return (
-    <Modal
-      title={`Inkooporder ${inkooporder.ordernummer} mailen`}
-      onClose={bezig ? undefined : onNietMailen}
-      width={520}
-    >
-      {fout && <div className="banner banner-danger">{fout}</div>}
-      {inkooporder.gemaildOp && (
-        <div className="banner banner-warning">
-          Let op: deze order is al eerder gemaild ({formatDateTime(inkooporder.gemaildOp)}).
-        </div>
-      )}
-      <div className="field">
-        <label>Aan</label>
-        <textarea
-          rows={3}
-          value={aanTekst}
-          onChange={(e) => setAanTekst(e.target.value)}
-          placeholder="inkoop@leverancier.nl, verkoop@leverancier.nl"
-          autoFocus
-        />
-        <span className="hint">
-          Meerdere adressen scheiden met een komma. Wat je hier toevoegt geldt alleen voor deze mail; vaste
-          adressen stel je in bij de leverancier (tabblad Inkooporder).
-        </span>
-      </div>
-      {cc && <p className="hint">Kopie (cc) naar: {cc}</p>}
-      <div className="modal-actions">
-        <button type="button" className="btn btn-secondary" onClick={onNietMailen} disabled={bezig}>
-          Niet mailen
-        </button>
-        <button type="button" className="btn btn-primary" onClick={handleVersturen} disabled={bezig}>
-          {bezig ? 'Versturen…' : `Versturen${aan.length > 1 ? ` (${aan.length} adressen)` : ''}`}
-        </button>
-      </div>
-    </Modal>
-  )
-}
-
-// Toont naar wie en wanneer de order gemaild is, en (live) of de
-// Cloud Function verstuurMail de mail daadwerkelijk heeft kunnen versturen.
-function MailStatus({ inkooporder }) {
-  const [delivery, setDelivery] = useState(null)
-
-  useEffect(() => {
-    if (!inkooporder.mailId) return undefined
-    return onSnapshot(
-      doc(db, 'mail', inkooporder.mailId),
-      (snap) => setDelivery(snap.data()?.delivery || null),
-      () => setDelivery(null)
-    )
-  }, [inkooporder.mailId])
-
-  if (!inkooporder.gemaildOp) return null
-
-  const state = delivery?.state
-  const label =
-    state === 'SUCCESS'
-      ? 'verzonden'
-      : state === 'ERROR'
-        ? `niet verzonden: ${delivery.error || 'onbekende fout'}`
-        : 'wacht op verzending'
-
-  return (
-    <div className={'banner ' + (state === 'ERROR' ? 'banner-danger' : state === 'SUCCESS' ? 'banner-info' : 'banner-warning')}>
-      Gemaild naar {(inkooporder.gemaildNaar || []).join(', ')}
-      {inkooporder.gemaildCc?.length ? ` (cc: ${inkooporder.gemaildCc.join(', ')})` : ''} op {formatDateTime(inkooporder.gemaildOp)} — {label}
     </div>
   )
 }

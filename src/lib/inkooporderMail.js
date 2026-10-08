@@ -7,9 +7,10 @@ import InkooporderDocument from '../pages/inkooporders/InkooporderDocument'
 import { inkooporderEmailadressen, laadInkooporderVoorAfdruk, wijzigInkooporder } from './inkooporders'
 
 // Rendert de A4-pagina buiten beeld en zet 'm om naar een PDF (base64).
-// Zelfde opmaak als de afdrukpagina, dus wat de leverancier krijgt is
-// precies wat je via "PDF / afdrukken" ziet.
-export async function maakPdfBase64(gegevens) {
+// Zelfde opmaak als de afdrukpagina, dus wat de ontvanger krijgt is precies
+// wat je via "PDF / afdrukken" ziet. `Document` is het component dat de pagina
+// tekent (InkooporderDocument, VerkoopDocument, ...).
+export async function maakPdfBase64(gegevens, Document = InkooporderDocument) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
 
   const container = document.createElement('div')
@@ -17,7 +18,7 @@ export async function maakPdfBase64(gegevens) {
   document.body.appendChild(container)
   const root = createRoot(container)
   try {
-    flushSync(() => root.render(createElement(InkooporderDocument, gegevens)))
+    flushSync(() => root.render(createElement(Document, gegevens)))
     const pagina = container.querySelector('.afdruk-pagina')
     await Promise.all(
       [...pagina.querySelectorAll('img')].map((img) => (img.complete ? null : img.decode().catch(() => null)))
@@ -26,7 +27,19 @@ export async function maakPdfBase64(gegevens) {
 
     const canvas = await html2canvas(pagina, { scale: 2, backgroundColor: '#ffffff', useCORS: true })
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297)
+    // Langer dan één A4 (veel regels): in stukken van een A4-hoogte over meerdere pagina's.
+    const paginaHoogtePx = Math.round((canvas.width * 297) / 210)
+    const stuk = document.createElement('canvas')
+    stuk.width = canvas.width
+    stuk.height = paginaHoogtePx
+    const ctx = stuk.getContext('2d')
+    for (let y = 0; y < canvas.height - 2; y += paginaHoogtePx) {
+      if (y > 0) pdf.addPage()
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, stuk.width, stuk.height)
+      ctx.drawImage(canvas, 0, -y)
+      pdf.addImage(stuk.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297)
+    }
     return pdf.output('datauristring').split(',')[1]
   } finally {
     root.unmount()
@@ -63,11 +76,11 @@ function escapeHtml(tekst) {
 
 // Lettertype van de mail, gelijk aan de handtekening in Outlook:
 // Aptos (Hoofdtekst) 12 pt, met terugval voor ontvangers zonder Aptos.
-const MAIL_FONT = "font-family:Aptos,'Aptos (Body)',Calibri,Arial,sans-serif;font-size:12pt"
+export const MAIL_FONT = "font-family:Aptos,'Aptos (Body)',Calibri,Arial,sans-serif;font-size:12pt"
 
 // Platte tekst -> eenvoudige HTML: regels behouden, webadressen en
 // e-mailadressen klikbaar.
-function tekstNaarHtml(tekst) {
+export function tekstNaarHtml(tekst) {
   return escapeHtml(tekst)
     .split('\n')
     .map((regel) =>

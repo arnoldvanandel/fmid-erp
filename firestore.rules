@@ -86,6 +86,31 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Verkooporderregels: zelfde patroon als inkooporderregels.
+    match /verkooporderregels/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
+    // Pakbonnen en facturen worden vanuit een verkooporder gemaakt. Na het
+    // aanmaken worden alleen nog de mailgegevens bijgewerkt; de inhoud van een
+    // factuur (bedragen, regels, nummer) ligt vast.
+    match /pakbonnen/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
+    match /facturen/{docId} {
+      allow read: if isActive();
+      allow create: if isActive();
+      allow update: if isActive()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['gemaildNaar', 'gemaildCc', 'gemaildOp', 'mailId']);
+      allow delete: if isAdmin();
+    }
+
     match /inkooporders/{docId} {
       allow read: if isActive();
       allow create, update: if isActive();

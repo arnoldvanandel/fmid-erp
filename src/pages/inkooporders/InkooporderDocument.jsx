@@ -1,24 +1,30 @@
 import { formatNumber } from '../../lib/format'
 import './afdruk.css'
 
-// Bedrijfsgegevens zoals ze op de Axapta-inkooporder stonden.
-const BEDRIJF = {
+// Bedrijfsgegevens zoals ze op de Axapta-inkooporder stonden. Ook gebruikt
+// door de verkoopdocumenten (orderbevestiging, pakbon, factuur).
+export const BEDRIJF = {
   naam: 'F.M.I. Dussen B.V.',
   adres: ['Loswal 5', '4271 BA  Dussen', 'The Netherlands'],
   telefoon: '+31 (0)416 39 22 33',
   fax: '+31 (0)416 39 21 26',
   email: 'info@fmid.nl',
   website: 'www.fmid.nl',
+  // Verplicht op een factuur. Nog in te vullen; lege velden worden niet getoond.
+  btwNummer: '',
+  kvkNummer: '',
+  iban: '',
+  bic: '',
 }
 
 // "2026-10-01" -> "1-10-2026" (kop) of "01-10-26" (regels), zoals op de oude order.
-function datumLang(iso) {
+export function datumLang(iso) {
   if (!iso) return ''
   const [j, m, d] = iso.split('-')
   return `${Number(d)}-${Number(m)}-${j}`
 }
 
-function datumKort(iso) {
+export function datumKort(iso) {
   if (!iso) return ''
   const [j, m, d] = iso.split('-')
   return `${d}-${m}-${j.slice(2)}`

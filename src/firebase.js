@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { connectAuthEmulator, getAuth } from 'firebase/auth'
+import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
 // Deze waarden komen uit je eigen Firebase-project (zie README.md).
@@ -28,6 +28,13 @@ if (missing.length > 0) {
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+// Lokaal testen zonder de echte data te raken: `npm run dev:emulator` start
+// Vite met VITE_EMULATOR=1 (zie .env.emulator), na `npm run emulators`.
+if (import.meta.env.VITE_EMULATOR === '1') {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+}
 
 // Cloud Storage moet apart ingeschakeld worden in de Firebase Console (zie
 // README.md) — als dat nog niet is gebeurd gooit getStorage() een synchrone

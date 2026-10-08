@@ -6,6 +6,7 @@ dist
 .env.local
 .firebase
 firebase-debug.log
+firestore-debug.log
 
 # migratie: sleutels en exports nooit committen
 migratie/*.json

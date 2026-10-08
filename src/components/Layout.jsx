@@ -5,6 +5,8 @@ const navItems = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/artikelen', label: 'Artikelen' },
   { to: '/klanten', label: 'Klanten' },
+  { to: '/verkooporders', label: 'Verkooporders' },
+  { to: '/facturen', label: 'Facturen' },
   { to: '/leveranciers', label: 'Leveranciers' },
   { to: '/inkooporders', label: 'Inkooporders' },
   { to: '/voorraad', label: 'Voorraad' },

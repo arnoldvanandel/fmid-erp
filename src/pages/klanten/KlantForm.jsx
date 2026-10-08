@@ -103,6 +103,14 @@ function AdresVelden({ adres: a, onChange }) {
   )
 }
 
+// "a@x.nl, b@y.nl" -> ['a@x.nl', 'b@y.nl']
+function emailLijst(tekst) {
+  return tekst
+    .split(/[,;\s]+/)
+    .map((e) => e.trim())
+    .filter(Boolean)
+}
+
 export default function KlantForm({ klant, onDone }) {
   const { isAdmin } = useAuth()
   const isNew = !klant?.id
@@ -117,6 +125,8 @@ export default function KlantForm({ klant, onDone }) {
     fax: klant?.fax || '',
     email: klant?.email || '',
     website: klant?.website || '',
+    orderbevestigingEmails: (klant?.orderbevestigingEmails || []).join(', '),
+    factuurEmails: (klant?.factuurEmails || []).join(', '),
     straat: klant?.straat || '',
     postcode: klant?.postcode || '',
     plaats: klant?.plaats || '',
@@ -187,6 +197,8 @@ export default function KlantForm({ klant, onDone }) {
       fax: form.fax.trim(),
       email: form.email.trim(),
       website: form.website.trim(),
+      orderbevestigingEmails: emailLijst(form.orderbevestigingEmails),
+      factuurEmails: emailLijst(form.factuurEmails),
       straat: form.straat.trim(),
       postcode: form.postcode.trim(),
       plaats: form.plaats.trim(),
@@ -451,6 +463,29 @@ export default function KlantForm({ klant, onDone }) {
                 <input type="text" value={form.fax} onChange={(e) => set('fax', e.target.value)} />
               </div>
             </div>
+            <div className="field-row">
+              <div className="field">
+                <label>E-mailadressen voor orderbevestigingen en pakbonnen</label>
+                <input
+                  type="text"
+                  value={form.orderbevestigingEmails}
+                  onChange={(e) => set('orderbevestigingEmails', e.target.value)}
+                  placeholder="inkoop@klant.nl, planning@klant.nl"
+                />
+              </div>
+              <div className="field">
+                <label>E-mailadressen voor facturen</label>
+                <input
+                  type="text"
+                  value={form.factuurEmails}
+                  onChange={(e) => set('factuurEmails', e.target.value)}
+                  placeholder="crediteuren@klant.nl"
+                />
+              </div>
+            </div>
+            <span className="hint">
+              Meerdere adressen scheiden met een komma. Leeg = het algemene e-mailadres hierboven.
+            </span>
           </>
         )}
 

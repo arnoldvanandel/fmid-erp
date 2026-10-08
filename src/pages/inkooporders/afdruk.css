@@ -1,4 +1,5 @@
-/* Printbare inkooporder: A4, huisstijlkleuren uit het FMID-logo. */
+/* Printbare inkooporder, orderbevestiging, pakbon en factuur: A4,
+   huisstijlkleuren uit het FMID-logo. */
 
 .afdruk-scherm {
   min-height: 100vh;
@@ -135,6 +136,38 @@
   text-align: right;
 }
 
+.afdruk-totalen {
+  margin: 4mm 0 0 auto;
+  width: 95mm;
+  padding-top: 2mm;
+  border-top: 1px solid #c4cad3;
+}
+
+.afdruk-totalen div {
+  display: flex;
+  justify-content: space-between;
+  gap: 6mm;
+  padding: 0.6mm 2mm;
+}
+
+.afdruk-totalen .afdruk-totalen-eind {
+  margin-top: 1mm;
+  padding-top: 1.5mm;
+  border-top: 1.5px solid var(--fmid-blauw);
+  font-weight: 700;
+}
+
+.afdruk-leveradres {
+  margin-bottom: 4mm;
+}
+
+.afdruk-ontvangen {
+  margin: 14mm 0 0 4mm;
+  padding-bottom: 14mm;
+  border-bottom: 1px dotted #888;
+  width: 110mm;
+}
+
 .afdruk-opmerkingen {
   margin: 8mm 0 0 4mm;
   white-space: pre-wrap;
@@ -176,9 +209,9 @@
     display: none;
   }
 
+  /* Langer dan één A4 (veel regels) loopt door op de volgende pagina. */
   .afdruk-pagina {
-    height: 297mm;
-    overflow: hidden;
+    min-height: 297mm;
     margin: 0;
     box-shadow: none;
     -webkit-print-color-adjust: exact;

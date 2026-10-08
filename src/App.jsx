@@ -9,6 +9,9 @@ import LeveranciersList from './pages/leveranciers/LeveranciersList'
 import KlantenList from './pages/klanten/KlantenList'
 import InkoopordersList from './pages/inkooporders/InkoopordersList'
 import InkooporderAfdruk from './pages/inkooporders/InkooporderAfdruk'
+import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
+import FacturenList from './pages/verkooporders/FacturenList'
+import VerkoopAfdruk from './pages/verkooporders/VerkoopAfdruk'
 import VoorraadOverzicht from './pages/voorraad/VoorraadOverzicht'
 import ProductieordersList from './pages/productieorders/ProductieordersList'
 import LocatiesBeheer from './pages/locaties/LocatiesBeheer'
@@ -88,6 +91,50 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <InkooporderAfdruk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verkooporders"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <VerkoopordersList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/facturen"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <FacturenList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verkooporders/:id/afdruk"
+            element={
+              <ProtectedRoute>
+                <VerkoopAfdruk soort="bevestiging" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pakbonnen/:id/afdruk"
+            element={
+              <ProtectedRoute>
+                <VerkoopAfdruk soort="pakbon" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/facturen/:id/afdruk"
+            element={
+              <ProtectedRoute>
+                <VerkoopAfdruk soort="factuur" />
               </ProtectedRoute>
             }
           />
