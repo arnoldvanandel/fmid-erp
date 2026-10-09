@@ -4,6 +4,7 @@ import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
 import { useVoorraadTotals } from '../../hooks/useVoorraadTotals'
+import { BRON_LABEL, bronVan, useMutaties } from '../../hooks/useMutaties'
 import { formatBytes, formatCurrency, formatDateTime, formatNumber } from '../../lib/format'
 import { uploadArtikelDocument, verwijderArtikelDocument } from '../../lib/documenten'
 import {
@@ -424,19 +425,12 @@ export default function ArtikelForm({ artikel, onDone }) {
 // te boeken zonder terug te hoeven naar de Voorraad-pagina.
 function VoorraadTab({ artikel }) {
   const { standenPerArtikel, totalenPerArtikel, loading: loadingStanden } = useVoorraadTotals()
-  const { data: mutaties, loading: loadingMutaties } = useCollection('voorraadmutaties', {
-    orderByField: 'datum',
-    orderDirection: 'desc',
-  })
+  const { mutaties: mutatiesVoorArtikel, loading: loadingMutaties } = useMutaties({ artikelId: artikel.id, max: 10 })
   const [mutatieBoeken, setMutatieBoeken] = useState(false)
 
   const standen = standenPerArtikel[artikel.id] || []
   const totaal = totalenPerArtikel[artikel.id] || 0
   const laag = totaal <= Number(artikel.minVoorraad || 0)
-  const mutatiesVoorArtikel = useMemo(
-    () => mutaties.filter((m) => m.artikelId === artikel.id).slice(0, 10),
-    [mutaties, artikel.id]
-  )
 
   return (
     <div>
@@ -479,7 +473,12 @@ function VoorraadTab({ artikel }) {
         </table>
       )}
 
-      <h3>Recente mutaties</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <h3>Recente mutaties</h3>
+        <a href={`/voorraad/mutaties?artikel=${encodeURIComponent(artikel.artikelnummer)}`} className="hint">
+          Alle mutaties van dit artikel →
+        </a>
+      </div>
       {loadingMutaties ? (
         <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }} /></div>
       ) : mutatiesVoorArtikel.length === 0 ? (
@@ -494,6 +493,7 @@ function VoorraadTab({ artikel }) {
                 <th>Type</th>
                 <th className="num">Van</th>
                 <th className="num">Naar</th>
+                <th>Herkomst</th>
                 <th>Reden</th>
                 <th>Door</th>
               </tr>
@@ -510,6 +510,10 @@ function VoorraadTab({ artikel }) {
                   </td>
                   <td className="num">{formatNumber(m.voorraadVoor)}</td>
                   <td className="num">{formatNumber(m.voorraadNa)}</td>
+                  <td>
+                    {BRON_LABEL[bronVan(m)]}
+                    {m.bronNummer && ` ${m.bronNummer}`}
+                  </td>
                   <td>{m.reden || '-'}</td>
                   <td>{m.gebruiker || '-'}</td>
                 </tr>

@@ -1,4 +1,21 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "voorraadmutaties",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "artikelId", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "voorraadmutaties",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "locatieId", "order": "ASCENDING" },
+        { "fieldPath": "datum", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

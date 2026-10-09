@@ -9,7 +9,8 @@ const navItems = [
   { to: '/facturen', label: 'Facturen' },
   { to: '/leveranciers', label: 'Leveranciers' },
   { to: '/inkooporders', label: 'Inkooporders' },
-  { to: '/voorraad', label: 'Voorraad' },
+  { to: '/voorraad', label: 'Voorraad', end: true },
+  { to: '/voorraad/mutaties', label: 'Voorraadmutaties' },
   { to: '/productieorders', label: 'Productieorders' },
   { to: '/locaties', label: 'Locaties' },
 ]

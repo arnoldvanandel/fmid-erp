@@ -451,6 +451,10 @@ export async function maakPakbon({ verkooporderId, aantallen, locatieId, leverda
           voorraadVoor: huidig,
           voorraadNa: huidig - n,
           reden: `Pakbon ${nummer} (${order.ordernummer}, ${order.klantNaam})`,
+          bron: 'pakbon',
+          bronId: pakbonRef.id,
+          bronNummer: nummer,
+          relatie: `${order.klantcode} ${order.klantNaam}`.trim(),
           gebruiker: gebruiker || '',
           datum: serverTimestamp(),
         })

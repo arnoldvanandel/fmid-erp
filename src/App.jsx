@@ -13,6 +13,7 @@ import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
 import FacturenList from './pages/verkooporders/FacturenList'
 import VerkoopAfdruk from './pages/verkooporders/VerkoopAfdruk'
 import VoorraadOverzicht from './pages/voorraad/VoorraadOverzicht'
+import MutatiesOverzicht from './pages/voorraad/MutatiesOverzicht'
 import ProductieordersList from './pages/productieorders/ProductieordersList'
 import LocatiesBeheer from './pages/locaties/LocatiesBeheer'
 import Gebruikersbeheer from './pages/gebruikers/Gebruikersbeheer'
@@ -144,6 +145,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <VoorraadOverzicht />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/voorraad/mutaties"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <MutatiesOverzicht />
                 </Layout>
               </ProtectedRoute>
             }

@@ -83,6 +83,7 @@ export async function boekVoorraadMutatie({
       voorraadVoor: huidig,
       voorraadNa: nieuw,
       reden: reden || '',
+      bron: 'handmatig',
       gebruiker: gebruiker || '',
       datum: serverTimestamp(),
     })

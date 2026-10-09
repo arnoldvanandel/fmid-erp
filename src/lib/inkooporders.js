@@ -12,6 +12,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
+import { voorraadstandId } from './voorraad'
 
 // Genereert een oplopend inkoopordernummer (IO-000001, IO-000002, ...) via
 // een transactie op counters/inkooporders, zodat twee collega's die
@@ -141,4 +142,123 @@ export function inkooporderEmailadressen(leverancier) {
     ? leverancier.inkooporderEmails
     : [leverancier?.email].filter(Boolean)
   return [...new Set(lijst.map((e) => e.trim()).filter(Boolean))]
+}
+
+// ---------------------------------------------------------------------------
+// Ontvangst
+// ---------------------------------------------------------------------------
+
+export const STATUS_LABEL = {
+  concept: 'Concept',
+  besteld: 'Besteld',
+  'deels ontvangen': 'Deels ontvangen',
+  ontvangen: 'Ontvangen',
+  geannuleerd: 'Geannuleerd',
+}
+
+// Per artikel de locatie waar het al het meeste van ligt, als voorstel bij
+// een ontvangst ({ artikelId: { id, code } }).
+export async function standaardLocaties(artikelIds) {
+  const uniek = [...new Set(artikelIds.filter(Boolean))]
+  const beste = {}
+  for (let i = 0; i < uniek.length; i += 30) {
+    const snap = await getDocs(query(collection(db, 'voorraadstanden'), where('artikelId', 'in', uniek.slice(i, i + 30))))
+    for (const d of snap.docs) {
+      const s = d.data()
+      if (!beste[s.artikelId] || Number(s.aantal) > Number(beste[s.artikelId].aantal)) beste[s.artikelId] = s
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(beste).map(([artikelId, s]) => [artikelId, { id: s.locatieId, code: s.locatieCode }])
+  )
+}
+
+// Boekt een (deel)ontvangst: `ontvangst` is { regelId: { aantal, locatieId } }.
+// Werkt per regel het ontvangen aantal bij, boekt de voorraad in op de gekozen
+// locatie (met een mutatie per regel) en zet de status van de order. Alles in
+// één transactie.
+export async function boekOntvangst({ inkooporderId, ontvangst, pakbonLeverancier = '', gebruiker }) {
+  const regelIds = Object.keys(ontvangst).filter((id) => Number(ontvangst[id].aantal) > 0)
+  if (regelIds.length === 0) throw new Error('Vul bij minimaal één regel een aantal in.')
+  for (const id of regelIds) {
+    if (!ontvangst[id].locatieId) throw new Error('Kies bij elke ontvangen regel een locatie.')
+  }
+  const pakbon = String(pakbonLeverancier || '').trim()
+
+  const alleRegels = (await getDocs(query(collection(db, 'inkooporderregels'), where('inkooporderId', '==', inkooporderId)))).docs.map(
+    (d) => ({ id: d.id, ...d.data() })
+  )
+
+  return runTransaction(db, async (tx) => {
+    const orderRef = doc(db, 'inkooporders', inkooporderId)
+    const orderSnap = await tx.get(orderRef)
+    if (!orderSnap.exists()) throw new Error('Inkooporder niet gevonden.')
+    const order = orderSnap.data()
+
+    const regelSnaps = await Promise.all(regelIds.map((id) => tx.get(doc(db, 'inkooporderregels', id))))
+    const locatieIds = [...new Set(regelIds.map((id) => ontvangst[id].locatieId))]
+    const locaties = {}
+    for (const id of locatieIds) {
+      const snap = await tx.get(doc(db, 'locaties', id))
+      if (!snap.exists()) throw new Error('Een gekozen locatie bestaat niet (meer).')
+      locaties[id] = { id, ...snap.data() }
+    }
+
+    // Voorraadstanden per artikel+locatie (één artikel kan op twee regels staan).
+    const standen = {}
+    for (const s of regelSnaps) {
+      if (!s.exists()) throw new Error('Een orderregel bestaat niet meer; vernieuw de order.')
+      const sleutel = voorraadstandId(s.data().artikelId, ontvangst[s.id].locatieId)
+      if (!(sleutel in standen)) {
+        const snap = await tx.get(doc(db, 'voorraadstanden', sleutel))
+        standen[sleutel] = snap.exists() ? Number(snap.data().aantal) || 0 : 0
+      }
+    }
+
+    const bijgewerkt = {}
+    for (const s of regelSnaps) {
+      const r = s.data()
+      const n = Number(ontvangst[s.id].aantal)
+      const locatie = locaties[ontvangst[s.id].locatieId]
+      const sleutel = voorraadstandId(r.artikelId, locatie.id)
+      const voor = standen[sleutel]
+      standen[sleutel] = voor + n
+      bijgewerkt[s.id] = (Number(r.ontvangen) || 0) + n
+
+      tx.set(
+        doc(db, 'voorraadstanden', sleutel),
+        { artikelId: r.artikelId, artikelnummer: r.artikelnummer, locatieId: locatie.id, locatieCode: locatie.code || '', aantal: voor + n },
+        { merge: true }
+      )
+      tx.set(doc(collection(db, 'voorraadmutaties')), {
+        artikelId: r.artikelId,
+        artikelnummer: r.artikelnummer,
+        artikelnaam: r.artikelnaam,
+        locatieId: locatie.id,
+        locatieCode: locatie.code || '',
+        type: 'in',
+        aantal: n,
+        voorraadVoor: voor,
+        voorraadNa: voor + n,
+        reden: `Ontvangst ${order.ordernummer}${pakbon ? `, pakbon leverancier ${pakbon}` : ''}`,
+        bron: 'inkooporder',
+        bronId: inkooporderId,
+        bronNummer: order.ordernummer,
+        relatie: `${order.leverancierscode} ${order.leverancierNaam}`.trim(),
+        gebruiker: gebruiker || '',
+        datum: serverTimestamp(),
+      })
+    }
+    for (const [id, ontvangen] of Object.entries(bijgewerkt)) {
+      tx.update(doc(db, 'inkooporderregels', id), { ontvangen })
+    }
+
+    const regelsNa = alleRegels.map((r) => (r.id in bijgewerkt ? { ...r, ontvangen: bijgewerkt[r.id] } : r))
+    const alles = regelsNa.every((r) => (Number(r.ontvangen) || 0) >= Number(r.aantal))
+    tx.update(orderRef, {
+      status: order.status === 'geannuleerd' ? order.status : alles ? 'ontvangen' : 'deels ontvangen',
+      laatsteOntvangstOp: serverTimestamp(),
+    })
+    return { alles }
+  })
 }

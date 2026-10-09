@@ -7,7 +7,9 @@ import { haalArtikelOpNummer } from '../../lib/artikelZoeken'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
 import MailVenster, { MailStatus } from '../../components/MailVenster'
 import { GetalCel, gridToets } from '../../components/RegelGrid'
+import OntvangstVenster from './OntvangstVenster'
 import {
+  STATUS_LABEL,
   inkooporderEmailadressen,
   laadInkooporderVoorAfdruk,
   verwijderInkooporder,
@@ -17,13 +19,7 @@ import {
   wijzigInkooporderRegel,
 } from '../../lib/inkooporders'
 
-const STATUSSEN = ['concept', 'besteld', 'ontvangen', 'geannuleerd']
-const STATUS_LABEL = {
-  concept: 'Concept',
-  besteld: 'Besteld',
-  ontvangen: 'Ontvangen',
-  geannuleerd: 'Geannuleerd',
-}
+const STATUSSEN = Object.keys(STATUS_LABEL)
 
 export default function InkooporderForm({ inkooporder, onDone }) {
   const { isAdmin, profile } = useAuth()
@@ -38,6 +34,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const [saving, setSaving] = useState(false)
   const [mailen, setMailen] = useState(false)
   const [mailGegevens, setMailGegevens] = useState(null)
+  const [ontvangstOpen, setOntvangstOpen] = useState(false)
   const [error, setError] = useState(null)
 
   const { data: regels, loading: loadingRegels } = useCollection('inkooporderregels')
@@ -54,6 +51,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     (max, r) => Math.max(max, Number(r.regelnummer) || 0),
     0
   )
+  const teOntvangen = regelsVoorOrder.some((r) => (Number(r.ontvangen) || 0) < Number(r.aantal))
   const totaalbedrag = regelsVoorOrder.reduce(
     (sum, r) => sum + (Number(r.aantal) || 0) * (Number(r.prijs) || 0),
     0
@@ -294,6 +292,21 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         >
           PDF / afdrukken
         </a>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setOntvangstOpen(true)}
+          disabled={!teOntvangen || status === 'geannuleerd' || status === 'concept'}
+          title={
+            status === 'concept'
+              ? 'Eerst bestellen'
+              : !teOntvangen
+                ? 'Alles is al ontvangen'
+                : 'Ontvangen goederen op voorraad boeken'
+          }
+        >
+          Ontvangst boeken
+        </button>
         <button type="button" className="btn btn-primary btn-sm" onClick={handleHeaderSubmit} disabled={saving}>
           {saving ? 'Opslaan…' : 'Opslaan'}
         </button>
@@ -317,6 +330,19 @@ export default function InkooporderForm({ inkooporder, onDone }) {
       )}
 
       <MailStatus document={inkooporder} />
+
+      {ontvangstOpen && (
+        <OntvangstVenster
+          order={inkooporder}
+          regels={regelsVoorOrder}
+          gebruiker={profile?.naam || profile?.email}
+          onKlaar={(resultaat) => {
+            setOntvangstOpen(false)
+            // De status is in de database bijgewerkt; ook hier, zodat Opslaan hem niet terugzet.
+            if (resultaat) setStatus(resultaat.alles ? 'ontvangen' : 'deels ontvangen')
+          }}
+        />
+      )}
 
       <div className="regel-grid-kop">
         <h3>Orderregels</h3>
@@ -356,12 +382,13 @@ export default function InkooporderForm({ inkooporder, onDone }) {
               <th>Artikelnaam</th>
               <th>Leveringsdatum</th>
               <th>Art.nr. leverancier</th>
+              <th className="num">Ontvangen</th>
             </tr>
           </thead>
           <tbody>
             {loadingRegels ? (
               <tr>
-                <td colSpan={9} className="regel-grid-leeg">
+                <td colSpan={10} className="regel-grid-leeg">
                   Laden…
                 </td>
               </tr>
@@ -416,6 +443,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
                       onBlur={(e) => handleRegelTekstChange(r, 'leverancierArtikelnummer', e.target.value)}
                     />
                   </td>
+                  <td className="num alleen-lezen">{formatNumber(r.ontvangen || 0, 0)}</td>
                 </tr>
               ))
             )}
@@ -486,6 +514,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
                   onKeyDown={gridToets}
                 />
               </td>
+              <td className="alleen-lezen"></td>
             </tr>
           </tbody>
           <tfoot>
@@ -495,7 +524,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
                 {formatNumber(regelsVoorOrder.length)} {regelsVoorOrder.length === 1 ? 'regel' : 'regels'}
               </td>
               <td className="num">{formatNumber(totaalbedrag, 2)}</td>
-              <td colSpan={3}>Totaal nettobedrag ({formatCurrency(totaalbedrag)})</td>
+              <td colSpan={4}>Totaal nettobedrag ({formatCurrency(totaalbedrag)})</td>
             </tr>
           </tfoot>
         </table>

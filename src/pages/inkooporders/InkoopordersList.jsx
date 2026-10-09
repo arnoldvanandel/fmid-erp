@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
 import { formatCurrency, formatDateTime } from '../../lib/format'
-import { maakInkooporder } from '../../lib/inkooporders'
+import { STATUS_LABEL, maakInkooporder } from '../../lib/inkooporders'
 import Modal from '../../components/Modal'
 import InkooporderForm from './InkooporderForm'
 
-const STATUS_LABEL = { concept: 'Concept', besteld: 'Besteld', ontvangen: 'Ontvangen', geannuleerd: 'Geannuleerd' }
 const STATUS_BADGE = {
+  'deels ontvangen': 'badge-warning',
   concept: 'badge-neutral',
   besteld: 'badge-warning',
   ontvangen: 'badge-success',

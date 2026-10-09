@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useCollection } from '../../hooks/useCollection'
+import { Link } from 'react-router-dom'
+import { BRON_LABEL, bronVan, useMutaties } from '../../hooks/useMutaties'
 import { useVoorraadArtikelen } from '../../hooks/useVoorraadArtikelen'
 import { telArtikelen, useArtikelZoeken } from '../../lib/artikelZoeken'
 import { formatDateTime, formatNumber } from '../../lib/format'
@@ -19,10 +20,7 @@ export default function VoorraadOverzicht() {
     standenPerArtikel,
     loading: loadingVoorraad,
   } = useVoorraadArtikelen()
-  const { data: mutaties, loading: loadingMutaties } = useCollection('voorraadmutaties', {
-    orderByField: 'datum',
-    orderDirection: 'desc',
-  })
+  const { mutaties, loading: loadingMutaties } = useMutaties({ max: 20 })
 
   const [search, setSearch] = useState('')
   const [alleenLaag, setAlleenLaag] = useState(false)
@@ -168,7 +166,10 @@ export default function VoorraadOverzicht() {
 
       <div className="card">
         <div className="card-pad" style={{ paddingBottom: 12 }}>
-          <h2>Recente mutaties</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <h2>Recente mutaties</h2>
+            <Link to="/voorraad/mutaties">Alle mutaties, zoeken en exporteren →</Link>
+          </div>
         </div>
         {loadingMutaties ? (
           <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }} /></div>
@@ -185,12 +186,13 @@ export default function VoorraadOverzicht() {
                   <th>Type</th>
                   <th className="num">Van</th>
                   <th className="num">Naar</th>
+                  <th>Herkomst</th>
                   <th>Reden</th>
                   <th>Door</th>
                 </tr>
               </thead>
               <tbody>
-                {mutaties.slice(0, 50).map((m) => (
+                {mutaties.map((m) => (
                   <tr key={m.id} style={{ cursor: 'default' }}>
                     <td>{formatDateTime(m.datum)}</td>
                     <td>
@@ -204,6 +206,10 @@ export default function VoorraadOverzicht() {
                     </td>
                     <td className="num">{formatNumber(m.voorraadVoor)}</td>
                     <td className="num">{formatNumber(m.voorraadNa)}</td>
+                    <td>
+                      {BRON_LABEL[bronVan(m)]}
+                      {m.bronNummer && ` ${m.bronNummer}`}
+                    </td>
                     <td>{m.reden || '-'}</td>
                     <td>{m.gebruiker || '-'}</td>
                   </tr>
