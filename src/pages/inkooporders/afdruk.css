@@ -369,6 +369,12 @@
   border-bottom: 1px solid #888;
 }
 
+.pick-vervangt {
+  font-size: 7pt;
+  font-weight: 700;
+  color: var(--fmid-blauw);
+}
+
 .pick-kop {
   margin: 6mm 0 1.5mm;
   font-size: 9pt;

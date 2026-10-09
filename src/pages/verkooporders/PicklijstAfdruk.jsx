@@ -116,7 +116,10 @@ export default function PicklijstAfdruk() {
                   </td>
                   <td className="pick-locatie doc-nowrap">{p.locatieCode}</td>
                   <td className="doc-artikelnummer doc-nowrap">{p.artikelnummer}</td>
-                  <td>{p.artikelnaam}</td>
+                  <td>
+                    {p.artikelnaam}
+                    {p.vervangt && <div className="pick-vervangt">vervangt {p.vervangt}</div>}
+                  </td>
                   <td className="num pick-aantal">{aantal(p.aantal)}</td>
                   <td className="doc-nowrap">{p.eenheid}</td>
                   <td className="num">{aantal(p.opLocatie)}</td>
@@ -149,7 +152,10 @@ export default function PicklijstAfdruk() {
                   <tr key={t.regelnummer}>
                     <td className="doc-pos">{t.regelnummer}</td>
                     <td className="doc-artikelnummer doc-nowrap">{t.artikelnummer}</td>
-                    <td>{t.artikelnaam}</td>
+                    <td>
+                      {t.artikelnaam}
+                      {t.vervanger && <div className="pick-vervangt">ook {t.vervanger} niet (genoeg) op voorraad</div>}
+                    </td>
                     <td className="num">{aantal(t.nodig)}</td>
                     <td className="num doc-artikelnummer">{aantal(t.tekort)}</td>
                     <td>{t.eenheid}</td>
@@ -166,7 +172,8 @@ export default function PicklijstAfdruk() {
           <div>Colli / pallets: ________</div>
         </div>
         <p className="doc-instructie">
-          Vink elke regel af en noteer bij afwijkingen het gepickte aantal. Geef de lijst daarna terug aan
+          Vink elke regel af en noteer bij afwijkingen het gepickte aantal. Een BON-artikel met "vervangt"
+          mag geleverd worden in plaats van het A-artikel dat niet op voorraad is. Geef de lijst daarna terug aan
           verkoop; de voorraad wordt afgeboekt bij het maken van de pakbon.
         </p>
       </div>
