@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { boekVoorraadMutatie } from '../../lib/voorraad'
 import { useAuth } from '../../contexts/AuthContext'
-import { useCollection } from '../../hooks/useCollection'
+import LocatieKiezer from '../../components/LocatieKiezer'
 import { formatNumber } from '../../lib/format'
 
 export default function MutatieForm({ artikel, standen, onDone }) {
   const { profile } = useAuth()
-  const { data: locaties, loading: loadingLocaties } = useCollection('locaties', { orderByField: 'code' })
-  const [locatieId, setLocatieId] = useState(standen?.[0]?.locatieId || '')
+  // Standaard de locatie waar het artikel al ligt; anders zelf een code typen.
+  const [locatieCode, setLocatieCode] = useState(standen?.[0]?.locatieCode || '')
+  const [locatie, setLocatie] = useState(null)
+  const locatieId = locatie?.id || ''
   const [type, setType] = useState('in')
   const [aantal, setAantal] = useState('')
   const [reden, setReden] = useState('')
@@ -20,7 +22,7 @@ export default function MutatieForm({ artikel, standen, onDone }) {
     e.preventDefault()
     setError(null)
     if (!locatieId) {
-      setError('Kies een locatie.')
+      setError(locatieCode.trim() ? `Locatie "${locatieCode.trim()}" bestaat niet.` : 'Kies een locatie.')
       return
     }
     setSaving(true)
@@ -57,7 +59,7 @@ export default function MutatieForm({ artikel, standen, onDone }) {
           </thead>
           <tbody>
             {standen.map((s) => (
-              <tr key={s.locatieId} style={{ cursor: 'default' }}>
+              <tr key={s.locatieId} onClick={() => setLocatieCode(s.locatieCode)} title="Kies deze locatie">
                 <td>{s.locatieCode}</td>
                 <td className="num">
                   {formatNumber(s.aantal)} {artikel.eenheid}
@@ -71,69 +73,59 @@ export default function MutatieForm({ artikel, standen, onDone }) {
       <form onSubmit={handleSubmit}>
         {error && <div className="banner banner-danger">{error}</div>}
 
-        {!loadingLocaties && locaties.length === 0 ? (
-          <div className="banner banner-danger">
-            Er zijn nog geen locaties aangemaakt. Voeg eerst een locatie toe via de pagina
-            "Locaties" voordat je een mutatie kunt boeken.
-          </div>
-        ) : (
-          <>
-            <div className="field">
-              <label>Locatie</label>
-              <select value={locatieId} onChange={(e) => setLocatieId(e.target.value)}>
-                <option value="">Kies locatie…</option>
-                {locaties.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.code} {l.naam ? `— ${l.naam}` : ''}
-                  </option>
-                ))}
-              </select>
-              {standVanGekozenLocatie && (
-                <span className="hint">
-                  Huidige voorraad op deze locatie: {formatNumber(standVanGekozenLocatie.aantal)}{' '}
-                  {artikel.eenheid}
-                </span>
-              )}
-            </div>
+        <div className="field">
+          <label>Locatie</label>
+          <LocatieKiezer
+            value={locatieCode}
+            onChange={setLocatieCode}
+            onKies={setLocatie}
+            placeholder="Typ een locatiecode, bijv. 1343-1"
+          />
+          {locatieCode.trim() && !locatie && <span className="hint">Onbekende locatie</span>}
+          {standVanGekozenLocatie && (
+            <span className="hint">
+              Huidige voorraad op deze locatie: {formatNumber(standVanGekozenLocatie.aantal)}{' '}
+              {artikel.eenheid}
+            </span>
+          )}
+        </div>
 
-            <div className="field">
-              <label>Type mutatie</label>
-              <select value={type} onChange={(e) => setType(e.target.value)}>
-                <option value="in">Inboeken (ontvangst)</option>
-                <option value="uit">Afboeken (uitgifte/verkoop)</option>
-                <option value="correctie">Correctie (nieuwe telling)</option>
-              </select>
-            </div>
+        <div className="field">
+          <label>Type mutatie</label>
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="in">Inboeken (ontvangst)</option>
+            <option value="uit">Afboeken (uitgifte/verkoop)</option>
+            <option value="correctie">Correctie (nieuwe telling)</option>
+          </select>
+        </div>
 
-            <div className="field">
-              <label>{type === 'correctie' ? 'Nieuwe voorraadstand' : 'Aantal'}</label>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={aantal}
-                onChange={(e) => setAantal(e.target.value)}
-                autoFocus
-              />
-            </div>
+        <div className="field">
+          <label>{type === 'correctie' ? 'Nieuwe voorraadstand' : 'Aantal'}</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={aantal}
+            onChange={(e) => setAantal(e.target.value)}
+            autoFocus
+          />
+        </div>
 
-            <div className="field">
-              <label>Reden / referentie</label>
-              <input
-                type="text"
-                value={reden}
-                onChange={(e) => setReden(e.target.value)}
-                placeholder="bijv. ordernr., leverancier, telling"
-              />
-            </div>
-          </>
-        )}
+        <div className="field">
+          <label>Reden / referentie</label>
+          <input
+            type="text"
+            value={reden}
+            onChange={(e) => setReden(e.target.value)}
+            placeholder="bijv. ordernr., leverancier, telling"
+          />
+        </div>
 
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onDone} disabled={saving}>
             Annuleren
           </button>
-          <button type="submit" className="btn btn-primary" disabled={saving || locaties.length === 0}>
+          <button type="submit" className="btn btn-primary" disabled={saving || !locatieId}>
             {saving ? 'Boeken…' : 'Boeken'}
           </button>
         </div>

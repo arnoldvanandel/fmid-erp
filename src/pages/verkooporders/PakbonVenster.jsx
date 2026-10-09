@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useCollection } from '../../hooks/useCollection'
+import LocatieKiezer from '../../components/LocatieKiezer'
 import { formatNumber } from '../../lib/format'
 import { maakPakbon } from '../../lib/verkooporders'
 import Modal from '../../components/Modal'
@@ -8,13 +8,14 @@ import { GetalCel } from '../../components/RegelGrid'
 // Pakbon maken: per regel hoeveel er nu geleverd wordt (standaard alles wat
 // nog openstaat), en eventueel de voorraad afboeken van een locatie.
 export default function PakbonVenster({ order, regels, gebruiker, onKlaar }) {
-  const { data: locaties } = useCollection('locaties', { orderByField: 'code' })
   const open = regels.filter((r) => (Number(r.geleverd) || 0) < Number(r.aantal))
   const [aantallen, setAantallen] = useState(() =>
     Object.fromEntries(open.map((r) => [r.id, Number(r.aantal) - (Number(r.geleverd) || 0)]))
   )
   const [leverdatum, setLeverdatum] = useState(new Date().toISOString().slice(0, 10))
-  const [locatieId, setLocatieId] = useState('')
+  const [locatieCode, setLocatieCode] = useState('')
+  const [locatie, setLocatie] = useState(null)
+  const locatieId = locatie?.id || ''
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
 
@@ -27,6 +28,10 @@ export default function PakbonVenster({ order, regels, gebruiker, onKlaar }) {
         setFout(`${r.artikelnummer}: je kunt maximaal ${formatNumber(rest)} leveren.`)
         return
       }
+    }
+    if (locatieCode.trim() && !locatieId) {
+      setFout(`Locatie "${locatieCode.trim()}" bestaat niet. Laat het veld leeg om niet af te boeken.`)
+      return
     }
     setBezig(true)
     try {
@@ -48,16 +53,13 @@ export default function PakbonVenster({ order, regels, gebruiker, onKlaar }) {
           <input type="date" value={leverdatum} onChange={(e) => setLeverdatum(e.target.value)} />
         </div>
         <div className="field" style={{ flex: 2 }}>
-          <label>Voorraad afboeken van</label>
-          <select value={locatieId} onChange={(e) => setLocatieId(e.target.value)}>
-            <option value="">Niet afboeken</option>
-            {locaties.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.code}
-                {l.naam ? ` — ${l.naam}` : ''}
-              </option>
-            ))}
-          </select>
+          <label>Voorraad afboeken van locatie</label>
+          <LocatieKiezer
+            value={locatieCode}
+            onChange={setLocatieCode}
+            onKies={setLocatie}
+            placeholder="Leeg = niet afboeken"
+          />
         </div>
       </div>
 
