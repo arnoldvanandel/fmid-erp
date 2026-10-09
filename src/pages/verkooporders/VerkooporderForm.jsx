@@ -397,6 +397,15 @@ export default function VerkooporderForm({ verkooporder: begin, onDone }) {
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => openMail('bevestiging')}>
           Bevestiging mailen
         </button>
+        <a
+          className="btn btn-secondary btn-sm"
+          href={`/verkooporders/${order.id}/picklijst`}
+          target="_blank"
+          rel="noreferrer"
+          title={!teLeveren ? 'Alles is al geleverd' : 'Picklijst voor het magazijn'}
+        >
+          Picklijst
+        </a>
         <button
           type="button"
           className="btn btn-secondary btn-sm"

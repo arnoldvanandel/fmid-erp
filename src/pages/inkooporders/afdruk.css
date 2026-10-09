@@ -329,6 +329,63 @@
   font-size: 8pt;
 }
 
+/* ---------- Picklijst (intern, zonder briefpapier) ---------- */
+
+.pick-pagina {
+  padding: 12mm 14mm 14mm;
+}
+
+.pick-logo {
+  width: 38mm;
+  height: auto;
+}
+
+.pick-regels td {
+  padding: 1.8mm 1.2mm;
+  vertical-align: middle;
+}
+
+.pick-regels .pick-vink {
+  width: 7mm;
+  text-align: center;
+}
+
+.pick-vakje {
+  display: inline-block;
+  width: 3.8mm;
+  height: 3.8mm;
+  border: 1px solid #333;
+}
+
+.pick-locatie,
+.pick-aantal {
+  font-size: 9.5pt;
+  font-weight: 700;
+}
+
+.pick-invul {
+  display: inline-block;
+  width: 14mm;
+  border-bottom: 1px solid #888;
+}
+
+.pick-kop {
+  margin: 6mm 0 1.5mm;
+  font-size: 9pt;
+  color: var(--color-danger, #c0392b);
+}
+
+.pick-tekort th {
+  background: #6b7280;
+}
+
+.pick-aftekenen {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10mm;
+  font-size: 8.5pt;
+}
+
 @page {
   size: A4;
   margin: 0;
