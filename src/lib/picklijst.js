@@ -79,6 +79,7 @@ export async function maakPicklijst(verkooporderId) {
       const isVervanger = v && s.artikelId === v.id
       picks.push({
         sleutel: `${r.id}-${s.id}`,
+        regelId: r.id,
         regelnummer: r.regelnummer,
         artikelId: s.artikelId,
         artikelnummer: isVervanger ? v.artikelnummer : r.artikelnummer,
@@ -97,6 +98,7 @@ export async function maakPicklijst(verkooporderId) {
     }
     if (nodig > 0) {
       tekorten.push({
+        regelId: r.id,
         regelnummer: r.regelnummer,
         artikelnummer: r.artikelnummer,
         artikelnaam: r.artikelnaam,

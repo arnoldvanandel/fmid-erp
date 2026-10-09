@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth, ROL_LABELS } from '../contexts/AuthContext'
+import { useInstellingen } from '../hooks/useInstellingen'
 
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
@@ -19,6 +20,7 @@ const adminNavItems = [{ to: '/gebruikers', label: 'Gebruikers' }]
 
 export default function Layout({ children }) {
   const { profile, logout, isAdmin } = useAuth()
+  const { testfase, testEmail } = useInstellingen()
   const navigate = useNavigate()
 
   async function handleLogout() {
@@ -58,6 +60,11 @@ export default function Layout({ children }) {
             ))}
         </nav>
         <div className="sidebar-footer">
+          {testfase && (
+            <div className="sidebar-testfase" title="Alle mail gaat alleen naar het testadres">
+              Testfase · mail alleen naar {testEmail}
+            </div>
+          )}
           <div className="sidebar-user">
             <strong>{profile?.naam || profile?.email}</strong>
             {ROL_LABELS[profile?.role] || 'Invoer'}

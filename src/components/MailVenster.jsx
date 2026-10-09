@@ -3,6 +3,7 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
 import { formatDateTime } from '../lib/format'
 import Modal from './Modal'
+import { useInstellingen } from '../hooks/useInstellingen'
 
 // Venster om een document (inkooporder, orderbevestiging, pakbon, factuur) te
 // mailen. De standaardadressen komen van de leverancier of klant; voor deze
@@ -18,6 +19,7 @@ export default function MailVenster({
   onVersturen,
   onAnnuleren,
 }) {
+  const { testfase, testEmail } = useInstellingen()
   const [aanTekst, setAanTekst] = useState((standaardAdressen || []).join(', '))
   const [fout, setFout] = useState(null)
 
@@ -48,6 +50,11 @@ export default function MailVenster({
   return (
     <Modal title={titel} onClose={bezig ? undefined : onAnnuleren} width={520}>
       {fout && <div className="banner banner-danger">{fout}</div>}
+      {testfase && (
+        <div className="banner banner-warning">
+          Testfase: deze mail gaat alleen naar <strong>{testEmail}</strong>, niet naar de adressen hieronder.
+        </div>
+      )}
       {eerderGemaildOp && (
         <div className="banner banner-warning">Let op: dit is al eerder gemaild ({formatDateTime(eerderGemaildOp)}).</div>
       )}

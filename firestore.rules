@@ -175,6 +175,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Instellingen voor de hele app (o.a. testfase voor mail). Iedereen leest,
+    // alleen een admin wijzigt.
+    match /instellingen/{docId} {
+      allow read: if isActive();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /counters/{docId} {
       allow read: if isActive();
       allow create, update: if isActive();

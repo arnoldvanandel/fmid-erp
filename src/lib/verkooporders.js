@@ -343,13 +343,15 @@ function statusNa(order, regels) {
 // Pakbon
 // ---------------------------------------------------------------------------
 
-// Maakt een pakbon voor de opgegeven aantallen ({ regelId: aantal }). Werkt de
-// regels (geleverd) en de orderstatus bij, en boekt desgewenst de voorraad af
-// van `locatieId`. Alles in één transactie: lukt één onderdeel niet (bijv.
-// onvoldoende voorraad), dan wordt er niets vastgelegd.
-export async function maakPakbon({ verkooporderId, aantallen, locatieId, leverdatum, gebruiker }) {
-  const regelIds = Object.keys(aantallen).filter((id) => Number(aantallen[id]) > 0)
-  if (regelIds.length === 0) throw new Error('Vul bij minimaal één regel een aantal in.')
+// Maakt een pakbon. `leveringen` is een lijst { regelId, locatieId, aantal }:
+// per orderregel één of meer locaties waar het vandaan komt (locatieId leeg =
+// niet van de voorraad afboeken). Werkt de regels (geleverd) en de orderstatus
+// bij en boekt de voorraad per locatie af. Alles in één transactie: lukt één
+// onderdeel niet (bijv. onvoldoende voorraad), dan wordt er niets vastgelegd.
+export async function maakPakbon({ verkooporderId, leveringen, leverdatum, gebruiker }) {
+  const lijst = (leveringen || []).filter((l) => Number(l.aantal) > 0)
+  if (lijst.length === 0) throw new Error('Vul bij minimaal één regel een aantal in.')
+  const regelIds = [...new Set(lijst.map((l) => l.regelId))]
 
   return runTransaction(db, async (tx) => {
     const { nummer, schrijf } = await volgendNummerInTransactie(tx, 'pakbonnen')
@@ -358,33 +360,66 @@ export async function maakPakbon({ verkooporderId, aantallen, locatieId, leverda
     if (!orderSnap.exists()) throw new Error('Verkooporder niet gevonden.')
     const order = orderSnap.data()
     const alleRegels = await laadRegels(verkooporderId)
-    const regelSnaps = await Promise.all(regelIds.map((id) => tx.get(doc(db, 'verkooporderregels', id))))
 
-    let locatie = null
+    const regels = {}
+    for (const id of regelIds) {
+      const s = await tx.get(doc(db, 'verkooporderregels', id))
+      if (!s.exists()) throw new Error('Een orderregel bestaat niet meer; vernieuw de order.')
+      regels[id] = s.data()
+    }
+    const locaties = {}
+    for (const id of [...new Set(lijst.map((l) => l.locatieId).filter(Boolean))]) {
+      const s = await tx.get(doc(db, 'locaties', id))
+      if (!s.exists()) throw new Error('Een gekozen locatie bestaat niet (meer).')
+      locaties[id] = { id, ...s.data() }
+    }
     const standen = {}
-    if (locatieId) {
-      const locSnap = await tx.get(doc(db, 'locaties', locatieId))
-      if (!locSnap.exists()) throw new Error('Locatie bestaat niet (meer).')
-      locatie = { id: locSnap.id, ...locSnap.data() }
-      for (const s of regelSnaps) {
-        const artikelId = s.data().artikelId
-        if (!standen[artikelId]) standen[artikelId] = await tx.get(doc(db, 'voorraadstanden', voorraadstandId(artikelId, locatieId)))
+    for (const l of lijst) {
+      if (!l.locatieId) continue
+      const id = voorraadstandId(regels[l.regelId].artikelId, l.locatieId)
+      if (!(id in standen)) {
+        const s = await tx.get(doc(db, 'voorraadstanden', id))
+        standen[id] = s.exists() ? Number(s.data().aantal) || 0 : 0
       }
     }
 
-    // Controleren en berekenen (nog niets schrijven).
-    const pakbonRegels = []
+    // Controleren (nog niets schrijven).
+    const perRegel = {}
+    for (const l of lijst) perRegel[l.regelId] = (perRegel[l.regelId] || 0) + Number(l.aantal)
+    for (const [id, n] of Object.entries(perRegel)) {
+      const r = regels[id]
+      const open = (Number(r.aantal) || 0) - (Number(r.geleverd) || 0)
+      if (n > open + 1e-9) throw new Error(`${r.artikelnummer}: er staat nog ${open} open; meer leveren kan niet.`)
+    }
+    const nodigPerStand = {}
+    for (const l of lijst) {
+      if (!l.locatieId) continue
+      const id = voorraadstandId(regels[l.regelId].artikelId, l.locatieId)
+      nodigPerStand[id] = (nodigPerStand[id] || 0) + Number(l.aantal)
+    }
+    for (const l of lijst) {
+      if (!l.locatieId) continue
+      const id = voorraadstandId(regels[l.regelId].artikelId, l.locatieId)
+      if (standen[id] - nodigPerStand[id] < 0) {
+        throw new Error(
+          `Onvoldoende voorraad van ${regels[l.regelId].artikelnummer} op ${locaties[l.locatieId].code}: ` +
+            `nog ${standen[id]}, kan niet ${nodigPerStand[id]} afboeken.`
+        )
+      }
+    }
+
+    // Schrijven.
+    schrijf()
+    const pakbonRef = doc(collection(db, 'pakbonnen'))
     const bijgewerkt = {}
-    const afboeken = {}
-    for (const s of regelSnaps) {
-      if (!s.exists()) throw new Error('Een orderregel bestaat niet meer; vernieuw de order.')
-      const r = s.data()
-      const n = Number(aantallen[s.id])
+    const pakbonRegels = regelIds.map((id) => {
+      const r = regels[id]
+      const n = perRegel[id]
       const geleverd = (Number(r.geleverd) || 0) + n
-      bijgewerkt[s.id] = geleverd
-      afboeken[r.artikelId] = (afboeken[r.artikelId] || 0) + n
-      pakbonRegels.push({
-        regelId: s.id,
+      bijgewerkt[id] = geleverd
+      return {
+        regelId: id,
+        regelnummer: r.regelnummer || 0,
         artikelId: r.artikelId,
         artikelnummer: r.artikelnummer,
         artikelnaam: r.artikelnaam,
@@ -393,23 +428,13 @@ export async function maakPakbon({ verkooporderId, aantallen, locatieId, leverda
         besteld: Number(r.aantal) || 0,
         aantal: n,
         nogTeLeveren: Math.max(0, (Number(r.aantal) || 0) - geleverd),
-      })
-    }
-    if (locatie) {
-      for (const [artikelId, n] of Object.entries(afboeken)) {
-        const huidig = standen[artikelId].exists() ? Number(standen[artikelId].data().aantal) || 0 : 0
-        if (huidig - n < 0) {
-          const r = pakbonRegels.find((p) => p.artikelId === artikelId)
-          throw new Error(
-            `Onvoldoende voorraad van ${r.artikelnummer} op ${locatie.code}: nog ${huidig}, kan niet ${n} afboeken.`
-          )
-        }
+        locaties: lijst
+          .filter((l) => l.regelId === id && l.locatieId)
+          .map((l) => ({ code: locaties[l.locatieId].code || '', aantal: Number(l.aantal) })),
       }
-    }
+    })
+    pakbonRegels.sort((a, b) => (Number(a.regelnummer) || 0) - (Number(b.regelnummer) || 0))
 
-    // Schrijven.
-    schrijf()
-    const pakbonRef = doc(collection(db, 'pakbonnen'))
     tx.set(pakbonRef, {
       pakbonnummer: nummer,
       verkooporderId,
@@ -423,42 +448,44 @@ export async function maakPakbon({ verkooporderId, aantallen, locatieId, leverda
       taal: order.taal || 'nl',
       leverdatum: leverdatum || vandaag(),
       regels: pakbonRegels,
-      locatieId: locatie?.id || '',
-      locatieCode: locatie?.code || '',
+      locatieCodes: [...new Set(Object.values(locaties).map((l) => l.code))],
       gemaaktDoor: gebruiker || '',
       datum: serverTimestamp(),
     })
     for (const [id, geleverd] of Object.entries(bijgewerkt)) {
       tx.update(doc(db, 'verkooporderregels', id), { geleverd })
     }
-    if (locatie) {
-      for (const [artikelId, n] of Object.entries(afboeken)) {
-        const huidig = standen[artikelId].exists() ? Number(standen[artikelId].data().aantal) || 0 : 0
-        const r = pakbonRegels.find((p) => p.artikelId === artikelId)
-        tx.set(
-          doc(db, 'voorraadstanden', voorraadstandId(artikelId, locatie.id)),
-          { artikelId, artikelnummer: r.artikelnummer, locatieId: locatie.id, locatieCode: locatie.code || '', aantal: huidig - n },
-          { merge: true }
-        )
-        tx.set(doc(collection(db, 'voorraadmutaties')), {
-          artikelId,
-          artikelnummer: r.artikelnummer,
-          artikelnaam: r.artikelnaam,
-          locatieId: locatie.id,
-          locatieCode: locatie.code || '',
-          type: 'uit',
-          aantal: n,
-          voorraadVoor: huidig,
-          voorraadNa: huidig - n,
-          reden: `Pakbon ${nummer} (${order.ordernummer}, ${order.klantNaam})`,
-          bron: 'pakbon',
-          bronId: pakbonRef.id,
-          bronNummer: nummer,
-          relatie: `${order.klantcode} ${order.klantNaam}`.trim(),
-          gebruiker: gebruiker || '',
-          datum: serverTimestamp(),
-        })
-      }
+    for (const l of lijst) {
+      if (!l.locatieId) continue
+      const r = regels[l.regelId]
+      const locatie = locaties[l.locatieId]
+      const id = voorraadstandId(r.artikelId, l.locatieId)
+      const n = Number(l.aantal)
+      const voor = standen[id]
+      standen[id] = voor - n
+      tx.set(
+        doc(db, 'voorraadstanden', id),
+        { artikelId: r.artikelId, artikelnummer: r.artikelnummer, locatieId: locatie.id, locatieCode: locatie.code || '', aantal: voor - n },
+        { merge: true }
+      )
+      tx.set(doc(collection(db, 'voorraadmutaties')), {
+        artikelId: r.artikelId,
+        artikelnummer: r.artikelnummer,
+        artikelnaam: r.artikelnaam,
+        locatieId: locatie.id,
+        locatieCode: locatie.code || '',
+        type: 'uit',
+        aantal: n,
+        voorraadVoor: voor,
+        voorraadNa: voor - n,
+        reden: `Pakbon ${nummer} (${order.ordernummer}, ${order.klantNaam})`,
+        bron: 'pakbon',
+        bronId: pakbonRef.id,
+        bronNummer: nummer,
+        relatie: `${order.klantcode} ${order.klantNaam}`.trim(),
+        gebruiker: gebruiker || '',
+        datum: serverTimestamp(),
+      })
     }
     const regelsNa = alleRegels.map((r) => (r.id in bijgewerkt ? { ...r, geleverd: bijgewerkt[r.id] } : r))
     tx.update(orderRef, { status: statusNa(order, regelsNa) })

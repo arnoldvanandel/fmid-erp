@@ -652,7 +652,12 @@ export default function VerkooporderForm({ verkooporder: begin, onDone }) {
                 <tr key={d.id} style={{ cursor: 'default' }}>
                   <td>
                     {d.soort === 'factuur' ? 'Factuur' : 'Pakbon'} {d.nummer}
-                    {d.locatieCode && <span className="hint"> · afgeboekt van {d.locatieCode}</span>}
+                    {(d.locatieCodes?.length || d.locatieCode) && (
+                      <span className="hint">
+                        {' '}
+                        · afgeboekt van {d.locatieCodes?.length ? d.locatieCodes.join(', ') : d.locatieCode}
+                      </span>
+                    )}
                   </td>
                   <td>{formatDate(d.datumTekst)}</td>
                   <td className="num">{d.soort === 'factuur' ? formatNumber(d.totaal, 2) : ''}</td>
@@ -703,12 +708,11 @@ export default function VerkooporderForm({ verkooporder: begin, onDone }) {
           order={order}
           regels={regelsVoorOrder}
           gebruiker={gebruiker}
-          onKlaar={(pakbon) => {
+          onMailen={(pakbon) => {
             setVenster(null)
-            if (pakbon && confirm(`Pakbon ${pakbon.pakbonnummer} is gemaakt. Nu naar de klant mailen?`)) {
-              openMail('pakbon', pakbon.id)
-            }
+            openMail('pakbon', pakbon.id)
           }}
+          onKlaar={() => setVenster(null)}
         />
       )}
 

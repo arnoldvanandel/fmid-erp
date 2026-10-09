@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { doc, updateDoc } from 'firebase/firestore'
+import { useInstellingen, wijzigInstellingen } from '../../hooks/useInstellingen'
 import { useCollection } from '../../hooks/useCollection'
 import { db } from '../../firebase'
 import { useAuth, ROL_LABELS } from '../../contexts/AuthContext'
@@ -8,6 +10,73 @@ const ROL_BADGES = {
   wachtend: 'badge-warning',
   invoer: 'badge-neutral',
   admin: 'badge-success',
+}
+
+// Testfase: zolang aan, gaat alle mail (inkooporders, bevestigingen, pakbonnen,
+// facturen) alleen naar het testadres. Wordt afgedwongen in de Cloud Function.
+function TestfaseInstelling() {
+  const { profile } = useAuth()
+  const { instellingen, loading, testfase } = useInstellingen()
+  const [adres, setAdres] = useState('')
+  const [bezig, setBezig] = useState(false)
+  const [fout, setFout] = useState(null)
+
+  useEffect(() => {
+    if (!loading) setAdres(instellingen.testEmail || profile?.email || '')
+  }, [loading, instellingen.testEmail, profile?.email])
+
+  async function zet(aan) {
+    setFout(null)
+    if (aan && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adres.trim())) {
+      setFout('Vul een geldig testadres in.')
+      return
+    }
+    if (!aan && !confirm('Testfase uitzetten? Vanaf nu gaan mails weer echt naar klanten en leveranciers.')) return
+    setBezig(true)
+    try {
+      await wijzigInstellingen({ testfase: aan, testEmail: adres.trim() }, profile?.naam || profile?.email)
+    } catch (err) {
+      setFout(err.message)
+    } finally {
+      setBezig(false)
+    }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginBottom: 20 }}>
+      <h2 style={{ marginTop: 0 }}>Testfase</h2>
+      {fout && <div className="banner banner-danger">{fout}</div>}
+      <div className={'banner ' + (testfase ? 'banner-warning' : 'banner-info')}>
+        {testfase
+          ? `De testfase staat aan: alle mail gaat alleen naar ${instellingen.testEmail}, met [TEST] in het onderwerp.`
+          : 'De testfase staat uit: mail gaat naar de echte ontvangers (klanten en leveranciers).'}
+      </div>
+      <div className="field-row" style={{ alignItems: 'flex-end' }}>
+        <div className="field" style={{ maxWidth: 320 }}>
+          <label>Testadres</label>
+          <input type="email" value={adres} onChange={(e) => setAdres(e.target.value)} disabled={bezig} />
+        </div>
+        <div className="field" style={{ flex: 0, whiteSpace: 'nowrap' }}>
+          {testfase ? (
+            <div style={{ display: 'flex', gap: 8 }}>
+              {adres.trim() !== instellingen.testEmail && (
+                <button type="button" className="btn btn-secondary" onClick={() => zet(true)} disabled={bezig}>
+                  Adres opslaan
+                </button>
+              )}
+              <button type="button" className="btn btn-secondary" onClick={() => zet(false)} disabled={bezig}>
+                Testfase uitzetten
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={() => zet(true)} disabled={bezig}>
+              Testfase aanzetten
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function Gebruikersbeheer() {
@@ -40,6 +109,8 @@ export default function Gebruikersbeheer() {
           <div className="page-header-sub">Beheer wie toegang heeft en wie beheerder is</div>
         </div>
       </div>
+
+      <TestfaseInstelling />
 
       <div className="banner banner-info">
         Nieuwe collega's toevoegen doe je in de Firebase Console onder Authentication → Add user. Zodra
