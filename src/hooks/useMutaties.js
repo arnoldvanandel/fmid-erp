@@ -4,7 +4,7 @@ import { db } from '../firebase'
 
 // Herkomst van een voorraadmutatie (veld `bron`). Oudere mutaties zonder bron
 // zijn handmatig geboekt, of door een pakbon (dan begint de reden met "Pakbon").
-export const BRON_LABEL = { handmatig: 'Handmatig', inkooporder: 'Inkooporder', pakbon: 'Pakbon', import: 'Import Axapta' }
+export const BRON_LABEL = { handmatig: 'Handmatig', inkooporder: 'Inkooporder', pakbon: 'Pakbon', omboeking: 'Omboeking', import: 'Import Axapta' }
 
 export function bronVan(m) {
   if (m.bron) return m.bron

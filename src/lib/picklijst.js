@@ -15,7 +15,9 @@ async function haalOpIn(collectie, veld, waarden) {
 
 // Vervangende artikelen: voor een A-artikel mag het BON-artikel met hetzelfde
 // nummer gepakt worden als het A-artikel niet (genoeg) op voorraad is
-// (A104 15-15 -> BON104 15-15, A108a 1/2-15 -> BON108A 1/2-15).
+// (A104 15-15 -> BON104 15-15, A108a 1/2-15 -> BON108A 1/2-15). Het BON-artikel
+// wordt dan omgeboekt naar het A-artikel (zie boekOmboekingen in lib/voorraad.js)
+// en als A-artikel geleverd.
 export function vervangendeNummers(artikelnummer) {
   const m = /^A(.+)$/i.exec(String(artikelnummer || '').trim())
   if (!m) return []
@@ -82,6 +84,9 @@ export async function maakPicklijst(verkooporderId) {
         artikelnummer: isVervanger ? v.artikelnummer : r.artikelnummer,
         artikelnaam: isVervanger ? v.naam : r.artikelnaam,
         vervangt: isVervanger ? r.artikelnummer : '',
+        // Bij een BON-pick: om te boeken naar het A-artikel van de orderregel.
+        omboekenNaarId: isVervanger ? r.artikelId : '',
+        locatieId: s.locatieId,
         klantArtikelnummer: r.klantArtikelnummer || '',
         eenheid: r.eenheid,
         locatieCode: s.locatieCode,

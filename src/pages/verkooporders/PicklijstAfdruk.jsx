@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '../../contexts/AuthContext'
+import { boekOmboekingen } from '../../lib/voorraad'
 import { useParams } from 'react-router-dom'
 import { formatDateTime, formatNumber } from '../../lib/format'
 import { maakPicklijst } from '../../lib/picklijst'
@@ -16,19 +18,56 @@ function aantal(v) {
 // Boekt niets; de voorraad gaat pas af bij het maken van de pakbon.
 export default function PicklijstAfdruk() {
   const { id } = useParams()
+  const { profile } = useAuth()
   const [lijst, setLijst] = useState(null)
   const [error, setError] = useState(null)
-  const [gemaaktOp] = useState(() => new Date())
+  const [melding, setMelding] = useState(null)
+  const [bezig, setBezig] = useState(false)
+  const [ververs, setVervers] = useState(0)
+  const [gemaaktOp, setGemaaktOp] = useState(() => new Date())
 
   useEffect(() => {
     let actief = true
     maakPicklijst(id)
-      .then((l) => actief && setLijst(l))
+      .then((l) => {
+        if (!actief) return
+        setLijst(l)
+        setGemaaktOp(new Date())
+      })
       .catch((err) => actief && setError(err.message))
     return () => {
       actief = false
     }
-  }, [id])
+  }, [id, ververs])
+
+  // BON-artikelen die als A-artikel geleverd worden: eerst omboeken op dezelfde locatie.
+  async function handleOmboeken() {
+    const omboek = lijst.picks.filter((p) => p.omboekenNaarId)
+    const tekst = omboek
+      .map((p) => `${p.aantal}× ${p.artikelnummer} → ${p.vervangt} (locatie ${p.locatieCode})`)
+      .join('\n')
+    if (!confirm(`Deze omboekingen boeken?\n\n${tekst}`)) return
+    setBezig(true)
+    setMelding(null)
+    try {
+      await boekOmboekingen({
+        omboekingen: omboek.map((p) => ({
+          vanArtikelId: p.artikelId,
+          naarArtikelId: p.omboekenNaarId,
+          locatieId: p.locatieId,
+          aantal: p.aantal,
+        })),
+        bronNummer: lijst.order.ordernummer,
+        gebruiker: profile?.naam || profile?.email,
+      })
+      setMelding({ soort: 'info', tekst: `${omboek.length} omboeking(en) geboekt. De picklijst is bijgewerkt.` })
+      setVervers((v) => v + 1)
+    } catch (err) {
+      setMelding({ soort: 'danger', tekst: err.message })
+    } finally {
+      setBezig(false)
+    }
+  }
 
   useEffect(() => {
     if (lijst) document.title = `Picklijst ${lijst.order.ordernummer}`
@@ -51,14 +90,25 @@ export default function PicklijstAfdruk() {
 
   const { order, picks, tekorten } = lijst
   const locaties = new Set(picks.map((p) => p.locatieCode)).size
+  const aantalOmboeken = picks.filter((p) => p.omboekenNaarId).length
 
   return (
     <div className="afdruk-scherm">
-      <div className="afdruk-toolbar">
+      <div className="afdruk-toolbar" style={{ gap: 8 }}>
+        {aantalOmboeken > 0 && (
+          <button className="btn btn-secondary" onClick={handleOmboeken} disabled={bezig}>
+            {bezig ? 'Omboeken…' : `Omboekingen boeken (${aantalOmboeken})`}
+          </button>
+        )}
         <button className="btn btn-primary" onClick={() => window.print()}>
           Afdrukken / opslaan als PDF
         </button>
       </div>
+      {melding && (
+        <div className={`banner banner-${melding.soort} afdruk-toolbar`} style={{ display: 'block' }}>
+          {melding.tekst}
+        </div>
+      )}
 
       <div className="afdruk-pagina pick-pagina">
         <div className="doc-kop">
@@ -118,7 +168,7 @@ export default function PicklijstAfdruk() {
                   <td className="doc-artikelnummer doc-nowrap">{p.artikelnummer}</td>
                   <td>
                     {p.artikelnaam}
-                    {p.vervangt && <div className="pick-vervangt">vervangt {p.vervangt}</div>}
+                    {p.vervangt && <div className="pick-vervangt">omboeken naar {p.vervangt}</div>}
                   </td>
                   <td className="num pick-aantal">{aantal(p.aantal)}</td>
                   <td className="doc-nowrap">{p.eenheid}</td>
@@ -172,8 +222,8 @@ export default function PicklijstAfdruk() {
           <div>Colli / pallets: ________</div>
         </div>
         <p className="doc-instructie">
-          Vink elke regel af en noteer bij afwijkingen het gepickte aantal. Een BON-artikel met "vervangt"
-          mag geleverd worden in plaats van het A-artikel dat niet op voorraad is. Geef de lijst daarna terug aan
+          Vink elke regel af en noteer bij afwijkingen het gepickte aantal. Een BON-artikel met "omboeken naar"
+          wordt omgeboekt naar het A-artikel en als A-artikel geleverd. Geef de lijst daarna terug aan
           verkoop; de voorraad wordt afgeboekt bij het maken van de pakbon.
         </p>
       </div>
