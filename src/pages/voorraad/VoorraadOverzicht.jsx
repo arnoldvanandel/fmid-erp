@@ -24,6 +24,9 @@ export default function VoorraadOverzicht() {
 
   const [search, setSearch] = useState('')
   const [alleenLaag, setAlleenLaag] = useState(false)
+  // Bij zoeken standaard alleen artikelen met voorraad; aanvinken om een
+  // artikel zonder voorraad te vinden (bijv. voor een eerste mutatie).
+  const [ookZonder, setOokZonder] = useState(false)
   const [mutatieVoor, setMutatieVoor] = useState(null)
   const [aantalArtikelen, setAantalArtikelen] = useState(null)
   const zoeken = search.trim() !== ''
@@ -40,11 +43,15 @@ export default function VoorraadOverzicht() {
   const loadingArtikelen = zoeken ? loadingZoeken : loadingVoorraad
 
   const filtered = useMemo(() => {
-    const bron = alleenLaag ? laag : zoeken ? zoekResultaten : voorraadArtikelen
+    const bron = alleenLaag
+      ? laag
+      : zoeken
+        ? zoekResultaten.filter((a) => ookZonder || (totalenPerArtikel[a.id] || 0) !== 0)
+        : voorraadArtikelen
     if (!alleenLaag || !zoeken) return bron
     const ids = new Set(zoekResultaten.map((a) => a.id))
     return bron.filter((a) => ids.has(a.id))
-  }, [alleenLaag, laag, zoeken, zoekResultaten, voorraadArtikelen])
+  }, [alleenLaag, laag, zoeken, zoekResultaten, voorraadArtikelen, ookZonder, totalenPerArtikel])
 
   const laagAantal = laag.length
   // Inkoopprijs geldt per inkoopprijsHoeveelheid (bijv. per 100 stuks).
@@ -103,6 +110,17 @@ export default function VoorraadOverzicht() {
               />
               Alleen lage voorraad
             </label>
+            {zoeken && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={ookZonder}
+                  onChange={(e) => setOokZonder(e.target.checked)}
+                  style={{ width: 'auto' }}
+                />
+                Ook artikelen zonder voorraad
+              </label>
+            )}
           </div>
         </div>
 
@@ -111,7 +129,9 @@ export default function VoorraadOverzicht() {
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             {zoeken
-              ? 'Geen artikelen gevonden.'
+              ? ookZonder
+                ? 'Geen artikelen gevonden.'
+                : 'Geen artikelen met voorraad gevonden. Vink "Ook artikelen zonder voorraad" aan om een eerste mutatie te boeken.'
               : 'Nog geen artikelen met voorraad. Zoek hierboven een artikel om een mutatie te boeken.'}
           </div>
         ) : (

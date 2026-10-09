@@ -3,8 +3,10 @@ import { useCollection } from './useCollection'
 
 // Telt voor elk artikel de voorraad over alle locaties bij elkaar op.
 // Geeft ook de losse standen (per artikel+locatie) terug voor de detailweergave.
+// Posities met 0 stuks (bijv. na een afboeking tot nul) laten we weg.
 export function useVoorraadTotals() {
-  const { data: standen, loading, error } = useCollection('voorraadstanden')
+  const { data: alleStanden, loading, error } = useCollection('voorraadstanden')
+  const standen = useMemo(() => alleStanden.filter((s) => Number(s.aantal) !== 0), [alleStanden])
 
   const totalenPerArtikel = useMemo(() => {
     const map = {}

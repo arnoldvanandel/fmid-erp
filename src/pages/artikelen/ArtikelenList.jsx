@@ -108,7 +108,7 @@ export default function ArtikelenList() {
                       <td className="num">{prijsMetEenheid(a.inkoopprijs, a.inkoopprijsHoeveelheid)}</td>
                       <td className="num">{prijsMetEenheid(a.verkoopprijs, a.verkoopprijsHoeveelheid)}</td>
                       <td className="num">
-                        {formatNumber(voorraad)}
+                        {voorraad !== 0 && formatNumber(voorraad)}
                         {laag && (
                           <span className="badge badge-warning" style={{ marginLeft: 8 }}>
                             laag
