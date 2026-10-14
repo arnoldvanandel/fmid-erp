@@ -735,9 +735,13 @@ table.data-table {
   justify-content: center;
   z-index: 100;
   padding: 20px;
+  /* Lange vensters (bijv. een artikel met staffel) scrollen binnen de achtergrond. */
+  overflow-y: auto;
 }
 
 .modal {
+  /* margin: auto centreert, maar laat de bovenkant zichtbaar als het venster hoger is dan het scherm. */
+  margin: auto;
   width: 100%;
   max-width: 420px;
   background: var(--color-surface);

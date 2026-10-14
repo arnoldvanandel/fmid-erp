@@ -3,7 +3,7 @@ import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from '
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import { MAIL_TALEN } from '../../lib/inkooporderMail'
-import { BTW_GROEPEN, VALUTA } from '../../lib/stamgegevens'
+import { BTW_GROEPEN, LEVERINGSVOORWAARDEN, VALUTA } from '../../lib/stamgegevens'
 
 // Tabbladen zoals bij de leverancier in Axapta.
 const TABS = [
@@ -24,6 +24,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
     email: leverancier?.email || '',
     inkooporderEmails: (leverancier?.inkooporderEmails || []).join(', '),
     taal: leverancier?.taal || 'nl',
+    leveringsvoorwaarde: leverancier?.leveringsvoorwaarde || '',
     telefoon: leverancier?.telefoon || '',
     straat: leverancier?.straat || '',
     postcode: leverancier?.postcode || '',
@@ -68,6 +69,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
         .map((e) => e.trim())
         .filter(Boolean),
       taal: form.taal,
+      leveringsvoorwaarde: form.leveringsvoorwaarde,
       telefoon: form.telefoon.trim(),
       straat: form.straat.trim(),
       postcode: form.postcode.trim(),
@@ -236,6 +238,21 @@ export default function LeverancierForm({ leverancier, onDone }) {
                 ))}
               </select>
               <span className="hint">Onderwerp, aanhef en tekst van de inkooporder-mail</span>
+            </div>
+            <div className="field">
+              <label>Standaard levering</label>
+              <select
+                value={form.leveringsvoorwaarde}
+                onChange={(e) => set('leveringsvoorwaarde', e.target.value)}
+              >
+                <option value="">—</option>
+                {Object.entries(LEVERINGSVOORWAARDEN).map(([code, omschrijving]) => (
+                  <option key={code} value={code}>
+                    {code} — {omschrijving}
+                  </option>
+                ))}
+              </select>
+              <span className="hint">Wordt ingevuld bij een nieuwe inkooporder</span>
             </div>
           </div>
         )}

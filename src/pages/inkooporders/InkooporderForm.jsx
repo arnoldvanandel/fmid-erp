@@ -3,7 +3,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
 import { formatCurrency, formatNumber } from '../../lib/format'
 import { mailInkooporder } from '../../lib/inkooporderMail'
-import { haalArtikelOpNummer } from '../../lib/artikelZoeken'
+import { haalArtikelenOp, haalArtikelOpNummer } from '../../lib/artikelZoeken'
+import { inkoopprijsPerEenheid, staffelRegels } from '../../lib/staffel'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
 import MailVenster, { MailStatus } from '../../components/MailVenster'
 import { GetalCel, gridToets } from '../../components/RegelGrid'
@@ -85,10 +86,19 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   function kiesArtikel(artikel) {
     const updates = { artikel }
     // Inkoopprijzen uit Axapta gelden vaak per 100 of 1000 stuks; een
-    // orderregel rekent met de prijs per stuk.
-    if (artikel) {
-      const perStuk = (Number(artikel.inkoopprijs) || 0) / (Number(artikel.inkoopprijsHoeveelheid) || 1)
-      updates.prijs = Math.round(perStuk * 10000) / 10000
+    // orderregel rekent met de prijs per stuk. Met een staffel hangt de prijs
+    // ook af van de hoeveelheid.
+    if (artikel) updates.prijs = inkoopprijsPerEenheid(artikel, nieuweRegelRef.current.aantal)
+    setNieuweRegel(updates)
+  }
+
+  // Nieuwe hoeveelheid in de lege regel: bij een artikel met staffel de prijs
+  // opnieuw bepalen.
+  function wijzigNieuwAantal(aantal) {
+    const updates = { aantal }
+    const artikel = nieuweRegelRef.current.artikel
+    if (artikel && staffelRegels(artikel.inkoopStaffel).length > 0) {
+      updates.prijs = inkoopprijsPerEenheid(artikel, aantal)
     }
     setNieuweRegel(updates)
   }
@@ -195,7 +205,15 @@ export default function InkooporderForm({ inkooporder, onDone }) {
       return
     }
     try {
-      await wijzigInkooporderRegel(regel.id, { [veld]: Number(value) || 0 })
+      const updates = { [veld]: Number(value) || 0 }
+      // Andere hoeveelheid bij een artikel met staffel: prijs volgt de staffel.
+      if (veld === 'aantal' && regel.artikelId) {
+        const artikel = (await haalArtikelenOp([regel.artikelId]))[regel.artikelId]
+        if (artikel && staffelRegels(artikel.inkoopStaffel).length > 0) {
+          updates.prijs = inkoopprijsPerEenheid(artikel, value)
+        }
+      }
+      await wijzigInkooporderRegel(regel.id, updates)
     } catch (err) {
       setRegelError(err.message)
     }
@@ -477,7 +495,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
                   kolom="aantal"
                   value={nieuweRegel.aantal}
                   decimalen={2}
-                  onCommit={(v) => setNieuweRegel({ aantal: v })}
+                  onCommit={wijzigNieuwAantal}
                 />
               </td>
               <td className="alleen-lezen">{nieuwArtikel?.eenheid || ''}</td>

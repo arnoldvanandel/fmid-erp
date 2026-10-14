@@ -14,6 +14,7 @@ import {
 } from '../../lib/stuklijst'
 import { verwijderRouteRegel, voegRouteRegelToe, wijzigRouteRegel } from '../../lib/route'
 import { useArtikelenOpId, zoekTermen } from '../../lib/artikelZoeken'
+import { STAFFEL_SOORTEN, staffelRegels } from '../../lib/staffel'
 import Modal from '../../components/Modal'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
 import MutatieForm from '../voorraad/MutatieForm'
@@ -40,6 +41,8 @@ export default function ArtikelForm({ artikel, onDone }) {
     inkoopprijsHoeveelheid: artikel?.inkoopprijsHoeveelheid ?? 1,
     inkoopprijsDatum: artikel?.inkoopprijsDatum || '',
     inkoopkorting: artikel?.inkoopkorting ?? 0,
+    inkoopStaffelSoort: artikel?.inkoopStaffel?.soort || 'eenheid',
+    inkoopStaffelRegels: (artikel?.inkoopStaffel?.regels || []).map((r) => ({ tot: r.tot, prijs: r.prijs })),
     verkoopprijs: artikel?.verkoopprijs ?? '',
     verkoopprijsHoeveelheid: artikel?.verkoopprijsHoeveelheid ?? 1,
     verkoopprijsDatum: artikel?.verkoopprijsDatum || '',
@@ -90,6 +93,13 @@ export default function ArtikelForm({ artikel, onDone }) {
     setForm((f) => ({ ...f, [field]: value }))
   }
 
+  function setStaffelRegel(index, veld, value) {
+    setForm((f) => ({
+      ...f,
+      inkoopStaffelRegels: f.inkoopStaffelRegels.map((r, i) => (i === index ? { ...r, [veld]: value } : r)),
+    }))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
@@ -108,6 +118,10 @@ export default function ArtikelForm({ artikel, onDone }) {
       inkoopprijsHoeveelheid: Number(form.inkoopprijsHoeveelheid) || 1,
       inkoopprijsDatum: form.inkoopprijsDatum || '',
       inkoopkorting: Number(form.inkoopkorting) || 0,
+      inkoopStaffel: {
+        soort: form.inkoopStaffelSoort,
+        regels: staffelRegels({ regels: form.inkoopStaffelRegels }),
+      },
       verkoopprijs: Number(form.verkoopprijs) || 0,
       verkoopprijsHoeveelheid: Number(form.verkoopprijsHoeveelheid) || 1,
       verkoopprijsDatum: form.verkoopprijsDatum || '',
@@ -246,7 +260,8 @@ export default function ArtikelForm({ artikel, onDone }) {
       )}
 
       {activeTab === 'prijzen' && (
-        <div className="price-columns">
+        <div>
+          <div className="price-columns">
           <div className="price-panel">
             <h4 className="price-panel-title">Inkooporder</h4>
             <div className="price-row">
@@ -352,6 +367,87 @@ export default function ArtikelForm({ artikel, onDone }) {
                 ` — netto ${formatCurrency(
                   (Number(form.verkoopprijs) || 0) * (1 - Number(form.verkoopkorting) / 100)
                 )}`}
+            </p>
+          </div>
+          </div>
+
+          <div className="price-panel" style={{ marginTop: 18 }}>
+            <h4 className="price-panel-title">Inkoopstaffel</h4>
+            <div className="field" style={{ maxWidth: 260 }}>
+              <label>Soort staffel</label>
+              <select value={form.inkoopStaffelSoort} onChange={(e) => set('inkoopStaffelSoort', e.target.value)}>
+                {Object.entries(STAFFEL_SOORTEN).map(([waarde, label]) => (
+                  <option key={waarde} value={waarde}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {form.inkoopStaffelRegels.length > 0 && (
+              <table className="data-table" style={{ maxWidth: 480 }}>
+                <thead>
+                  <tr>
+                    <th className="num">T/m hoeveelheid ({form.eenheid.toLowerCase()})</th>
+                    <th className="num">
+                      {form.inkoopStaffelSoort === 'zending' ? 'Bedrag per zending' : `Prijs per ${form.eenheid.toLowerCase()}`}
+                    </th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.inkoopStaffelRegels.map((r, i) => (
+                    <tr key={i}>
+                      <td className="num">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={r.tot}
+                          onChange={(e) => setStaffelRegel(i, 'tot', e.target.value)}
+                          style={{ textAlign: 'right' }}
+                        />
+                      </td>
+                      <td className="num">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={r.prijs}
+                          onChange={(e) => setStaffelRegel(i, 'prijs', e.target.value)}
+                          style={{ textAlign: 'right' }}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() =>
+                            set(
+                              'inkoopStaffelRegels',
+                              form.inkoopStaffelRegels.filter((_, j) => j !== i)
+                            )
+                          }
+                        >
+                          Verwijderen
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ marginTop: 8 }}
+              onClick={() => set('inkoopStaffelRegels', [...form.inkoopStaffelRegels, { tot: '', prijs: '' }])}
+            >
+              Staffelregel toevoegen
+            </button>
+            <p className="hint" style={{ marginTop: 8 }}>
+              Op de inkooporder geldt de eerste regel waar de hoeveelheid onder of op valt
+              {form.inkoopStaffelSoort === 'zending' && '; het bedrag wordt omgerekend naar een prijs per eenheid'}.
+              Boven de hoogste regel geldt de gewone inkoopprijs hierboven.
             </p>
           </div>
         </div>

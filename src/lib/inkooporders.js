@@ -52,7 +52,8 @@ export async function maakInkooporder({ leverancier, gebruiker, gebruikerEmail }
     besteldDoor: gebruiker || '',
     besteldDoorEmail: gebruikerEmail || '',
     offertenummer: '',
-    levering: '',
+    // Standaard leveringsvoorwaarde van de leverancier (bijv. DAP of FH).
+    levering: leverancier.leveringsvoorwaarde || '',
     opmerkingen: '',
     aangemaaktDoor: gebruiker || '',
     datum: serverTimestamp(),
