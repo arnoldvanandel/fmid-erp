@@ -17,6 +17,7 @@ export const KLANTGROEPEN = ['NL', 'EU', 'Niet EU']
 export const LEVERINGSVOORWAARDEN = {
   FH: 'Franco huis',
   EXW: 'Af fabriek (Ex Works)',
+  CPT: 'Carriage Paid To',
   DAP: 'Delivered at Place',
   DDP: 'Delivered Duty Paid',
   DDU: 'Delivered Duty Unpaid',
