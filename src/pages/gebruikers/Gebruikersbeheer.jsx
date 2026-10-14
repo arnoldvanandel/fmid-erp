@@ -101,6 +101,13 @@ export default function Gebruikersbeheer() {
     await updateDoc(doc(db, 'users', u.id), { role: nieuweRol })
   }
 
+  // De naam staat o.a. in de zijbalk, bij "Besteld door" en op documenten.
+  async function wijzigNaam(u, naam) {
+    const nieuw = naam.trim()
+    if (nieuw === (u.naam || '')) return
+    await updateDoc(doc(db, 'users', u.id), { naam: nieuw })
+  }
+
   return (
     <div className="content">
       <div className="page-header">
@@ -145,7 +152,17 @@ export default function Gebruikersbeheer() {
               <tbody>
                 {gesorteerd.map((u) => (
                   <tr key={u.id} style={{ cursor: 'default' }}>
-                    <td>{u.naam || '-'}</td>
+                    <td>
+                      <input
+                        type="text"
+                        defaultValue={u.naam || ''}
+                        placeholder="Naam"
+                        aria-label={`Naam van ${u.email}`}
+                        onBlur={(e) => wijzigNaam(u, e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                        style={{ minWidth: 160 }}
+                      />
+                    </td>
                     <td>{u.email}</td>
                     <td>
                       <span className={'badge ' + (ROL_BADGES[u.role] || 'badge-neutral')}>
