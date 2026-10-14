@@ -7,7 +7,8 @@ import { useInstellingen } from '../hooks/useInstellingen'
 
 // Venster om een document (inkooporder, orderbevestiging, pakbon, factuur) te
 // mailen. De standaardadressen komen van de leverancier of klant; voor deze
-// ene mail kun je adressen toevoegen of weghalen.
+// ene mail kun je adressen toevoegen of weghalen. `children` komt boven het
+// adresveld, bijv. de regels van een stickerbestelling.
 export default function MailVenster({
   titel,
   standaardAdressen,
@@ -18,6 +19,8 @@ export default function MailVenster({
   annulerenLabel = 'Annuleren',
   onVersturen,
   onAnnuleren,
+  width = 520,
+  children,
 }) {
   const { testfase, testEmail } = useInstellingen()
   const [aanTekst, setAanTekst] = useState((standaardAdressen || []).join(', '))
@@ -48,7 +51,7 @@ export default function MailVenster({
   }
 
   return (
-    <Modal title={titel} onClose={bezig ? undefined : onAnnuleren} width={520}>
+    <Modal title={titel} onClose={bezig ? undefined : onAnnuleren} width={width}>
       {fout && <div className="banner banner-danger">{fout}</div>}
       {testfase && (
         <div className="banner banner-warning">
@@ -58,6 +61,7 @@ export default function MailVenster({
       {eerderGemaildOp && (
         <div className="banner banner-warning">Let op: dit is al eerder gemaild ({formatDateTime(eerderGemaildOp)}).</div>
       )}
+      {children}
       <div className="field">
         <label>Aan</label>
         <textarea
@@ -87,8 +91,9 @@ export default function MailVenster({
 
 // Toont naar wie en wanneer een document gemaild is, en (live) of de Cloud
 // Function verstuurMail de mail daadwerkelijk heeft kunnen versturen.
-// `document` heeft de velden gemaildNaar, gemaildCc, gemaildOp en mailId.
-export function MailStatus({ document: d, compact = false }) {
+// `document` heeft de velden gemaildNaar, gemaildCc, gemaildOp en mailId;
+// `titel` staat vooraan in de melding (bijv. "Stickers besteld bij Bonfix, gemaild").
+export function MailStatus({ document: d, compact = false, titel = 'Gemaild' }) {
   const [delivery, setDelivery] = useState(null)
 
   useEffect(() => {
@@ -120,7 +125,7 @@ export function MailStatus({ document: d, compact = false }) {
 
   return (
     <div className={'banner ' + (state === 'ERROR' ? 'banner-danger' : state === 'SUCCESS' ? 'banner-info' : 'banner-warning')}>
-      Gemaild naar {(d.gemaildNaar || []).join(', ')}
+      {titel} naar {(d.gemaildNaar || []).join(', ')}
       {d.gemaildCc?.length ? ` (cc: ${d.gemaildCc.join(', ')})` : ''} op {formatDateTime(d.gemaildOp)} — {label}
     </div>
   )

@@ -9,6 +9,8 @@ import ArtikelKiezer from '../../components/ArtikelKiezer'
 import MailVenster, { MailStatus } from '../../components/MailVenster'
 import { GetalCel, gridToets } from '../../components/RegelGrid'
 import OntvangstVenster from './OntvangstVenster'
+import StickerVenster from './StickerVenster'
+import { isBonArtikel } from '../../lib/stickers'
 import {
   STATUS_LABEL,
   inkooporderEmailadressen,
@@ -36,6 +38,8 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   const [mailen, setMailen] = useState(false)
   const [mailGegevens, setMailGegevens] = useState(null)
   const [ontvangstOpen, setOntvangstOpen] = useState(false)
+  // Stickervenster: 'knop' (via de knop) of 'naMail' (direct na het mailen van de order).
+  const [stickersOpen, setStickersOpen] = useState(null)
   const [error, setError] = useState(null)
 
   const { data: regels, loading: loadingRegels } = useCollection('inkooporderregels')
@@ -52,6 +56,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     (max, r) => Math.max(max, Number(r.regelnummer) || 0),
     0
   )
+  const heeftBonArtikelen = regelsVoorOrder.some((r) => isBonArtikel(r.artikelnummer))
   const teOntvangen = regelsVoorOrder.some((r) => (Number(r.ontvangen) || 0) < Number(r.aantal))
   const totaalbedrag = regelsVoorOrder.reduce(
     (sum, r) => sum + (Number(r.aantal) || 0) * (Number(r.prijs) || 0),
@@ -141,7 +146,11 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         gegevens: mailGegevens,
         ontvangers,
       })
-      onDone?.()
+      // Order met BON-artikelen: meteen voorstellen de stickers bij Bonfix te bestellen.
+      if (heeftBonArtikelen && !inkooporder.stickersBesteldOp) {
+        setMailGegevens(null)
+        setStickersOpen('naMail')
+      } else onDone?.()
     } finally {
       setMailen(false)
     }
@@ -310,6 +319,11 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         >
           PDF / afdrukken
         </a>
+        {heeftBonArtikelen && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setStickersOpen('knop')}>
+            Stickers bestellen
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-secondary btn-sm"
@@ -348,6 +362,30 @@ export default function InkooporderForm({ inkooporder, onDone }) {
       )}
 
       <MailStatus document={inkooporder} />
+      {inkooporder.stickersBesteldOp && (
+        <MailStatus
+          titel={`Stickers besteld bij Bonfix${inkooporder.stickersBesteldDoor ? ` door ${inkooporder.stickersBesteldDoor}` : ''}, gemaild`}
+          document={{
+            gemaildNaar: inkooporder.stickersBesteldNaar,
+            gemaildCc: inkooporder.stickersBesteldCc,
+            gemaildOp: inkooporder.stickersBesteldOp,
+            mailId: inkooporder.stickersMailId,
+          }}
+        />
+      )}
+
+      {stickersOpen && (
+        <StickerVenster
+          inkooporder={inkooporder}
+          regels={regelsVoorOrder}
+          profile={profile}
+          onKlaar={() => {
+            const naMail = stickersOpen === 'naMail'
+            setStickersOpen(null)
+            if (naMail) onDone?.()
+          }}
+        />
+      )}
 
       {ontvangstOpen && (
         <OntvangstVenster

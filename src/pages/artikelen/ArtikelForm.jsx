@@ -15,6 +15,7 @@ import {
 import { verwijderRouteRegel, voegRouteRegelToe, wijzigRouteRegel } from '../../lib/route'
 import { useArtikelenOpId, zoekTermen } from '../../lib/artikelZoeken'
 import { STAFFEL_SOORTEN, staffelRegels } from '../../lib/staffel'
+import { bonfixCode, isBonArtikel } from '../../lib/stickers'
 import Modal from '../../components/Modal'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
 import MutatieForm from '../voorraad/MutatieForm'
@@ -36,6 +37,7 @@ export default function ArtikelForm({ artikel, onDone }) {
   const [form, setForm] = useState({
     artikelnummer: artikel?.artikelnummer || '',
     naam: artikel?.naam || '',
+    bonfixNummer: artikel?.bonfixNummer || '',
     eenheid: artikel?.eenheid || 'Stuks',
     inkoopprijs: artikel?.inkoopprijs ?? '',
     inkoopprijsHoeveelheid: artikel?.inkoopprijsHoeveelheid ?? 1,
@@ -136,6 +138,8 @@ export default function ArtikelForm({ artikel, onDone }) {
       breedte: form.breedte === '' ? null : Number(form.breedte) || 0,
       diepte: form.diepte === '' ? null : Number(form.diepte) || 0,
     }
+    // Bonfix-nummer alleen bij BON-artikelen (voor het bestellen van stickers).
+    if (isBonArtikel(payload.artikelnummer)) payload.bonfixNummer = form.bonfixNummer.trim()
     payload.zoek = zoekTermen({ ...payload, zoeknaam: artikel?.zoeknaam })
 
     setSaving(true)
@@ -211,6 +215,22 @@ export default function ArtikelForm({ artikel, onDone }) {
             <label>Naam</label>
             <input type="text" value={form.naam} onChange={(e) => set('naam', e.target.value)} />
           </div>
+
+          {isBonArtikel(form.artikelnummer) && (
+            <div className="field">
+              <label>Bonfix-nummer</label>
+              <input
+                type="text"
+                value={form.bonfixNummer}
+                onChange={(e) => set('bonfixNummer', e.target.value)}
+                placeholder="bijv. 53505"
+                style={{ maxWidth: 200 }}
+              />
+              <span className="hint">
+                Voor het bestellen van stickers bij Bonfix (code bij Bonfix: {bonfixCode(form.artikelnummer)})
+              </span>
+            </div>
+          )}
 
           <div className="field-row">
             <div className="field">
