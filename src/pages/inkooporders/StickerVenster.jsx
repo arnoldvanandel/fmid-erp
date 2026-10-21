@@ -79,6 +79,7 @@ export default function StickerVenster({ inkooporder, regels, profile, onKlaar }
       gebruikerEmail={profile?.email}
       bezig={bezig}
       width={640}
+      buitenTestfase
       onVersturen={versturen}
       onAnnuleren={onKlaar}
     >

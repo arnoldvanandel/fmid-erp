@@ -8,7 +8,9 @@ import { useInstellingen } from '../hooks/useInstellingen'
 // Venster om een document (inkooporder, orderbevestiging, pakbon, factuur) te
 // mailen. De standaardadressen komen van de leverancier of klant; voor deze
 // ene mail kun je adressen toevoegen of weghalen. `children` komt boven het
-// adresveld, bijv. de regels van een stickerbestelling.
+// adresveld, bijv. de regels van een stickerbestelling. `buitenTestfase`: deze
+// mail gaat ook tijdens de testfase naar de echte ontvangers (zie BUITEN_TESTFASE
+// in functions/index.js).
 export default function MailVenster({
   titel,
   standaardAdressen,
@@ -20,6 +22,7 @@ export default function MailVenster({
   onVersturen,
   onAnnuleren,
   width = 520,
+  buitenTestfase = false,
   children,
 }) {
   const { testfase, testEmail } = useInstellingen()
@@ -53,11 +56,16 @@ export default function MailVenster({
   return (
     <Modal title={titel} onClose={bezig ? undefined : onAnnuleren} width={width}>
       {fout && <div className="banner banner-danger">{fout}</div>}
-      {testfase && (
-        <div className="banner banner-warning">
-          Testfase: deze mail gaat alleen naar <strong>{testEmail}</strong>, niet naar de adressen hieronder.
-        </div>
-      )}
+      {testfase &&
+        (buitenTestfase ? (
+          <div className="banner banner-info">
+            Testfase staat aan, maar deze mail gaat wél echt naar de adressen hieronder.
+          </div>
+        ) : (
+          <div className="banner banner-warning">
+            Testfase: deze mail gaat alleen naar <strong>{testEmail}</strong>, niet naar de adressen hieronder.
+          </div>
+        ))}
       {eerderGemaildOp && (
         <div className="banner banner-warning">Let op: dit is al eerder gemaild ({formatDateTime(eerderGemaildOp)}).</div>
       )}

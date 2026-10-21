@@ -24,6 +24,10 @@ function escapeHtml(tekst) {
 // alleen naar het testadres, met "[TEST]" in het onderwerp en bovenaan de
 // ontvangers die de mail normaal had gekregen. Zo kan er tijdens het testen
 // nooit per ongeluk iets naar een klant of leverancier.
+// Uitzondering: deze soorten mail (veld `soort` in het mail-document) gaan ook
+// tijdens de testfase direct naar de echte ontvangers.
+const BUITEN_TESTFASE = ['inkooporder', 'stickers']
+
 async function testfaseInstelling() {
   const snap = await db.doc('instellingen/algemeen').get()
   const data = snap.data() || {}
@@ -87,7 +91,7 @@ export const verstuurMail = onDocumentCreated(
         auth: { user: SMTP_USER.value(), pass: SMTP_PASSWORD.value() },
       })
 
-      const testEmail = await testfaseInstelling()
+      const testEmail = BUITEN_TESTFASE.includes(mail.soort) ? null : await testfaseInstelling()
       const { subject, text, html, attachments = [] } = mail.message || {}
       const bericht = testEmail
         ? naarTestadres(mail, testEmail)

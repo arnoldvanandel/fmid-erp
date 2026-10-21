@@ -186,6 +186,7 @@ export async function mailInkooporder({
     cc,
     message: await maakInkooporderBericht({ gegevens, gebruiker, handtekening }),
     inkooporderId,
+    soort: 'inkooporder',
     verzondenDoor: gebruiker || '',
     datum: serverTimestamp(),
   })

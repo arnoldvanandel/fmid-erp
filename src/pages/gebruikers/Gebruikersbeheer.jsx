@@ -12,8 +12,9 @@ const ROL_BADGES = {
   admin: 'badge-success',
 }
 
-// Testfase: zolang aan, gaat alle mail (inkooporders, bevestigingen, pakbonnen,
-// facturen) alleen naar het testadres. Wordt afgedwongen in de Cloud Function.
+// Testfase: zolang aan, gaat alle mail (bevestigingen, pakbonnen, facturen)
+// alleen naar het testadres; inkooporders en stickerbestellingen gaan wel echt.
+// Wordt afgedwongen in de Cloud Function.
 function TestfaseInstelling() {
   const { profile } = useAuth()
   const { instellingen, loading, testfase } = useInstellingen()
@@ -48,7 +49,7 @@ function TestfaseInstelling() {
       {fout && <div className="banner banner-danger">{fout}</div>}
       <div className={'banner ' + (testfase ? 'banner-warning' : 'banner-info')}>
         {testfase
-          ? `De testfase staat aan: alle mail gaat alleen naar ${instellingen.testEmail}, met [TEST] in het onderwerp.`
+          ? `De testfase staat aan: mail gaat alleen naar ${instellingen.testEmail}, met [TEST] in het onderwerp. Uitzondering: inkooporders en stickerbestellingen bij Bonfix gaan wel direct naar de leverancier.`
           : 'De testfase staat uit: mail gaat naar de echte ontvangers (klanten en leveranciers).'}
       </div>
       <div className="field-row" style={{ alignItems: 'flex-end' }}>

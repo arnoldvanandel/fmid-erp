@@ -353,6 +353,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
           gebruikerEmail={profile?.email}
           bezig={mailen}
           annulerenLabel="Niet mailen"
+          buitenTestfase
           onVersturen={verstuurMail}
           onAnnuleren={() => {
             setMailGegevens(null)

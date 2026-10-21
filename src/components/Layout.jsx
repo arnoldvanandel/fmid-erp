@@ -61,7 +61,7 @@ export default function Layout({ children }) {
         </nav>
         <div className="sidebar-footer">
           {testfase && (
-            <div className="sidebar-testfase" title="Alle mail gaat alleen naar het testadres">
+            <div className="sidebar-testfase" title="Mail gaat alleen naar het testadres, behalve inkooporders en stickerbestellingen">
               Testfase · mail alleen naar {testEmail}
             </div>
           )}
