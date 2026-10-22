@@ -11,6 +11,8 @@ import { GetalCel, gridToets } from '../../components/RegelGrid'
 import OntvangstVenster from './OntvangstVenster'
 import StickerVenster from './StickerVenster'
 import { isBonArtikel } from '../../lib/stickers'
+import { maakSjabloonVanInkooporder } from '../../lib/inkoopsjablonen'
+import Modal from '../../components/Modal'
 import {
   STATUS_LABEL,
   inkooporderEmailadressen,
@@ -41,6 +43,9 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   // Stickervenster: 'knop' (via de knop) of 'naMail' (direct na het mailen van de order).
   const [stickersOpen, setStickersOpen] = useState(null)
   const [error, setError] = useState(null)
+  // "Opslaan als sjabloon": null = dicht, anders de ingevulde naam.
+  const [sjabloonNaam, setSjabloonNaam] = useState(null)
+  const [sjabloonMelding, setSjabloonMelding] = useState(null)
 
   const { data: regels, loading: loadingRegels } = useCollection('inkooporderregels')
 
@@ -156,6 +161,32 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     }
   }
 
+  async function handleSjabloonOpslaan(e) {
+    e.preventDefault()
+    setError(null)
+    setSaving(true)
+    try {
+      await maakSjabloonVanInkooporder({
+        naam: sjabloonNaam,
+        // Kopvelden zoals ze nu op het scherm staan (ook als nog niet opgeslagen).
+        inkooporder: {
+          ...inkooporder,
+          referentie: referentie.trim(),
+          levering: levering.trim(),
+          opmerkingen: opmerkingen.trim(),
+        },
+        regels: regelsVoorOrder,
+        gebruiker: profile?.naam || profile?.email,
+      })
+      setSjabloonMelding(`Sjabloon "${sjabloonNaam.trim()}" opgeslagen.`)
+      setSjabloonNaam(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleDelete() {
     if (!confirm(`Inkooporder ${inkooporder.ordernummer} verwijderen?`)) return
     setSaving(true)
@@ -241,6 +272,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   return (
     <div>
       {error && <div className="banner banner-danger">{error}</div>}
+      {sjabloonMelding && <div className="banner banner-info">{sjabloonMelding}</div>}
 
       <div className="field-row">
         <div className="field">
@@ -319,6 +351,15 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         >
           PDF / afdrukken
         </a>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          disabled={regelsVoorOrder.length === 0}
+          title={regelsVoorOrder.length === 0 ? 'Eerst regels toevoegen' : 'Deze order bewaren als vaste bestelling'}
+          onClick={() => setSjabloonNaam(inkooporder.leverancierNaam || '')}
+        >
+          Opslaan als sjabloon
+        </button>
         {heeftBonArtikelen && (
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setStickersOpen('knop')}>
             Stickers bestellen
@@ -343,6 +384,29 @@ export default function InkooporderForm({ inkooporder, onDone }) {
           {saving ? 'Opslaan…' : 'Opslaan'}
         </button>
       </div>
+
+      {sjabloonNaam !== null && (
+        <Modal title="Opslaan als sjabloon" onClose={() => setSjabloonNaam(null)}>
+          <form onSubmit={handleSjabloonOpslaan}>
+            <div className="field">
+              <label>Naam sjabloon</label>
+              <input type="text" autoFocus value={sjabloonNaam} onChange={(e) => setSjabloonNaam(e.target.value)} />
+              <div className="hint">
+                Leverancier, kopvelden en de {regelsVoorOrder.length} regels worden bewaard. Een nieuwe order uit dit
+                sjabloon krijgt de actuele inkoopprijzen.
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setSjabloonNaam(null)} disabled={saving}>
+                Annuleren
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={saving || !sjabloonNaam.trim()}>
+                {saving ? 'Opslaan…' : 'Sjabloon opslaan'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {mailGegevens && (
         <MailVenster

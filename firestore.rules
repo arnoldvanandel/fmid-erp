@@ -126,6 +126,14 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Inkoopsjablonen: vaste inkooporders (leverancier + regels als array)
+    // waaruit met één klik een nieuwe concept-inkooporder gemaakt wordt.
+    match /inkoopsjablonen/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
     match /productieorders/{docId} {
       allow read: if isActive();
       allow create, update: if isActive();

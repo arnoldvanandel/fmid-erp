@@ -9,6 +9,7 @@ import LeveranciersList from './pages/leveranciers/LeveranciersList'
 import KlantenList from './pages/klanten/KlantenList'
 import InkoopordersList from './pages/inkooporders/InkoopordersList'
 import InkooporderAfdruk from './pages/inkooporders/InkooporderAfdruk'
+import InkoopsjablonenList from './pages/inkooporders/InkoopsjablonenList'
 import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
 import FacturenList from './pages/verkooporders/FacturenList'
 import VerkoopAfdruk from './pages/verkooporders/VerkoopAfdruk'
@@ -84,6 +85,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <InkoopordersList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inkoopsjablonen"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <InkoopsjablonenList />
                 </Layout>
               </ProtectedRoute>
             }
