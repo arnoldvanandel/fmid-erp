@@ -75,6 +75,7 @@ export default function Layout({ children }) {
           <button className="btn btn-secondary btn-sm" style={{ width: '100%' }} onClick={handleLogout}>
             Uitloggen
           </button>
+          <div className="sidebar-versie">Versie {__APP_VERSIE__}</div>
         </div>
       </aside>
       <div className="main">{children}</div>
