@@ -7,6 +7,7 @@ const navItems = [
   { to: '/artikelen', label: 'Artikelen' },
   { to: '/klanten', label: 'Klanten' },
   { to: '/verkooporders', label: 'Verkooporders' },
+  { to: '/picklijsten', label: 'Picklijsten' },
   { to: '/facturen', label: 'Facturen' },
   { to: '/leveranciers', label: 'Leveranciers' },
   { to: '/inkooporders', label: 'Inkooporders' },
@@ -15,6 +16,7 @@ const navItems = [
   { to: '/voorraad/mutaties', label: 'Voorraadmutaties' },
   { to: '/productieorders', label: 'Productieorders' },
   { to: '/locaties', label: 'Locaties' },
+  { to: '/looproute', label: 'Looproute' },
 ]
 
 const adminNavItems = [{ to: '/gebruikers', label: 'Gebruikers' }]

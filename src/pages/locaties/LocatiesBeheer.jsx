@@ -9,6 +9,9 @@ function LocatieForm({ locatie, onDone }) {
   const isNew = !locatie?.id
   const [code, setCode] = useState(locatie?.code || '')
   const [naam, setNaam] = useState(locatie?.naam || '')
+  const [sorteercode, setSorteercode] = useState(
+    locatie?.sorteercode === 0 || locatie?.sorteercode ? String(locatie.sorteercode) : ''
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -18,10 +21,22 @@ function LocatieForm({ locatie, onDone }) {
       setError('Code is verplicht (bijv. "HFD" of "MAG1").')
       return
     }
+    let sort = 0
+    if (sorteercode.trim() !== '') {
+      sort = Number(sorteercode)
+      if (!Number.isFinite(sort) || sort < 0) {
+        setError('Sorteercode moet een getal van 0 of hoger zijn (loopvolgorde).')
+        return
+      }
+    }
     setError(null)
     setSaving(true)
     try {
-      const payload = { code: code.trim().toUpperCase(), naam: naam.trim() }
+      const payload = {
+        code: code.trim().toUpperCase(),
+        naam: naam.trim(),
+        sorteercode: sort,
+      }
       const bestaand = await haalLocatieOpCode(payload.code)
       if (bestaand && bestaand.id !== locatie?.id) {
         setError(`Locatie ${payload.code} bestaat al.`)
@@ -65,6 +80,18 @@ function LocatieForm({ locatie, onDone }) {
       <div className="field">
         <label>Naam</label>
         <input type="text" value={naam} onChange={(e) => setNaam(e.target.value)} placeholder="bijv. Hoofdmagazijn" />
+      </div>
+      <div className="field">
+        <label>Sorteercode (looproute)</label>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          value={sorteercode}
+          onChange={(e) => setSorteercode(e.target.value)}
+          placeholder="bijv. 100, 110, 120…"
+        />
+        <p className="hint">Lager = eerder in de pickroute. Optioneel verfijnd via Looproute / afstanden.</p>
       </div>
       <div className="modal-actions" style={{ justifyContent: !isNew ? 'space-between' : 'flex-end' }}>
         {!isNew && (
@@ -150,6 +177,7 @@ export default function LocatiesBeheer() {
                 <tr>
                   <th>Code</th>
                   <th>Naam</th>
+                  <th className="num">Sorteer</th>
                   <th>Type</th>
                   <th>Magazijn</th>
                 </tr>
@@ -159,6 +187,7 @@ export default function LocatiesBeheer() {
                   <tr key={l.id} onClick={() => setEditing(l)}>
                     <td>{l.code}</td>
                     <td>{l.naam || '-'}</td>
+                    <td className="num">{l.sorteercode || '—'}</td>
                     <td>{l.type || '-'}</td>
                     <td>{l.magazijn || '-'}</td>
                   </tr>

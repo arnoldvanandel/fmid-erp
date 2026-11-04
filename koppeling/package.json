@@ -1,0 +1,16 @@
+{
+  "name": "fmid-axapta-koppeling",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Alleen-lezen sync van open Axapta-verkoopregels naar Firestore",
+  "scripts": {
+    "sync": "node sync.js",
+    "proef": "node sync.js --proef"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "firebase-admin": "^12.7.0",
+    "mssql": "^11.0.1"
+  }
+}
