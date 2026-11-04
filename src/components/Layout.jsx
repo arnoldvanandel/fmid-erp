@@ -14,6 +14,7 @@ const navItems = [
   { to: '/inkoopsjablonen', label: 'Inkoopsjablonen' },
   { to: '/voorraad', label: 'Voorraad', end: true },
   { to: '/voorraad/mutaties', label: 'Voorraadmutaties' },
+  { to: '/voorraad/op-voorraad/rapport', label: 'Op voorraad gezet' },
   { to: '/productieorders', label: 'Productieorders' },
   { to: '/locaties', label: 'Locaties' },
   { to: '/looproute', label: 'Looproute' },
@@ -72,7 +73,7 @@ export default function Layout({ children }) {
             <strong>{profile?.naam || profile?.email}</strong>
             {ROL_LABELS[profile?.role] || 'Invoer'}
           </div>
-          <button className="btn btn-secondary btn-sm" style={{ width: '100%' }} onClick={handleLogout}>
+          <button className="btn btn-secondary btn-sm sidebar-logout" onClick={handleLogout}>
             Uitloggen
           </button>
           <div className="sidebar-versie">Versie {__APP_VERSIE__}</div>

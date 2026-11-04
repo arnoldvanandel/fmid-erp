@@ -22,6 +22,12 @@ import MutatieForm from '../voorraad/MutatieForm'
 
 const EENHEDEN = ['Stuks', 'Meter', 'Kg', 'Liter', 'm²', 'Doos', 'Rol', 'Set']
 
+function optioneelAantal(waarde) {
+  if (waarde === '' || waarde == null) return null
+  const n = Number(waarde)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 // Overgenomen uit de Axapta-tabellen inventtable (artikeltype) en
 // InventTableModule (TaxItemGroupId) — zo sluiten nieuwe artikelen aan bij
 // de waarden die in de bestaande Axapta-export voorkomen.
@@ -39,6 +45,9 @@ export default function ArtikelForm({ artikel, onDone }) {
     naam: artikel?.naam || '',
     bonfixNummer: artikel?.bonfixNummer || '',
     eenheid: artikel?.eenheid || 'Stuks',
+    barcode: artikel?.barcode || '',
+    stuksPerDoos: artikel?.stuksPerDoos ?? '',
+    stuksPerZak: artikel?.stuksPerZak ?? '',
     inkoopprijs: artikel?.inkoopprijs ?? '',
     inkoopprijsHoeveelheid: artikel?.inkoopprijsHoeveelheid ?? 1,
     inkoopprijsDatum: artikel?.inkoopprijsDatum || '',
@@ -116,6 +125,9 @@ export default function ArtikelForm({ artikel, onDone }) {
       artikelnummer: form.artikelnummer.trim(),
       naam: form.naam.trim(),
       eenheid: form.eenheid,
+      barcode: form.barcode.trim(),
+      stuksPerDoos: optioneelAantal(form.stuksPerDoos),
+      stuksPerZak: optioneelAantal(form.stuksPerZak),
       inkoopprijs: Number(form.inkoopprijs) || 0,
       inkoopprijsHoeveelheid: Number(form.inkoopprijsHoeveelheid) || 1,
       inkoopprijsDatum: form.inkoopprijsDatum || '',
@@ -214,6 +226,43 @@ export default function ArtikelForm({ artikel, onDone }) {
           <div className="field">
             <label>Naam</label>
             <input type="text" value={form.naam} onChange={(e) => set('naam', e.target.value)} />
+          </div>
+
+          <div className="field">
+            <label>Barcode</label>
+            <input
+              type="text"
+              value={form.barcode}
+              onChange={(e) => set('barcode', e.target.value)}
+              placeholder="Scan of typ de barcode"
+              autoComplete="off"
+            />
+            <span className="hint">Voor op voorraad zetten: de telefoon zoekt het artikel op deze code.</span>
+          </div>
+
+          <div className="field-row">
+            <div className="field">
+              <label>Stuks per doos</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={form.stuksPerDoos}
+                onChange={(e) => set('stuksPerDoos', e.target.value)}
+              />
+              <span className="hint">Leeg laten als dit artikel niet per doos binnenkomt.</span>
+            </div>
+            <div className="field">
+              <label>Stuks per zakje</label>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={form.stuksPerZak}
+                onChange={(e) => set('stuksPerZak', e.target.value)}
+              />
+              <span className="hint">Leeg laten als dit artikel niet per zakje binnenkomt.</span>
+            </div>
           </div>
 
           {isBonArtikel(form.artikelnummer) && (

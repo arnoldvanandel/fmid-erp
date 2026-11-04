@@ -1,8 +1,9 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function ProtectedRoute({ children, adminOnly = false }) {
   const { user, profile, loading, isActive, logout } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return (
@@ -13,7 +14,7 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" replace state={{ from: location }} />
   }
 
   // Nieuw account dat nog niet door een admin is goedgekeurd: de rules laten

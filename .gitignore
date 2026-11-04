@@ -15,3 +15,7 @@ migratie/*.json
 
 # Excel-exports uit Axapta (bedrijfsgegevens) niet committen
 *.xlsx
+
+# Sleutel en slot van de Axapta-sync op de Raspberry Pi
+firebase-sleutel.json
+koppeling/axapta_sync.lock

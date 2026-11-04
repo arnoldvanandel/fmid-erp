@@ -153,7 +153,6 @@ export default function PicklijstAfdruk() {
                 <th>Omschrijving</th>
                 <th className="num">Picken</th>
                 <th>Eenh.</th>
-                <th className="num">Voorraad</th>
                 <th className="num">Gepickt</th>
                 <th className="doc-pos">Pos.</th>
               </tr>
@@ -164,7 +163,10 @@ export default function PicklijstAfdruk() {
                   <td className="pick-vink">
                     <span className="pick-vakje" />
                   </td>
-                  <td className="pick-locatie doc-nowrap">{p.locatieCode}</td>
+                  <td className="pick-locatie">
+                    <div className="doc-nowrap">{p.locatieCode || '—'}</div>
+                    <div className="pick-voorraad-bij">voorraad {aantal(p.opLocatie)}</div>
+                  </td>
                   <td className="doc-artikelnummer doc-nowrap">{p.artikelnummer}</td>
                   <td>
                     {p.artikelnaam}
@@ -172,7 +174,6 @@ export default function PicklijstAfdruk() {
                   </td>
                   <td className="num pick-aantal">{aantal(p.aantal)}</td>
                   <td className="doc-nowrap">{p.eenheid}</td>
-                  <td className="num">{aantal(p.opLocatie)}</td>
                   <td className="num">
                     <span className="pick-invul" />
                   </td>

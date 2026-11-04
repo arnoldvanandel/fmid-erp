@@ -1,10 +1,44 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { PicklijstQr } from '../../components/PicklijstQrVenster'
 import { useCollection } from '../../hooks/useCollection'
 
 // Startscherm: vul een klant in → genereer de gecombineerde picklijst.
+function openPicklijst(klantId) {
+  window.open(`/picklijsten/${klantId}`, '_blank', 'noopener,noreferrer')
+}
+
+function openRapport(klantId) {
+  window.open(`/picklijsten/${klantId}/rapport`, '_blank', 'noopener,noreferrer')
+}
+
+function openInpaklijst(klantId) {
+  window.open(`/picklijsten/${klantId}/inpaklijst`, '_blank', 'noopener,noreferrer')
+}
+
+function openInpakrapport(klantId) {
+  window.open(`/picklijsten/${klantId}/inpakrapport`, '_blank', 'noopener,noreferrer')
+}
+
+function qrVoor(klant, soort) {
+  const naam = [klant.klantcode, klant.naam].filter(Boolean).join(' — ')
+  if (soort === 'inpakken') {
+    return {
+      klant,
+      soort,
+      pad: `/picklijsten/${klant.id}/inpakken`,
+      inleiding: `Scan de code met de telefoon. Het inpakken van ${naam} opent dan.`,
+    }
+  }
+  return {
+    klant,
+    soort: 'picken',
+    pad: `/picklijsten/${klant.id}/mobiel`,
+    inleiding: `Scan de code met de telefoon. De picklijst van ${naam} opent dan.`,
+  }
+}
+
 export default function PicklijstenList() {
-  const navigate = useNavigate()
   const { data: klanten, loading: loadingKlanten, error: errorKlanten } = useCollection('klanten', {
     orderByField: 'klantcode',
   })
@@ -12,9 +46,13 @@ export default function PicklijstenList() {
     orderByField: 'ordernummer',
     orderDirection: 'desc',
   })
+  const { data: rapporten, error: foutRapporten } = useCollection('pickrapporten')
+  const { data: inpakrapporten, error: foutInpak } = useCollection('inpakrapporten')
   const [zoek, setZoek] = useState('')
   const [gekozenId, setGekozenId] = useState('')
   const [fout, setFout] = useState(null)
+  const [qr, setQr] = useState(null)
+  const qrRef = useRef(null)
 
   const openPerKlant = useMemo(() => {
     const map = {}
@@ -58,23 +96,70 @@ export default function PicklijstenList() {
     if (gekozen && `${gekozen.klantcode} — ${gekozen.naam || ''}`.trim().toLowerCase() === q) {
       return gekozen
     }
-    // Exact klantnummer (bijv. 5013)
+    // Exact klantnummer (bijv. 5013) of de tekst uit de keuzelijst ("5013 — Bonfix").
     const exact = klanten.find((k) => String(k.klantcode || '').trim().toLowerCase() === q)
     if (exact) return exact
+    const uitLijst = klanten.find((k) => `${k.klantcode} — ${k.naam || ''}`.trim().toLowerCase() === q)
+    if (uitLijst) return uitLijst
     // Unieke suggestie
     if (suggesties.length === 1) return suggesties[0]
     return gekozen
   }
 
-  function handleGenereer(e) {
-    e.preventDefault()
-    setFout(null)
+  function gekozenKlant() {
     const k = vindKlantUitZoek()
     if (!k) {
       setFout('Kies een klant: typ het klantnummer (bijv. 5013) of kies uit de lijst.')
-      return
+      return null
     }
-    navigate(`/picklijsten/${k.id}`)
+    setFout(null)
+    return k
+  }
+
+  function toonQr(klant, soort) {
+    setFout(null)
+    setQr(qrVoor(klant, soort))
+  }
+
+  useEffect(() => {
+    if (qr) qrRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [qr])
+
+  function handleMobiel(e) {
+    e.preventDefault()
+    const k = gekozenKlant()
+    if (k) toonQr(k, 'picken')
+  }
+
+  const rapportVan = useMemo(() => {
+    const set = new Set()
+    for (const r of rapporten) {
+      if ((r.regels || []).length > 0) set.add(r.klantId || r.id)
+    }
+    return set
+  }, [rapporten])
+
+  const inpakVan = useMemo(() => {
+    const set = new Set()
+    for (const r of inpakrapporten) {
+      if ((r.regels || []).length > 0) set.add(r.klantId || r.id)
+    }
+    return set
+  }, [inpakrapporten])
+
+  function handleAfdrukken() {
+    const k = gekozenKlant()
+    if (k) openPicklijst(k.id)
+  }
+
+  function handleInpakken() {
+    const k = gekozenKlant()
+    if (k) toonQr(k, 'inpakken')
+  }
+
+  function handleInpaklijst() {
+    const k = gekozenKlant()
+    if (k) openInpaklijst(k.id)
   }
 
   const openRijen = useMemo(() => {
@@ -89,6 +174,7 @@ export default function PicklijstenList() {
 
   const loading = loadingKlanten || loadingOrders
   const error = errorKlanten || errorOrders
+  const klantInVeld = vindKlantUitZoek()
 
   return (
     <div className="content">
@@ -96,7 +182,7 @@ export default function PicklijstenList() {
         <div>
           <h1>Picklijsten</h1>
           <div className="page-header-sub">
-            Vul een klant in; alle open regels van die klant komen in één lijst op looproute
+            Picken en daarna inpakken in dozen. Op telefoon via een QR-code, of als PDF.
           </div>
         </div>
         <Link className="btn btn-secondary" to="/looproute">
@@ -106,7 +192,7 @@ export default function PicklijstenList() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-pad">
-          <form onSubmit={handleGenereer}>
+            <form onSubmit={handleMobiel}>
             <div className="field">
               <label>Klant</label>
               <input
@@ -126,7 +212,9 @@ export default function PicklijstenList() {
                   <option key={k.id} value={`${k.klantcode} — ${k.naam || ''}`} />
                 ))}
               </datalist>
-              <p className="hint">Bijvoorbeeld 5013 voor Bonhoff. Daarna op “Picklijst maken”.</p>
+              <p className="hint">
+                Bijvoorbeeld 5013 voor Bonhoff. Eerst picken, daarna inpakken: per regel de doos, aan het eind het rapport.
+              </p>
             </div>
 
             {zoek.trim() && !gekozen && suggesties.length > 0 && (
@@ -163,13 +251,50 @@ export default function PicklijstenList() {
                 {fout || error}
               </div>
             )}
+            {(foutRapporten || foutInpak) && (
+              <div className="banner banner-warning" style={{ marginBottom: 12 }}>
+                Rapporten laden lukt niet. Vernieuw de pagina. {foutRapporten || foutInpak}
+              </div>
+            )}
 
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              Picklijst maken
-            </button>
+            <div className="picklijst-acties">
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                Op telefoon
+              </button>
+              <button type="button" className="btn btn-secondary" disabled={loading} onClick={handleAfdrukken}>
+                PDF picklijst
+              </button>
+              {klantInVeld && rapportVan.has(klantInVeld.id) && (
+                <button type="button" className="btn btn-secondary" onClick={() => openRapport(klantInVeld.id)}>
+                  PDF rapport
+                </button>
+              )}
+            </div>
+            <div className="picklijst-acties" style={{ marginTop: 8 }}>
+              <button type="button" className="btn btn-secondary" disabled={loading} onClick={handleInpakken}>
+                Inpakken
+              </button>
+              <button type="button" className="btn btn-secondary" disabled={loading} onClick={handleInpaklijst}>
+                PDF inpaklijst
+              </button>
+              {klantInVeld && inpakVan.has(klantInVeld.id) && (
+                <button type="button" className="btn btn-secondary" onClick={() => openInpakrapport(klantInVeld.id)}>
+                  Inpakrapport
+                </button>
+              )}
+            </div>
           </form>
         </div>
       </div>
+
+      {qr && (
+        <div className="card pick-qr-kaart" ref={qrRef}>
+          <div className="card-pad">
+            <h2 style={{ marginBottom: 8 }}>{qr.soort === 'inpakken' ? 'Inpakken' : 'Op telefoon'}</h2>
+            <PicklijstQr klant={qr.klant} pad={qr.pad} inleiding={qr.inleiding} onClose={() => setQr(null)} />
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-pad" style={{ paddingBottom: 8 }}>
@@ -207,13 +332,30 @@ export default function PicklijstenList() {
                       {k.aantalOrders > k.ordernummers.length ? '…' : ''}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={() => navigate(`/picklijsten/${k.id}`)}
-                      >
-                        Picklijst
-                      </button>
+                      <div className="picklijst-acties">
+                        <button type="button" className="btn btn-primary btn-sm" onMouseDown={() => toonQr(k, 'picken')}>
+                          Op telefoon
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openPicklijst(k.id)}>
+                          PDF picklijst
+                        </button>
+                        {rapportVan.has(k.id) && (
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openRapport(k.id)}>
+                            PDF rapport
+                          </button>
+                        )}
+                        <button type="button" className="btn btn-secondary btn-sm" onMouseDown={() => toonQr(k, 'inpakken')}>
+                          Inpakken
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openInpaklijst(k.id)}>
+                          PDF inpaklijst
+                        </button>
+                        {inpakVan.has(k.id) && (
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openInpakrapport(k.id)}>
+                            Inpakrapport
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

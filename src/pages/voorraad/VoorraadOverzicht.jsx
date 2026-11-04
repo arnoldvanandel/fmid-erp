@@ -5,6 +5,7 @@ import { useVoorraadArtikelen } from '../../hooks/useVoorraadArtikelen'
 import { telArtikelen, useArtikelZoeken } from '../../lib/artikelZoeken'
 import { formatDateTime, formatNumber } from '../../lib/format'
 import Modal from '../../components/Modal'
+import { TelefoonQr } from '../../components/PicklijstQrVenster'
 import MutatieForm from './MutatieForm'
 
 const TYPE_LABEL = { in: 'In', uit: 'Uit', correctie: 'Correctie' }
@@ -28,6 +29,7 @@ export default function VoorraadOverzicht() {
   // artikel zonder voorraad te vinden (bijv. voor een eerste mutatie).
   const [ookZonder, setOokZonder] = useState(false)
   const [mutatieVoor, setMutatieVoor] = useState(null)
+  const [qrOpen, setQrOpen] = useState(false)
   const [aantalArtikelen, setAantalArtikelen] = useState(null)
   const zoeken = search.trim() !== ''
   const { artikelen: zoekResultaten, loading: loadingZoeken } = useArtikelZoeken(zoeken ? search : '', {
@@ -69,6 +71,14 @@ export default function VoorraadOverzicht() {
         <div>
           <h1>Voorraad</h1>
           <div className="page-header-sub">Actuele voorraadstand per locatie en mutaties</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link className="btn btn-secondary" to="/voorraad/op-voorraad/rapport">
+            Rapport
+          </Link>
+          <button type="button" className="btn btn-primary" onClick={() => setQrOpen(true)}>
+            Op voorraad zetten
+          </button>
         </div>
       </div>
 
@@ -239,6 +249,19 @@ export default function VoorraadOverzicht() {
           </div>
         )}
       </div>
+
+      {qrOpen && (
+        <Modal title="Op voorraad zetten" onClose={() => setQrOpen(false)} width={440}>
+          <TelefoonQr
+            pad="/voorraad/op-voorraad"
+            tekst="Scan de code met de telefoon. De pagina om artikelen op voorraad te zetten opent dan."
+            alt="QR-code om op voorraad te zetten"
+          />
+          <p style={{ marginTop: 12 }}>
+            <Link to="/voorraad/op-voorraad">Open op dit apparaat</Link>
+          </p>
+        </Modal>
+      )}
 
       {mutatieVoor && (
         <Modal title="Voorraadmutatie boeken" onClose={() => setMutatieVoor(null)}>

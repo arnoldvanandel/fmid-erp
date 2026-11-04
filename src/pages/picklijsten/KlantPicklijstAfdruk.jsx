@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import PicklijstQrVenster from '../../components/PicklijstQrVenster'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatDateTime, formatNumber } from '../../lib/format'
 import { maakPicklijstPerKlant } from '../../lib/picklijst'
@@ -23,6 +24,7 @@ export default function KlantPicklijstAfdruk() {
   const [bezig, setBezig] = useState(false)
   const [ververs, setVervers] = useState(0)
   const [gemaaktOp, setGemaaktOp] = useState(() => new Date())
+  const [qrOpen, setQrOpen] = useState(false)
 
   useEffect(() => {
     let actief = true
@@ -100,8 +102,11 @@ export default function KlantPicklijstAfdruk() {
             {bezig ? 'Omboeken…' : `Omboekingen boeken (${aantalOmboeken})`}
           </button>
         )}
+        <button className="btn btn-secondary" type="button" onMouseDown={() => setQrOpen(true)}>
+          Op telefoon
+        </button>
         <button className="btn btn-primary" onClick={() => window.print()}>
-          Afdrukken / opslaan als PDF
+          PDF picklijst
         </button>
       </div>
       {melding && (
@@ -152,7 +157,6 @@ export default function KlantPicklijstAfdruk() {
                 <th>Omschrijving</th>
                 <th className="num">Picken</th>
                 <th>Eenh.</th>
-                <th className="num">Voorraad</th>
                 <th>Orders</th>
                 <th className="num">Gepickt</th>
               </tr>
@@ -163,7 +167,12 @@ export default function KlantPicklijstAfdruk() {
                   <td className="pick-vink">
                     <span className="pick-vakje" />
                   </td>
-                  <td className="pick-locatie doc-nowrap">{p.locatieCode || '—'}</td>
+                  <td className="pick-locatie">
+                    <div className="doc-nowrap">{p.locatieCode || '—'}</div>
+                    <div className="pick-voorraad-bij">
+                      voorraad {aantal(p.voorraadOpLocatie ?? p.opLocatie)}
+                    </div>
+                  </td>
                   <td className="doc-artikelnummer doc-nowrap">{p.artikelnummer}</td>
                   <td>
                     {p.artikelnaam}
@@ -171,7 +180,6 @@ export default function KlantPicklijstAfdruk() {
                   </td>
                   <td className="num pick-aantal">{aantal(p.aantal)}</td>
                   <td className="doc-nowrap">{p.eenheid}</td>
-                  <td className="num">{aantal(p.voorraadOpLocatie ?? p.opLocatie)}</td>
                   <td className="doc-nowrap">{(p.ordernummers || [p.ordernummer]).filter(Boolean).join(', ')}</td>
                   <td className="num">
                     <span className="pick-invul" />
@@ -229,6 +237,7 @@ export default function KlantPicklijstAfdruk() {
           bij het maken van de pakbon per order.
         </p>
       </div>
+      {qrOpen && <PicklijstQrVenster klant={klant} onClose={() => setQrOpen(false)} />}
     </div>
   )
 }

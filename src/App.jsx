@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
@@ -16,15 +16,29 @@ import VerkoopAfdruk from './pages/verkooporders/VerkoopAfdruk'
 import PicklijstAfdruk from './pages/verkooporders/PicklijstAfdruk'
 import PicklijstenList from './pages/picklijsten/PicklijstenList'
 import KlantPicklijstAfdruk from './pages/picklijsten/KlantPicklijstAfdruk'
+import PicklijstMobiel from './pages/picklijsten/PicklijstMobiel'
+import PickrapportAfdruk from './pages/picklijsten/PickrapportAfdruk'
+import InpakMobiel from './pages/picklijsten/InpakMobiel'
+import InpaklijstAfdruk from './pages/picklijsten/InpaklijstAfdruk'
+import InpakrapportAfdruk from './pages/picklijsten/InpakrapportAfdruk'
 import VoorraadOverzicht from './pages/voorraad/VoorraadOverzicht'
+import OpVoorraadMobiel from './pages/voorraad/OpVoorraadMobiel'
+import OpVoorraadRapport from './pages/voorraad/OpVoorraadRapport'
 import MutatiesOverzicht from './pages/voorraad/MutatiesOverzicht'
 import ProductieordersList from './pages/productieorders/ProductieordersList'
 import LocatiesBeheer from './pages/locaties/LocatiesBeheer'
 import LooprouteBeheer from './pages/locaties/LooprouteBeheer'
 import Gebruikersbeheer from './pages/gebruikers/Gebruikersbeheer'
 
+function terugNaLogin(from) {
+  const pad = `${from?.pathname || ''}${from?.search || ''}${from?.hash || ''}`
+  if (!pad.startsWith('/') || pad.startsWith('//')) return '/'
+  return pad
+}
+
 function LoginRoute() {
   const { user, loading } = useAuth()
+  const location = useLocation()
   if (loading) {
     return (
       <div className="center-screen">
@@ -32,7 +46,7 @@ function LoginRoute() {
       </div>
     )
   }
-  if (user) return <Navigate to="/" replace />
+  if (user) return <Navigate to={terugNaLogin(location.state?.from)} replace />
   return <Login />
 }
 
@@ -157,6 +171,46 @@ export default function App() {
             }
           />
           <Route
+            path="/picklijsten/:klantId/mobiel"
+            element={
+              <ProtectedRoute>
+                <PicklijstMobiel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/picklijsten/:klantId/rapport"
+            element={
+              <ProtectedRoute>
+                <PickrapportAfdruk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/picklijsten/:klantId/inpakken"
+            element={
+              <ProtectedRoute>
+                <InpakMobiel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/picklijsten/:klantId/inpaklijst"
+            element={
+              <ProtectedRoute>
+                <InpaklijstAfdruk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/picklijsten/:klantId/inpakrapport"
+            element={
+              <ProtectedRoute>
+                <InpakrapportAfdruk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/picklijsten/:klantId"
             element={
               <ProtectedRoute>
@@ -197,6 +251,22 @@ export default function App() {
                 <Layout>
                   <VoorraadOverzicht />
                 </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/voorraad/op-voorraad"
+            element={
+              <ProtectedRoute>
+                <OpVoorraadMobiel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/voorraad/op-voorraad/rapport"
+            element={
+              <ProtectedRoute>
+                <OpVoorraadRapport />
               </ProtectedRoute>
             }
           />

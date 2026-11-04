@@ -1,7 +1,53 @@
 # Axapta → Firebase koppeling (alleen lezen)
 
-Dit programma leest open verkoopregels uit Axapta (`AXDB30SP4`) en zet een
-kopie in Firestore (`axaptaOpenstaandeRegels`). Het doet **geen** schrijfacties
+`axapta_sync.py` is het script voor de Raspberry Pi. Het leest de voorraad en
+de open verkooporders uit Axapta (`AXDB30SP4`) en werkt Firestore bij, op
+dezelfde manier als `AantalAcs.py`: FreeTDS, `pyodbc`, cron. Het schrijft
+niets naar SQL Server.
+
+`sync.js` is een oudere Node-variant die alleen open regels in een losse
+collectie zet. De app leest die collectie niet. Gebruik op de Pi het
+Python-script.
+
+## Raspberry Pi
+
+Kopieer de map `koppeling/` naar de Pi, bijvoorbeeld `/home/pi/fmid-koppeling/`.
+`pyodbc` en FreeTDS staan er al, omdat `AantalAcs.py` daarmee draait.
+
+```bash
+cd /home/pi/fmid-koppeling
+python3 -m pip install --user -r requirements.txt
+# Lukt dat niet op een oude Pi: sudo apt-get install -y python3-requests python3-jwt python3-cryptography
+cp .env.example .env
+nano .env
+```
+
+In `.env` dezelfde SQL-login als `AantalAcs.py` (`AX_SQL_GEBRUIKER` en
+`AX_SQL_WACHTWOORD`). Zet het wachtwoord alleen in `.env`, niet in het script.
+`GOOGLE_APPLICATION_CREDENTIALS` wijst naar de Firebase-sleutel
+(`firebase-sleutel.json` in deze map, niet in git).
+
+```bash
+python3 axapta_sync.py --proef
+python3 axapta_sync.py
+```
+
+Cron, elke 5 minuten:
+
+```
+*/5 * * * * cd /home/pi/fmid-koppeling && /usr/bin/python3 axapta_sync.py >> /home/pi/fmid-koppeling/sync.log 2>&1
+```
+
+De voorraad komt in `voorraadstanden` (partijen op dezelfde locatie opgeteld).
+Open verkooporders komen in `verkooporders` / `verkooporderregels`, met het
+Axapta-ordernummer. Een wijziging in FMID op die documenten is bij de volgende
+run weer gelijk aan Axapta. Orders die je alleen in FMID aanmaakt (`VO-…`)
+blijven buiten de sync.
+
+## Node-script (niet gebruiken op de Pi)
+
+Dit programma leest open verkoopregels uit Axapta en zet een kopie in
+Firestore (`axaptaOpenstaandeRegels`). Het doet **geen** schrijfacties
 op SQL Server.
 
 > **Tip:** de Axapta-server draait SQL Server 2005 op een oudere Windows.

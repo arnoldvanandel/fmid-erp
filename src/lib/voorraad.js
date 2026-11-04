@@ -1,4 +1,4 @@
-import { doc, runTransaction, collection, serverTimestamp } from 'firebase/firestore'
+import { collection, doc, getDocs, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { db } from '../firebase'
 
 // Voorraad wordt (net als in Axapta) per locatie bijgehouden. Elke combinatie
@@ -6,6 +6,25 @@ import { db } from '../firebase'
 // id zodat we 'm zonder extra query kunnen opzoeken/aanmaken in de transactie.
 export function voorraadstandId(artikelId, locatieId) {
   return `${artikelId}__${locatieId}`
+}
+
+// Locaties waar dit artikel nu ligt (standen met 0 stuks vallen weg).
+export async function haalStandenVanArtikel(artikelId) {
+  if (!artikelId) return []
+  const snap = await getDocs(query(collection(db, 'voorraadstanden'), where('artikelId', '==', artikelId)))
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((s) => Number(s.aantal) !== 0)
+    .sort((a, b) => String(a.locatieCode).localeCompare(String(b.locatieCode), 'nl', { numeric: true }))
+}
+
+// Aantal dozen of zakjes omrekenen naar de eenheid van het artikel.
+export function stuksUitVerpakking(artikel, soort, aantal) {
+  const n = Number(aantal)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  if (soort === 'doos') return n * (Number(artikel?.stuksPerDoos) || 0)
+  if (soort === 'zak') return n * (Number(artikel?.stuksPerZak) || 0)
+  return n
 }
 
 // Boekt een voorraadmutatie (in, uit of correctie) op één locatie, en werkt de
@@ -18,6 +37,7 @@ export async function boekVoorraadMutatie({
   aantal,
   reden,
   gebruiker,
+  bron = 'handmatig',
 }) {
   if (!artikelId) throw new Error('Geen artikel gekozen.')
   if (!locatieId) throw new Error('Geen locatie gekozen.')
@@ -80,10 +100,11 @@ export async function boekVoorraadMutatie({
       locatieCode: locatieSnap.data().code || '',
       type,
       aantal: n,
+      eenheid: artikelSnap.data().eenheid || '',
       voorraadVoor: huidig,
       voorraadNa: nieuw,
       reden: reden || '',
-      bron: 'handmatig',
+      bron: bron || 'handmatig',
       gebruiker: gebruiker || '',
       datum: serverTimestamp(),
     })

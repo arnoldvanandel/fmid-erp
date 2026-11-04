@@ -14,6 +14,30 @@
   justify-content: flex-end;
 }
 
+.afdruk-toolbar.rapport-balk {
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.rapport-filters,
+.rapport-acties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.rapport-filters .field {
+  margin: 0;
+  min-width: 150px;
+}
+
+.rapport-filters input[type='date'] {
+  background: #fff;
+}
+
 .afdruk-pagina {
   --fmid-blauw: #3a4899;
   --fmid-groen: #5ab031;
@@ -363,6 +387,13 @@
   font-weight: 700;
 }
 
+.pick-voorraad-bij {
+  margin-top: 0.3mm;
+  font-size: 8pt;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .pick-invul {
   display: inline-block;
   width: 14mm;
@@ -379,6 +410,12 @@
   margin: 6mm 0 1.5mm;
   font-size: 9pt;
   color: var(--color-danger, #c0392b);
+}
+
+.inpak-doos-kop {
+  margin: 6mm 0 1.5mm;
+  font-size: 11pt;
+  color: var(--fmid-blauw);
 }
 
 .pick-tekort th {
