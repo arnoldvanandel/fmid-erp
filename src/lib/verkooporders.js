@@ -60,7 +60,7 @@ function vandaag() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function plusDagen(iso, dagen) {
+export function plusDagen(iso, dagen) {
   const d = new Date(`${iso}T12:00:00`)
   d.setDate(d.getDate() + (Number(dagen) || 0))
   return d.toISOString().slice(0, 10)

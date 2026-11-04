@@ -3,6 +3,7 @@ import { db } from '../firebase'
 import { haalArtikelenOp } from './artikelZoeken'
 import { inkoopprijsPerEenheid } from './staffel'
 import { maakInkooporder, voegInkooporderRegelToe } from './inkooporders'
+import { plusDagen } from './verkooporders'
 
 // Inkoopsjablonen: een vaste inkooporder (leverancier + regels) die je steeds
 // opnieuw bestelt. Een sjabloon is één document in `inkoopsjablonen`; de
@@ -91,6 +92,11 @@ export async function maakInkooporderUitSjabloon({ sjabloon, gebruiker, gebruike
   const kop = {}
   for (const veld of ['referentie', 'levering', 'opmerkingen']) {
     if (sjabloon[veld]) kop[veld] = sjabloon[veld]
+  }
+  // Levertijd in kalenderdagen, gerekend vanaf de besteldatum (vandaag). Staat
+  // vóór het toevoegen van de regels, zodat die dezelfde leverdatum krijgen.
+  if (Number.isInteger(sjabloon.levertijdDagen)) {
+    kop.verwachteLeverdatum = plusDagen(order.besteldatum, sjabloon.levertijdDagen)
   }
   if (Object.keys(kop).length) {
     await updateDoc(doc(db, 'inkooporders', order.id), kop)

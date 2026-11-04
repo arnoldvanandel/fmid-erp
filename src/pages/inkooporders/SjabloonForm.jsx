@@ -12,6 +12,7 @@ export default function SjabloonForm({ sjabloon, onMaakOrder, onDone }) {
   const [naam, setNaam] = useState(sjabloon.naam || '')
   const [referentie, setReferentie] = useState(sjabloon.referentie || '')
   const [levering, setLevering] = useState(sjabloon.levering || '')
+  const [levertijdDagen, setLevertijdDagen] = useState(sjabloon.levertijdDagen ?? '')
   const [opmerkingen, setOpmerkingen] = useState(sjabloon.opmerkingen || '')
   const [regels, setRegels] = useState(sjabloon.regels || [])
   const [nieuwNummer, setNieuwNummer] = useState('')
@@ -41,10 +42,17 @@ export default function SjabloonForm({ sjabloon, onMaakOrder, onDone }) {
     setNieuwAantal('')
   }
 
+  // Leeg = geen verwachte leverdatum op de order.
+  const levertijd = levertijdDagen === '' ? null : Number(levertijdDagen)
+
   async function opslaan() {
     setError(null)
     if (regels.some((r) => !(Number(r.aantal) > 0))) {
       setError('Elke regel moet een hoeveelheid groter dan 0 hebben.')
+      return false
+    }
+    if (levertijd !== null && !(Number.isInteger(levertijd) && levertijd >= 0)) {
+      setError('Levertijd moet een heel aantal dagen zijn (0 of meer).')
       return false
     }
     setSaving(true)
@@ -55,6 +63,7 @@ export default function SjabloonForm({ sjabloon, onMaakOrder, onDone }) {
           naam: naam.trim(),
           referentie: referentie.trim(),
           levering: levering.trim(),
+          levertijdDagen: levertijd,
           opmerkingen: opmerkingen.trim(),
           regels,
         },
@@ -113,6 +122,18 @@ export default function SjabloonForm({ sjabloon, onMaakOrder, onDone }) {
             onChange={(e) => setLevering(e.target.value)}
             placeholder="Leeg = standaard van de leverancier"
           />
+        </div>
+        <div className="field">
+          <label>Levertijd (dagen)</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={levertijdDagen}
+            onChange={(e) => setLevertijdDagen(e.target.value)}
+            placeholder="Leeg = geen leverdatum"
+          />
+          <span className="hint">Verwachte leverdatum = dag waarop de order gemaakt wordt + dit aantal kalenderdagen.</span>
         </div>
       </div>
       <div className="field">
@@ -232,6 +253,7 @@ export default function SjabloonForm({ sjabloon, onMaakOrder, onDone }) {
                   naam: naam.trim(),
                   referentie: referentie.trim(),
                   levering: levering.trim(),
+                  levertijdDagen: levertijd,
                   opmerkingen: opmerkingen.trim(),
                   regels,
                 })
