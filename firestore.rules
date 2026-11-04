@@ -182,6 +182,14 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Looproute / afstandsmatrix voor picklijsten. Iedereen die mag picken
+    // mag de matrix bijwerken (net als locaties).
+    match /looproute/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
     match /counters/{docId} {
       allow read: if isActive();
       allow create, update: if isActive();

@@ -497,6 +497,47 @@ table.data-table {
   background: #f7f9fc;
 }
 
+/* Keuzelijst in het dialoog "Nieuwe verkooporder". Een listbox-<select> neemt
+   de eerste klik niet over zolang het zoekveld nog focus heeft; knoppen wel. */
+.klant-keuze {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--color-surface);
+}
+
+.klant-keuze button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 7px 10px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.klant-keuze button + button {
+  border-top: 1px solid var(--color-border);
+}
+
+.klant-keuze button:hover {
+  background: var(--color-bg);
+}
+
+.klant-keuze button.geselecteerd,
+.klant-keuze button.geselecteerd:hover {
+  background: var(--color-primary-tint);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.klant-keuze button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .data-table td.num, .data-table th.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -775,4 +816,76 @@ table.data-table {
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+/* ---------- Looproute zone-matrix ---------- */
+
+.looproute-matrix-wrap {
+  overflow: auto;
+  max-height: min(70vh, 900px);
+  padding: 0 0 16px;
+}
+
+.looproute-matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.looproute-matrix th,
+.looproute-matrix td {
+  min-width: 44px;
+  padding: 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.looproute-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-bg-elevated, #fff);
+  box-shadow: 0 1px 0 var(--color-border);
+}
+
+.looproute-matrix tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-bg-elevated, #fff);
+  font-weight: 700;
+  text-align: right;
+  padding-right: 8px;
+  box-shadow: 1px 0 0 var(--color-border);
+}
+
+.looproute-matrix .looproute-corner {
+  left: 0;
+  z-index: 3;
+  text-align: left;
+  min-width: 72px;
+}
+
+.looproute-matrix .looproute-diag {
+  color: var(--color-text-faint);
+  background: #f3f4f6;
+}
+
+.looproute-matrix .looproute-spiegel {
+  color: var(--color-text-muted);
+  background: #fafafa;
+}
+
+.looproute-matrix .looproute-cel input {
+  width: 52px;
+  padding: 4px 2px;
+  text-align: center;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.looproute-matrix .looproute-cel input:focus {
+  outline: 2px solid var(--color-primary-tint);
+  border-color: var(--color-primary);
 }

@@ -1,0 +1,136 @@
+# Axapta → Firebase koppeling (alleen lezen)
+
+Dit programma leest open verkoopregels uit Axapta (`AXDB30SP4`) en zet een
+kopie in Firestore (`axaptaOpenstaandeRegels`). Het doet **geen** schrijfacties
+op SQL Server.
+
+> **Tip:** de Axapta-server draait SQL Server 2005 op een oudere Windows.
+> Zet dit programma bij voorkeur op een **andere machine in het netwerk**
+> (Linux of Windows) die `192.168.5.34` kan bereiken. Linux werkt prima met
+> de SQL-login hieronder. Dat is even veilig: de login blijft alleen-lezen.
+
+## Eenmalig op de pc / server
+
+### 1. Map aanmaken
+
+**Linux (aanbevolen):**
+
+```bash
+sudo mkdir -p /opt/fmid-koppeling
+sudo chown "$USER:$USER" /opt/fmid-koppeling
+```
+
+Kopieer de inhoud van `koppeling/` uit de git-repo naar `/opt/fmid-koppeling/`.
+
+**Windows:** map `C:\fmid-koppeling\` en daarheen kopiëren.
+
+### 2. Alleen-lezen SQL-login (op de Axapta-server, SSMS als beheerder)
+
+Een SQL-login is het eenvoudigst (werkt ook vanaf een andere pc in het netwerk).
+Kies een sterk wachtwoord:
+
+```sql
+USE master;
+CREATE LOGIN fmid_pickkoppel WITH PASSWORD = 'KiesEenSterkWachtwoord';
+
+USE AXDB30SP4;
+CREATE USER fmid_pickkoppel FOR LOGIN fmid_pickkoppel;
+
+GRANT SELECT ON OBJECT::dbo.SALESTABLE TO fmid_pickkoppel;
+GRANT SELECT ON OBJECT::dbo.SALESLINE TO fmid_pickkoppel;
+GRANT SELECT ON OBJECT::dbo.CUSTTABLE TO fmid_pickkoppel;
+GRANT SELECT ON OBJECT::dbo.INVENTITEMBARCODE TO fmid_pickkoppel;
+
+DENY INSERT, UPDATE, DELETE, ALTER ON SCHEMA::dbo TO fmid_pickkoppel;
+```
+
+Controle in SSMS: verbind als `fmid_pickkoppel` → `SELECT` op die tabellen werkt,
+`UPDATE SALESTABLE SET CUSTACCOUNT = CUSTACCOUNT WHERE 1 = 0` faalt.
+
+### 3. Firebase-sleutel
+
+1. Firebase Console → project `fmid-erp-fc354` → Projectinstellingen → Serviceaccounts  
+2. “Nieuwe privésleutel genereren”  
+3. Opslaan als `/opt/fmid-koppeling/firebase-sleutel.json` (Linux) of
+   `C:\fmid-koppeling\firebase-sleutel.json` (Windows)  
+4. Alleen het account dat de sync draait mag dit bestand lezen
+   (`chmod 600 firebase-sleutel.json` op Linux)
+
+### 4. Node.js en configuratie
+
+Installeer [Node.js LTS](https://nodejs.org/) (18 of nieuwer).
+
+**Linux:**
+
+```bash
+cd /opt/fmid-koppeling
+cp .env.example .env
+nano .env
+npm install
+```
+
+**Windows:**
+
+```bat
+cd C:\fmid-koppeling
+copy .env.example .env
+notepad .env
+npm install
+```
+
+In `.env` minimaal:
+
+```
+AX_SQL_SERVER=192.168.5.34
+AX_SQL_DATABASE=AXDB30SP4
+AX_DATAAREAID=fmd
+AX_SQL_GEBRUIKER=fmid_pickkoppel
+AX_SQL_WACHTWOORD=...
+GOOGLE_APPLICATION_CREDENTIALS=/opt/fmid-koppeling/firebase-sleutel.json
+```
+
+- Vul `AX_SQL_GEBRUIKER` en `AX_SQL_WACHTWOORD` met de login uit stap 2.  
+- Proef met één klant: `AX_KLANT=5013`  
+- Op Windows: pas het pad van `GOOGLE_APPLICATION_CREDENTIALS` aan.
+
+### 5. Eerste run
+
+```bash
+npm run proef
+npm run sync
+```
+
+`proef` leest alleen Axapta. `sync` schrijft naar Firestore.
+
+### 6. Automatisch elke 5 minuten
+
+**Linux (cron):**
+
+```bash
+crontab -e
+```
+
+Regel toevoegen:
+
+```
+*/5 * * * * cd /opt/fmid-koppeling && /usr/bin/node sync.js >> /opt/fmid-koppeling/sync.log 2>&1
+```
+
+Controleer met `which node` of het pad naar `node` klopt.
+
+**Windows (Taakplanner):** elke 5 minuten `node.exe sync.js` starten in
+`C:\fmid-koppeling`.
+
+## Firestore
+
+- Collectie `axaptaOpenstaandeRegels` — één document per open orderregel  
+- Document `axaptaSync/openstaandeRegels` — tijdstip en aantal van de laatste sync  
+
+Regels die niet meer open zijn, worden bij de volgende sync verwijderd.
+
+## Beveiliging
+
+- SQL: alleen `SELECT` op vier tabellen  
+- Geen terugschrijven naar Axapta  
+- `.env` en `firebase-sleutel.json` staan niet in git  
+- SQL-poort blijft binnen het bedrijfsnetwerk  

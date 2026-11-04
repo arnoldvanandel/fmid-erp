@@ -13,10 +13,13 @@ import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
 import FacturenList from './pages/verkooporders/FacturenList'
 import VerkoopAfdruk from './pages/verkooporders/VerkoopAfdruk'
 import PicklijstAfdruk from './pages/verkooporders/PicklijstAfdruk'
+import PicklijstenList from './pages/picklijsten/PicklijstenList'
+import KlantPicklijstAfdruk from './pages/picklijsten/KlantPicklijstAfdruk'
 import VoorraadOverzicht from './pages/voorraad/VoorraadOverzicht'
 import MutatiesOverzicht from './pages/voorraad/MutatiesOverzicht'
 import ProductieordersList from './pages/productieorders/ProductieordersList'
 import LocatiesBeheer from './pages/locaties/LocatiesBeheer'
+import LooprouteBeheer from './pages/locaties/LooprouteBeheer'
 import Gebruikersbeheer from './pages/gebruikers/Gebruikersbeheer'
 
 function LoginRoute() {
@@ -129,6 +132,34 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <PicklijstAfdruk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/picklijsten"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PicklijstenList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/picklijsten/:klantId"
+            element={
+              <ProtectedRoute>
+                <KlantPicklijstAfdruk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/looproute"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <LooprouteBeheer />
+                </Layout>
               </ProtectedRoute>
             }
           />

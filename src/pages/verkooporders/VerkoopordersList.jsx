@@ -63,21 +63,50 @@ function NieuweVerkooporderForm({ onCreated, onCancel }) {
               type="text"
               value={zoek}
               onChange={(e) => setZoek(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter in het zoekveld mag het formulier niet versturen zolang
+                // er nog geen klant gekozen is. Bij één treffer wel meteen kiezen.
+                if (e.key !== 'Enter') return
+                if (klant && gefilterd.some((k) => k.id === klant.id)) return
+                e.preventDefault()
+                if (gefilterd.length === 1) setKlantId(gefilterd[0].id)
+              }}
               placeholder="Klantnummer, naam of plaats…"
               autoFocus
             />
           </div>
           <div className="field">
             <label>Klant</label>
-            <select value={klantId} onChange={(e) => setKlantId(e.target.value)} size={8}>
-              {gefilterd.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.klantcode} — {k.naam}
-                  {k.plaats ? ` (${k.plaats})` : ''}
-                </option>
-              ))}
-            </select>
-            <span className="hint">Geblokkeerde klanten staan niet in de lijst.</span>
+            <div className="klant-keuze" role="listbox" aria-label="Klant">
+              {loading ? (
+                <div className="hint" style={{ padding: '8px 10px' }}>
+                  Klanten laden…
+                </div>
+              ) : gefilterd.length === 0 ? (
+                <div className="hint" style={{ padding: '8px 10px' }}>
+                  Geen klanten gevonden.
+                </div>
+              ) : (
+                gefilterd.map((k) => (
+                  <button
+                    type="button"
+                    key={k.id}
+                    role="option"
+                    aria-selected={klantId === k.id}
+                    className={klantId === k.id ? 'geselecteerd' : ''}
+                    onClick={() => setKlantId(k.id)}
+                  >
+                    {k.klantcode} — {k.naam}
+                    {k.plaats ? ` (${k.plaats})` : ''}
+                  </button>
+                ))
+              )}
+            </div>
+            <span className="hint">
+              {klant
+                ? `Geselecteerd: ${klant.klantcode} — ${klant.naam}`
+                : 'Geblokkeerde klanten staan niet in de lijst.'}
+            </span>
           </div>
         </>
       )}

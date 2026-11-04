@@ -153,7 +153,7 @@ export default function PicklijstAfdruk() {
                 <th>Omschrijving</th>
                 <th className="num">Picken</th>
                 <th>Eenh.</th>
-                <th className="num">Op locatie</th>
+                <th className="num">Voorraad</th>
                 <th className="num">Gepickt</th>
                 <th className="doc-pos">Pos.</th>
               </tr>
