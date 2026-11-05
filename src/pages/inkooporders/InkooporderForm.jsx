@@ -11,6 +11,7 @@ import { GetalCel, gridToets } from '../../components/RegelGrid'
 import OntvangstVenster from './OntvangstVenster'
 import StickerVenster from './StickerVenster'
 import { isBonArtikel } from '../../lib/stickers'
+import { vervangendeNummers } from '../../lib/picklijst'
 import { maakSjabloonVanInkooporder } from '../../lib/inkoopsjablonen'
 import Modal from '../../components/Modal'
 import {
@@ -25,6 +26,19 @@ import {
 } from '../../lib/inkooporders'
 
 const STATUSSEN = Object.keys(STATUS_LABEL)
+
+// Bij een A-artikel met BON-tegenhanger gaat 20% op het A-artikel en 80% op het BON-artikel.
+const A_DEEL = 0.2
+
+// Het BON-artikel dat bij een A-artikel hoort (zelfde nummer, bijv. A104 15-15
+// -> BON104 15-15), of null als het geen A-artikel is of er geen BON-artikel is.
+async function zoekBonTegenhanger(artikel) {
+  for (const nummer of vervangendeNummers(artikel.artikelnummer)) {
+    const bon = await haalArtikelOpNummer(nummer)
+    if (bon && !bon.geblokkeerd) return bon
+  }
+  return null
+}
 
 export default function InkooporderForm({ inkooporder, onDone }) {
   const { isAdmin, profile } = useAuth()
@@ -212,15 +226,53 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     }
     setRegelSaving(true)
     try {
-      await voegInkooporderRegelToe({
-        inkooporder: { ...inkooporder, verwachteLeverdatum },
-        artikel,
-        aantal: r.aantal,
-        prijs: r.prijs === '' ? 0 : r.prijs,
-        leverdatum: r.leverdatum,
-        leverancierArtikelnummer: r.leverancierArtikelnummer,
-        hoogsteRegelnummer,
-      })
+      const order = { ...inkooporder, verwachteLeverdatum }
+      const totaal = Number(r.aantal)
+      // Een A-artikel met een BON-tegenhanger (A104 15-15 -> BON104 15-15):
+      // 20% op het A-artikel, 80% op het BON-artikel.
+      const bon = Number.isFinite(totaal) && totaal > 0 ? await zoekBonTegenhanger(artikel) : null
+      if (!bon) {
+        await voegInkooporderRegelToe({
+          inkooporder: order,
+          artikel,
+          aantal: r.aantal,
+          prijs: r.prijs === '' ? 0 : r.prijs,
+          leverdatum: r.leverdatum,
+          leverancierArtikelnummer: r.leverancierArtikelnummer,
+          hoogsteRegelnummer,
+        })
+      } else {
+        const aantalA = Math.round(totaal * A_DEEL * 100) / 100
+        const aantalBon = Math.round((totaal - aantalA) * 100) / 100
+        let volgend = hoogsteRegelnummer
+        if (aantalA > 0) {
+          // Bij een staffel hoort bij het kleinere aantal een andere prijs.
+          const prijsA =
+            staffelRegels(artikel.inkoopStaffel).length > 0
+              ? inkoopprijsPerEenheid(artikel, aantalA)
+              : r.prijs === ''
+                ? 0
+                : r.prijs
+          await voegInkooporderRegelToe({
+            inkooporder: order,
+            artikel,
+            aantal: aantalA,
+            prijs: prijsA,
+            leverdatum: r.leverdatum,
+            leverancierArtikelnummer: r.leverancierArtikelnummer,
+            hoogsteRegelnummer: volgend,
+          })
+          volgend += 10
+        }
+        await voegInkooporderRegelToe({
+          inkooporder: order,
+          artikel: bon,
+          aantal: aantalBon,
+          prijs: inkoopprijsPerEenheid(bon, aantalBon) || 0,
+          leverdatum: r.leverdatum,
+          hoogsteRegelnummer: volgend,
+        })
+      }
       setNieuweRegel(LEGE_REGEL)
     } catch (err) {
       setRegelError(err.message)
@@ -652,7 +704,8 @@ export default function InkooporderForm({ inkooporder, onDone }) {
       </div>
       <p className="hint" style={{ marginTop: 6 }}>
         Klik in een cel om te wijzigen; de wijziging wordt opgeslagen zodra je de cel verlaat. Nieuw artikel: vul de
-        onderste regel in en druk op Enter. Met ↑ en ↓ ga je naar de regel erboven of eronder.
+        onderste regel in en druk op Enter. Bij een A-artikel met een BON-artikel (zelfde nummer) komt 20% op het
+        A-artikel en 80% op het BON-artikel. Met ↑ en ↓ ga je naar de regel erboven of eronder.
       </p>
 
       <div className="modal-actions" style={{ justifyContent: isAdmin ? 'space-between' : 'flex-end' }}>
