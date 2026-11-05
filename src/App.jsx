@@ -8,9 +8,11 @@ import ArtikelenList from './pages/artikelen/ArtikelenList'
 import LeveranciersList from './pages/leveranciers/LeveranciersList'
 import KlantenList from './pages/klanten/KlantenList'
 import InkoopordersList from './pages/inkooporders/InkoopordersList'
+import OpenstaandeInkooporders from './pages/inkooporders/OpenstaandeInkooporders'
 import InkooporderAfdruk from './pages/inkooporders/InkooporderAfdruk'
 import InkoopsjablonenList from './pages/inkooporders/InkoopsjablonenList'
 import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
+import OpenstaandeOrders from './pages/verkooporders/OpenstaandeOrders'
 import FacturenList from './pages/verkooporders/FacturenList'
 import VerkoopAfdruk from './pages/verkooporders/VerkoopAfdruk'
 import PicklijstAfdruk from './pages/verkooporders/PicklijstAfdruk'
@@ -107,6 +109,16 @@ export default function App() {
             }
           />
           <Route
+            path="/inkooporders/openstaand"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <OpenstaandeInkooporders />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/inkoopsjablonen"
             element={
               <ProtectedRoute>
@@ -130,6 +142,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <VerkoopordersList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verkooporders/openstaand"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <OpenstaandeOrders />
                 </Layout>
               </ProtectedRoute>
             }

@@ -35,14 +35,26 @@ function voorvoegsels(woord) {
 }
 
 // Zoektermen voor het veld `zoek` van een artikel.
-export function zoekTermen({ artikelnummer, naam, zoeknaam, barcode }) {
+export function zoekTermen({ artikelnummer, naam, zoeknaam, barcode, barcodeDoos, barcodeZak }) {
   const termen = new Set()
   const nummer = String(artikelnummer || '').toLowerCase().trim()
   for (const t of voorvoegsels(nummer)) termen.add(t)
-  for (const w of [...woorden(artikelnummer), ...woorden(naam), ...woorden(zoeknaam), ...woorden(barcode)]) {
+  for (const w of [
+    ...woorden(artikelnummer),
+    ...woorden(naam),
+    ...woorden(zoeknaam),
+    ...woorden(barcode),
+    ...woorden(barcodeDoos),
+    ...woorden(barcodeZak),
+  ]) {
     for (const t of voorvoegsels(w)) termen.add(t)
   }
   return [...termen]
+}
+
+export function barcodeCodesVan({ barcode, barcodeDoos, barcodeZak, barcodeCodes } = {}) {
+  const lijst = [barcodeDoos, barcodeZak, ...(barcodeCodes || []), barcode]
+  return [...new Set(lijst.map((code) => String(code || '').trim()).filter(Boolean))]
 }
 
 // Zoekt artikelen op (een deel van) artikelnummer of naam. Zonder zoekterm:
@@ -86,15 +98,29 @@ export async function haalArtikelOpNummer(artikelnummer) {
 
 // Eén artikel op de barcode uit het artikelbestand. Valt terug op het
 // artikelnummer, voor etiketten waar het nummer op staat in plaats van een barcode.
-export async function haalArtikelOpBarcode(code) {
-  const waarde = String(code || '').trim()
-  if (!waarde) return null
-  const snap = await getDocs(query(collection(db, 'artikelen'), where('barcode', '==', waarde), limit(2)))
+async function eersteArtikel(snap, waarde) {
   if (snap.size > 1) throw new Error(`Meerdere artikelen hebben barcode ${waarde}.`)
   if (snap.size === 1) {
     const d = snap.docs[0]
     return { id: d.id, ...d.data() }
   }
+  return null
+}
+
+export async function haalArtikelOpBarcode(code) {
+  const waarde = String(code || '').trim()
+  if (!waarde) return null
+  const ref = collection(db, 'artikelen')
+  const opCodes = await eersteArtikel(
+    await getDocs(query(ref, where('barcodeCodes', 'array-contains', waarde), limit(2))),
+    waarde
+  )
+  if (opCodes) return opCodes
+  const opBarcode = await eersteArtikel(
+    await getDocs(query(ref, where('barcode', '==', waarde), limit(2))),
+    waarde
+  )
+  if (opBarcode) return opBarcode
   return haalArtikelOpNummer(waarde)
 }
 

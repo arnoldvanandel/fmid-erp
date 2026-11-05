@@ -1,9 +1,9 @@
 # Axapta → Firebase koppeling (alleen lezen)
 
-`axapta_sync.py` is het script voor de Raspberry Pi. Het leest de voorraad en
-de open verkooporders uit Axapta (`AXDB30SP4`) en werkt Firestore bij, op
-dezelfde manier als `AantalAcs.py`: FreeTDS, `pyodbc`, cron. Het schrijft
-niets naar SQL Server.
+`axapta_sync.py` is het script voor de Raspberry Pi. Het leest de voorraad,
+de open verkooporders en de tekeningpaden van artikelen uit Axapta
+(`AXDB30SP4`) en werkt Firestore bij, op dezelfde manier als `AantalAcs.py`:
+FreeTDS, `pyodbc`, cron. Het schrijft niets naar SQL Server.
 
 `sync.js` is een oudere Node-variant die alleen open regels in een losse
 collectie zet. De app leest die collectie niet. Gebruik op de Pi het
@@ -43,6 +43,15 @@ Open verkooporders komen in `verkooporders` / `verkooporderregels`, met het
 Axapta-ordernummer. Een wijziging in FMID op die documenten is bij de volgende
 run weer gelijk aan Axapta. Orders die je alleen in FMID aanmaakt (`VO-…`)
 blijven buiten de sync.
+
+Tekeningen (Axapta-documenttype `Tekening` op het artikel) komen op het
+artikelveld `tekeningen`: naam, map en volledig pad, zoals
+`H:\Drawing\Axapta\A106 12-15.pdf`. De artikelpagina opent dat bestand.
+
+Streepjescodes uit `INVENTITEMBARCODE` komen op het artikel: `barcodeDoos`
+en `barcodeZak` (streepjescodesetup DOOS en ZAK), plus `barcodeCodes` zodat
+de telefoon beide kan scannen. Een gevulde hoeveelheid op die barcode
+(bijna altijd leeg in Axapta) wordt `stuksPerDoos` of `stuksPerZak`.
 
 ## Node-script (niet gebruiken op de Pi)
 

@@ -490,6 +490,33 @@ table.data-table {
   white-space: nowrap;
 }
 
+.data-table th .sorteer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: inherit;
+  color: inherit;
+  cursor: pointer;
+  justify-content: flex-start;
+}
+
+.data-table th.num .sorteer {
+  justify-content: flex-end;
+}
+
+.data-table th .sorteer:hover {
+  color: var(--color-primary);
+}
+
 .data-table td {
   padding: 10px 12px;
   border-bottom: 1px solid #eef0f3;

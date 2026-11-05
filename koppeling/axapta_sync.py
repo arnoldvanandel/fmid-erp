@@ -4,6 +4,8 @@
 Axapta blijft leidend. Het script zet:
   - de fysieke voorraad per artikel en locatie in `voorraadstanden`
   - open verkooporders (nog te leveren) in `verkooporders` en `verkooporderregels`
+  - tekeningpaden op het artikel (`artikelen.tekeningen`)
+  - streepjescodes van doos en zak op het artikel (`barcodeDoos`, `barcodeZak`)
 
 Orders die alleen in FMID bestaan (VO-…) worden niet aangeraakt.
 Een order of stand die uit Axapta komt krijgt bron 'axapta' en wordt bij
@@ -189,6 +191,251 @@ def regel_sleutel(regelnummer):
     if abs(n - round(n)) < 1e-6:
         return str(int(round(n)))
     return f'{n:.4f}'.rstrip('0').rstrip('.')
+
+
+def met_scheiding(map_pad):
+    map_pad = tekst(map_pad).replace('/', '\\')
+    if map_pad and map_pad[-1] != '\\':
+        map_pad += '\\'
+    return map_pad
+
+
+def tekeningpad(map_pad, bestand, extensie):
+    """DOCUVALUE bewaart map, bestandsnaam en type apart.
+
+    De bestandsnaam mag punten bevatten (CSI-E133.363); de extensie komt
+    uit FILETYPE en hoort er alleen achter als die er nog niet staat.
+    """
+    map_pad = met_scheiding(map_pad)
+    bestand = tekst(bestand)
+    ext = tekst(extensie).lstrip('.')
+    if not map_pad or not bestand:
+        return '', ''
+    if ext and not bestand.lower().endswith('.' + ext.lower()):
+        bestand = f'{bestand}.{ext}'
+    return map_pad + bestand, bestand
+
+
+def lees_tekeningen(conn, bedrijf):
+    """Tekeningen per artikelnummer (hoofdletters).
+
+    In Axapta hangt een tekening aan het artikel via DOCUREF
+    (TYPEID Tekening, REFTABLEID 175 = InventTable). Het bestandspad
+    staat in DOCUVALUE: PATH + FILENAME + FILETYPE, bijvoorbeeld
+    H:\\Drawing\\Axapta\\ + A106 12-15 + pdf.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT
+          LTRIM(RTRIM(i.ITEMID)) AS artikelnummer,
+          LTRIM(RTRIM(r.NAME)) AS naam,
+          LTRIM(RTRIM(v.PATH)) AS map,
+          LTRIM(RTRIM(v.FILENAME)) AS bestand,
+          LTRIM(RTRIM(v.FILETYPE)) AS type
+        FROM DOCUREF r
+        JOIN INVENTTABLE i
+          ON i.RECID = r.REFRECID
+         AND i.DATAAREAID = r.REFCOMPANYID
+        JOIN DOCUVALUE v
+          ON v.RECID = r.VALUERECID
+        WHERE r.TYPEID = 'Tekening'
+          AND r.REFTABLEID = 175
+          AND LTRIM(RTRIM(r.REFCOMPANYID)) = ?
+          AND v.FILENAME IS NOT NULL
+          AND LTRIM(RTRIM(v.FILENAME)) <> ''
+          AND v.PATH IS NOT NULL
+          AND LTRIM(RTRIM(v.PATH)) <> ''
+        """,
+        (bedrijf,),
+    )
+    per_artikel = {}
+    for rij in rijen(cursor):
+        nummer = tekst(rij['artikelnummer']).upper()
+        pad, bestand = tekeningpad(rij['map'], rij['bestand'], rij['type'])
+        if not nummer or not pad:
+            continue
+        lijst = per_artikel.setdefault(nummer, [])
+        if any(t['pad'].upper() == pad.upper() for t in lijst):
+            continue
+        lijst.append({
+            'naam': tekst(rij['naam']) or bestand,
+            'pad': pad,
+            'map': met_scheiding(rij['map']),
+            'bestand': bestand,
+            'type': tekst(rij['type']).lstrip('.').lower(),
+        })
+    for lijst in per_artikel.values():
+        lijst.sort(key=lambda t: t['pad'].upper())
+    return per_artikel
+
+
+def lees_barcodes(conn, bedrijf):
+    """Streepjescodes per artikelnummer (hoofdletters).
+
+    In Axapta hangen die aan INVENTITEMBARCODE. BARCODESETUPID is DOOS of
+    ZAK; dezelfde code staat soms dubbel. QTY is het aantal stuks in die
+    verpakking, maar is bijna overal 0 en alleen gevuld als het > 0 is.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT
+          LTRIM(RTRIM(ITEMID)) AS artikelnummer,
+          LTRIM(RTRIM(BARCODESETUPID)) AS soort,
+          LTRIM(RTRIM(ITEMBARCODE)) AS code,
+          QTY AS aantal
+        FROM INVENTITEMBARCODE
+        WHERE LTRIM(RTRIM(DATAAREAID)) = ?
+          AND ITEMBARCODE IS NOT NULL
+          AND LTRIM(RTRIM(ITEMBARCODE)) <> ''
+        """,
+        (bedrijf,),
+    )
+    per_artikel = {}
+    for rij in rijen(cursor):
+        nummer = tekst(rij['artikelnummer']).upper()
+        soort = tekst(rij['soort']).upper()
+        code = tekst(rij['code'])
+        if not nummer or not code or soort not in ('DOOS', 'ZAK'):
+            continue
+        gegevens = per_artikel.setdefault(nummer, {'doos': '', 'zak': '', 'stuksPerDoos': None, 'stuksPerZak': None})
+        veld = 'doos' if soort == 'DOOS' else 'zak'
+        if not gegevens[veld]:
+            gegevens[veld] = code
+        aantal = getal(rij['aantal'])
+        if aantal > 0:
+            sleutel = 'stuksPerDoos' if soort == 'DOOS' else 'stuksPerZak'
+            if gegevens[sleutel] is None:
+                gegevens[sleutel] = int(aantal) if aantal == int(aantal) else aantal
+    return per_artikel
+
+
+def barcode_payload(gegevens):
+    doos = gegevens.get('doos') or ''
+    zak = gegevens.get('zak') or ''
+    codes = []
+    for code in (doos, zak):
+        if code and code not in codes:
+            codes.append(code)
+    payload = {
+        'barcodeDoos': doos,
+        'barcodeZak': zak,
+        'barcode': doos or zak,
+        'barcodeCodes': codes,
+    }
+    if gegevens.get('stuksPerDoos'):
+        payload['stuksPerDoos'] = gegevens['stuksPerDoos']
+    if gegevens.get('stuksPerZak'):
+        payload['stuksPerZak'] = gegevens['stuksPerZak']
+    return payload
+
+
+def zoek_met_barcodes(artikel, codes):
+    zoek = list(artikel.get('zoek') or [])
+    aanwezig = {str(term).lower() for term in zoek}
+    for code in codes:
+        laag = code.lower()
+        if laag and laag not in aanwezig:
+            zoek.append(laag)
+            aanwezig.add(laag)
+    return zoek
+
+
+def zelfde_getal(a, b):
+    try:
+        return float(a) == float(b)
+    except (TypeError, ValueError):
+        return False
+
+
+def barcodes_gelijk(payload, artikel):
+    if tekst(artikel.get('barcodeDoos')) != payload['barcodeDoos']:
+        return False
+    if tekst(artikel.get('barcodeZak')) != payload['barcodeZak']:
+        return False
+    if tekst(artikel.get('barcode')) != payload['barcode']:
+        return False
+    if list(artikel.get('barcodeCodes') or []) != payload['barcodeCodes']:
+        return False
+    if 'stuksPerDoos' in payload and not zelfde_getal(artikel.get('stuksPerDoos'), payload['stuksPerDoos']):
+        return False
+    if 'stuksPerZak' in payload and not zelfde_getal(artikel.get('stuksPerZak'), payload['stuksPerZak']):
+        return False
+    if payload['barcodeCodes'] and list(artikel.get('zoek') or []) != zoek_met_barcodes(artikel, payload['barcodeCodes']):
+        return False
+    return True
+
+
+def schrijf_barcodes(db, barcodes, artikelen):
+    """Zet doos- en zakbarcode op het artikel. Leegmaken als Axapta ze kwijt is."""
+    batches = Batches(db)
+    bijgewerkt = 0
+    gewist = 0
+    overgeslagen = 0
+    for nummer, gegevens in barcodes.items():
+        artikel = artikelen.get(nummer)
+        if not artikel:
+            overgeslagen += 1
+            continue
+        payload = barcode_payload(gegevens)
+        if payload['barcodeCodes']:
+            payload['zoek'] = zoek_met_barcodes(artikel, payload['barcodeCodes'])
+        if barcodes_gelijk(payload, artikel):
+            continue
+        batches.set('artikelen', artikel['id'], payload)
+        bijgewerkt += 1
+    leeg = {'barcodeDoos': '', 'barcodeZak': '', 'barcode': '', 'barcodeCodes': []}
+    for nummer, artikel in artikelen.items():
+        if nummer in barcodes:
+            continue
+        if not (artikel.get('barcodeDoos') or artikel.get('barcodeZak') or artikel.get('barcodeCodes')):
+            continue
+        batches.set('artikelen', artikel['id'], leeg)
+        gewist += 1
+    batches.klaar()
+    return {
+        'artikelen': len(barcodes),
+        'bijgewerkt': bijgewerkt,
+        'gewist': gewist,
+        'overgeslagen': overgeslagen,
+    }
+
+
+def tekeningen_gelijk(nieuw, oud):
+    if not isinstance(oud, list) or len(nieuw) != len(oud):
+        return False
+    velden = ('naam', 'pad', 'map', 'bestand', 'type')
+    return all(all(a.get(veld) == b.get(veld) for veld in velden) for a, b in zip(nieuw, oud))
+
+
+def schrijf_tekeningen(db, tekeningen, artikelen):
+    """Zet `tekeningen` op het artikel. Leegmaken als Axapta de tekening kwijt is."""
+    batches = Batches(db)
+    bijgewerkt = 0
+    gewist = 0
+    overgeslagen = 0
+    for nummer, lijst in tekeningen.items():
+        artikel = artikelen.get(nummer)
+        if not artikel:
+            overgeslagen += 1
+            continue
+        if tekeningen_gelijk(lijst, artikel.get('tekeningen')):
+            continue
+        batches.set('artikelen', artikel['id'], {'tekeningen': lijst})
+        bijgewerkt += 1
+    for nummer, artikel in artikelen.items():
+        if nummer in tekeningen or not artikel.get('tekeningen'):
+            continue
+        batches.wisveld('artikelen', artikel['id'], 'tekeningen')
+        gewist += 1
+    batches.klaar()
+    return {
+        'artikelen': len(tekeningen),
+        'bijgewerkt': bijgewerkt,
+        'gewist': gewist,
+        'overgeslagen': overgeslagen,
+    }
 
 
 def lees_voorraad(conn, bedrijf):
@@ -495,6 +742,13 @@ class Firestore:
     def wisopdracht(self, collectie, doc_id):
         return {'delete': self.documentnaam(collectie, doc_id)}
 
+    def wisveldopdracht(self, collectie, doc_id, veld):
+        # Veld in het masker, maar niet in het document: Firestore wist het veld.
+        return {
+            'update': {'name': self.documentnaam(collectie, doc_id), 'fields': {}},
+            'updateMask': {'fieldPaths': [veld]},
+        }
+
 
 def index_op(db, collectie, veld):
     index = {}
@@ -520,6 +774,10 @@ class Batches:
 
     def delete(self, collectie, doc_id):
         self.writes.append(self.db.wisopdracht(collectie, doc_id))
+        self._tel()
+
+    def wisveld(self, collectie, doc_id, veld):
+        self.writes.append(self.db.wisveldopdracht(collectie, doc_id, veld))
         self._tel()
 
     def _tel(self):
@@ -781,17 +1039,31 @@ def main():
     try:
         standen = lees_voorraad(conn, bedrijf)
         orders = lees_open_orders(conn, bedrijf)
+        tekeningen = lees_tekeningen(conn, bedrijf)
+        barcodes = lees_barcodes(conn, bedrijf)
     finally:
         conn.close()
 
     regels = sum(len(o['regels']) for o in orders.values())
     print(f'Axapta: {len(standen)} voorraadregels, {len(orders)} open orders, {regels} orderregels')
+    tekening_aantal = sum(len(v) for v in tekeningen.values())
+    print(f'Tekeningen: {tekening_aantal} bij {len(tekeningen)} artikelen')
     if standen:
         (artikel, locatie), aantal = next(iter(standen.items()))
         print(f'Voorbeeld voorraad: {artikel} op {locatie} = {aantal}')
     if orders:
         nummer = next(iter(orders))
         print(f'Voorbeeld order: {nummer}, klant {tekst(orders[nummer]["kop"]["klantcode"])}')
+    voorbeeld_tekening = tekeningen.get('A106 1/2-15'.upper())
+    if voorbeeld_tekening:
+        print(f'Voorbeeld tekening: {voorbeeld_tekening[0]["pad"]}')
+    print(f'Barcodes: {len(barcodes)} artikelen')
+    voorbeeld_barcode = barcodes.get('A105 15-15'.upper())
+    if voorbeeld_barcode:
+        print(
+            f'Voorbeeld barcode A105 15-15: doos {voorbeeld_barcode["doos"] or "—"}, '
+            f'zak {voorbeeld_barcode["zak"] or "—"}'
+        )
     if proef:
         print('Proef klaar. Niets geschreven naar Firestore.')
         return
@@ -800,6 +1072,8 @@ def main():
     artikelen = index_op(db, 'artikelen', 'artikelnummer')
     voorraad = schrijf_voorraad(db, standen, artikelen, index_op(db, 'locaties', 'code'))
     verkoop = schrijf_orders(db, orders, artikelen, index_op(db, 'klanten', 'klantcode'))
+    tekening_sync = schrijf_tekeningen(db, tekeningen, artikelen)
+    barcode_sync = schrijf_barcodes(db, barcodes, artikelen)
 
     db.commit([db.schrijfopdracht('axaptaSync', 'fmid', {
         'laatsteSync': datetime.utcnow(),
@@ -814,6 +1088,14 @@ def main():
         'ordersBijgewerkt': verkoop['bijgewerkt'],
         'ordersGesloten': verkoop['gesloten'],
         'ordersZonderKlant': verkoop['zonderKlant'],
+        'tekeningArtikelen': tekening_sync['artikelen'],
+        'tekeningenBijgewerkt': tekening_sync['bijgewerkt'],
+        'tekeningenGewist': tekening_sync['gewist'],
+        'tekeningenOvergeslagen': tekening_sync['overgeslagen'],
+        'barcodeArtikelen': barcode_sync['artikelen'],
+        'barcodesBijgewerkt': barcode_sync['bijgewerkt'],
+        'barcodesGewist': barcode_sync['gewist'],
+        'barcodesOvergeslagen': barcode_sync['overgeslagen'],
         'bron': 'axapta',
     })])
 
@@ -828,6 +1110,14 @@ def main():
     )
     if verkoop['zonderKlant']:
         print('Order zonder klant in FMID:', '; '.join(verkoop['zonderKlant']))
+    print(
+        f"Tekeningen bijgewerkt: {tekening_sync['bijgewerkt']}, "
+        f"gewist: {tekening_sync['gewist']}, zonder artikel in FMID: {tekening_sync['overgeslagen']}"
+    )
+    print(
+        f"Barcodes bijgewerkt: {barcode_sync['bijgewerkt']}, "
+        f"gewist: {barcode_sync['gewist']}, zonder artikel in FMID: {barcode_sync['overgeslagen']}"
+    )
     print('Sync klaar.')
     if slot:
         slot.close()

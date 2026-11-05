@@ -204,7 +204,11 @@ export default function OpVoorraadMobiel() {
               <div className="pick-mobiel-label">Artikel</div>
               <div className="pick-mobiel-artikel">{artikel.artikelnummer}</div>
               {artikel.naam ? <div className="pick-mobiel-naam">{artikel.naam}</div> : null}
-              {artikel.barcode ? <div className="opv-barcode">Barcode {artikel.barcode}</div> : null}
+              {artikel.barcodeDoos ? <div className="opv-barcode">Doos {artikel.barcodeDoos}</div> : null}
+              {artikel.barcodeZak ? <div className="opv-barcode">Zakje {artikel.barcodeZak}</div> : null}
+              {!artikel.barcodeDoos && !artikel.barcodeZak && artikel.barcode ? (
+                <div className="opv-barcode">Barcode {artikel.barcode}</div>
+              ) : null}
               <button type="button" className="btn btn-ghost btn-sm" onClick={anderArtikel}>
                 Ander artikel
               </button>

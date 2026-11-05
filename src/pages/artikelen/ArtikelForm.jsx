@@ -4,8 +4,9 @@ import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
 import { useVoorraadTotals } from '../../hooks/useVoorraadTotals'
+import { useOpenInkoopVoorArtikel } from '../../hooks/useOpenInkoopVoorArtikel'
 import { BRON_LABEL, bronVan, useMutaties } from '../../hooks/useMutaties'
-import { formatBytes, formatCurrency, formatDateTime, formatNumber } from '../../lib/format'
+import { formatBytes, formatCurrency, formatDate, formatDateTime, formatNumber } from '../../lib/format'
 import { uploadArtikelDocument, verwijderArtikelDocument } from '../../lib/documenten'
 import {
   verwijderStuklijstRegel,
@@ -13,12 +14,23 @@ import {
   wijzigStuklijstRegelAantal,
 } from '../../lib/stuklijst'
 import { verwijderRouteRegel, voegRouteRegelToe, wijzigRouteRegel } from '../../lib/route'
-import { useArtikelenOpId, zoekTermen } from '../../lib/artikelZoeken'
+import { barcodeCodesVan, useArtikelenOpId, zoekTermen } from '../../lib/artikelZoeken'
 import { STAFFEL_SOORTEN, staffelRegels } from '../../lib/staffel'
 import { bonfixCode, isBonArtikel } from '../../lib/stickers'
+import { STATUS_LABEL as INKOOP_STATUS_LABEL } from '../../lib/inkooporders'
+import { tekeningHref } from '../../lib/tekeningen'
 import Modal from '../../components/Modal'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
 import MutatieForm from '../voorraad/MutatieForm'
+import InkooporderForm from '../inkooporders/InkooporderForm'
+
+const INKOOP_STATUS_BADGE = {
+  'deels ontvangen': 'badge-warning',
+  concept: 'badge-neutral',
+  besteld: 'badge-warning',
+  ontvangen: 'badge-success',
+  geannuleerd: 'badge-danger',
+}
 
 const EENHEDEN = ['Stuks', 'Meter', 'Kg', 'Liter', 'm²', 'Doos', 'Rol', 'Set']
 
@@ -40,12 +52,14 @@ const TYPE_BADGE = { in: 'badge-success', uit: 'badge-danger', correctie: 'badge
 export default function ArtikelForm({ artikel, onDone }) {
   const { isAdmin } = useAuth()
   const isNew = !artikel?.id
+  const openInkoop = useOpenInkoopVoorArtikel(artikel?.id)
   const [form, setForm] = useState({
     artikelnummer: artikel?.artikelnummer || '',
     naam: artikel?.naam || '',
     bonfixNummer: artikel?.bonfixNummer || '',
     eenheid: artikel?.eenheid || 'Stuks',
-    barcode: artikel?.barcode || '',
+    barcodeDoos: artikel?.barcodeDoos || '',
+    barcodeZak: artikel?.barcodeZak || '',
     stuksPerDoos: artikel?.stuksPerDoos ?? '',
     stuksPerZak: artikel?.stuksPerZak ?? '',
     inkoopprijs: artikel?.inkoopprijs ?? '',
@@ -125,7 +139,10 @@ export default function ArtikelForm({ artikel, onDone }) {
       artikelnummer: form.artikelnummer.trim(),
       naam: form.naam.trim(),
       eenheid: form.eenheid,
-      barcode: form.barcode.trim(),
+      barcodeDoos: form.barcodeDoos.trim(),
+      barcodeZak: form.barcodeZak.trim(),
+      barcode: form.barcodeDoos.trim() || form.barcodeZak.trim(),
+      barcodeCodes: barcodeCodesVan({ barcodeDoos: form.barcodeDoos, barcodeZak: form.barcodeZak }),
       stuksPerDoos: optioneelAantal(form.stuksPerDoos),
       stuksPerZak: optioneelAantal(form.stuksPerZak),
       inkoopprijs: Number(form.inkoopprijs) || 0,
@@ -199,6 +216,21 @@ export default function ArtikelForm({ artikel, onDone }) {
         ))}
       </div>
 
+      {!isNew && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13.5 }}>
+          <span>
+            Nog te ontvangen op inkooporders:{' '}
+            <strong>{openInkoop.loading ? '…' : formatNumber(openInkoop.totaal)}</strong>
+            {artikel.eenheid ? ` ${artikel.eenheid}` : ''}
+          </span>
+          {openInkoop.regels.length > 0 && activeTab !== 'voorraad' && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setActiveTab('voorraad')}>
+              Details
+            </button>
+          )}
+        </div>
+      )}
+
       {activeTab === 'algemeen' && (
         <div>
           <div className="field-row">
@@ -228,17 +260,31 @@ export default function ArtikelForm({ artikel, onDone }) {
             <input type="text" value={form.naam} onChange={(e) => set('naam', e.target.value)} />
           </div>
 
-          <div className="field">
-            <label>Barcode</label>
-            <input
-              type="text"
-              value={form.barcode}
-              onChange={(e) => set('barcode', e.target.value)}
-              placeholder="Scan of typ de barcode"
-              autoComplete="off"
-            />
-            <span className="hint">Voor op voorraad zetten: de telefoon zoekt het artikel op deze code.</span>
+          <div className="field-row">
+            <div className="field">
+              <label>Barcode doos</label>
+              <input
+                type="text"
+                value={form.barcodeDoos}
+                onChange={(e) => set('barcodeDoos', e.target.value)}
+                placeholder="Streepjescode op de doos"
+                autoComplete="off"
+              />
+            </div>
+            <div className="field">
+              <label>Barcode zakje</label>
+              <input
+                type="text"
+                value={form.barcodeZak}
+                onChange={(e) => set('barcodeZak', e.target.value)}
+                placeholder="Streepjescode op het zakje"
+                autoComplete="off"
+              />
+            </div>
           </div>
+          <span className="hint">
+            Komt uit Axapta (streepjescodesetup DOOS en ZAK). Op voorraad zetten herkent beide codes.
+          </span>
 
           <div className="field-row">
             <div className="field">
@@ -546,7 +592,7 @@ export default function ArtikelForm({ artikel, onDone }) {
         </div>
       )}
 
-      {activeTab === 'voorraad' && !isNew && <VoorraadTab artikel={artikel} />}
+      {activeTab === 'voorraad' && !isNew && <VoorraadTab artikel={artikel} openInkoop={openInkoop} />}
 
       {activeTab === 'documenten' && !isNew && <DocumentenTab artikel={artikel} />}
 
@@ -588,10 +634,11 @@ export default function ArtikelForm({ artikel, onDone }) {
 // Alleen-lezen overzicht van de actuele voorraad per locatie + recente
 // mutaties van dit ene artikel, met een snelkoppeling om direct een mutatie
 // te boeken zonder terug te hoeven naar de Voorraad-pagina.
-function VoorraadTab({ artikel }) {
+function VoorraadTab({ artikel, openInkoop }) {
   const { standenPerArtikel, totalenPerArtikel, loading: loadingStanden } = useVoorraadTotals()
   const { mutaties: mutatiesVoorArtikel, loading: loadingMutaties } = useMutaties({ artikelId: artikel.id, max: 10 })
   const [mutatieBoeken, setMutatieBoeken] = useState(false)
+  const [openOrder, setOpenOrder] = useState(null)
 
   const standen = standenPerArtikel[artikel.id] || []
   const totaal = totalenPerArtikel[artikel.id] || 0
@@ -636,6 +683,52 @@ function VoorraadTab({ artikel }) {
             ))}
           </tbody>
         </table>
+      )}
+
+      <h3>Openstaande inkooporders</h3>
+      {openInkoop.error && <div className="banner banner-danger">{openInkoop.error}</div>}
+      {openInkoop.loading ? (
+        <p className="page-header-sub" style={{ margin: '0 0 18px' }}>
+          Laden…
+        </p>
+      ) : openInkoop.regels.length === 0 ? (
+        <p className="page-header-sub" style={{ margin: '0 0 18px' }}>
+          Niets open op een inkooporder.
+        </p>
+      ) : (
+        <div style={{ overflowX: 'auto', marginBottom: 18 }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Leverancier</th>
+                <th className="num">Open</th>
+                <th>Leverdatum</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {openInkoop.regels.map((r) => (
+                <tr key={r.id} onClick={() => setOpenOrder(r.order)}>
+                  <td>{r.ordernummer}</td>
+                  <td>
+                    {r.leverancierscode}
+                    {r.leverancierNaam ? ` — ${r.leverancierNaam}` : ''}
+                  </td>
+                  <td className="num">
+                    {formatNumber(r.open)} {artikel.eenheid}
+                  </td>
+                  <td>{r.leverdatum ? formatDate(r.leverdatum) : '-'}</td>
+                  <td>
+                    <span className={'badge ' + (INKOOP_STATUS_BADGE[r.status] || 'badge-neutral')}>
+                      {INKOOP_STATUS_LABEL[r.status] || r.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -693,6 +786,12 @@ function VoorraadTab({ artikel }) {
           <MutatieForm artikel={artikel} standen={standen} onDone={() => setMutatieBoeken(false)} />
         </Modal>
       )}
+
+      {openOrder && (
+        <Modal title={`Inkooporder ${openOrder.ordernummer}`} onClose={() => setOpenOrder(null)} width={1120}>
+          <InkooporderForm inkooporder={openOrder} onDone={() => setOpenOrder(null)} />
+        </Modal>
+      )}
     </div>
   )
 }
@@ -714,6 +813,7 @@ function DocumentenTab({ artikel }) {
     () => documenten.filter((d) => d.artikelId === artikel.id),
     [documenten, artikel.id]
   )
+  const tekeningen = Array.isArray(artikel.tekeningen) ? artikel.tekeningen : []
 
   async function handleFileChange(e) {
     const file = e.target.files?.[0]
@@ -769,7 +869,7 @@ function DocumentenTab({ artikel }) {
 
       {loading ? (
         <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }} /></div>
-      ) : documentenVoorArtikel.length === 0 ? (
+      ) : documentenVoorArtikel.length === 0 && tekeningen.length === 0 ? (
         <div className="empty-state">Nog geen documenten gekoppeld aan dit artikel.</div>
       ) : (
         <table className="data-table">
@@ -783,6 +883,19 @@ function DocumentenTab({ artikel }) {
             </tr>
           </thead>
           <tbody>
+            {tekeningen.map((t) => (
+              <tr key={t.pad} style={{ cursor: 'default' }}>
+                <td>
+                  <a href={tekeningHref(t.pad)} target="_blank" rel="noopener noreferrer">
+                    {t.bestand || t.naam}
+                  </a>
+                </td>
+                <td className="num">-</td>
+                <td>-</td>
+                <td>Axapta</td>
+                <td></td>
+              </tr>
+            ))}
             {documentenVoorArtikel.map((d) => (
               <tr key={d.id} style={{ cursor: 'default' }}>
                 <td>
