@@ -21,10 +21,27 @@ function NieuweInkooporderForm({ onCreated, onCancel }) {
   const { profile } = useAuth()
   const { data: leveranciers, loading } = useCollection('leveranciers', { orderByField: 'leverancierscode' })
   const { data: sjablonen } = useCollection('inkoopsjablonen', { orderByField: 'naam' })
+  const [zoek, setZoek] = useState('')
   const [leverancierId, setLeverancierId] = useState('')
   const [sjabloonId, setSjabloonId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+
+  const gefilterd = useMemo(() => {
+    const q = zoek.trim().toLowerCase()
+    if (!q) return leveranciers
+    return leveranciers.filter(
+      (l) =>
+        l.leverancierscode?.toLowerCase().includes(q) ||
+        l.naam?.toLowerCase().includes(q) ||
+        l.plaats?.toLowerCase().includes(q)
+    )
+  }, [leveranciers, zoek])
+
+  function kiesLeverancier(id) {
+    setLeverancierId(id)
+    setSjabloonId('')
+  }
 
   const leverancier = leveranciers.find((l) => l.id === leverancierId)
   const sjabloon = sjablonen.find((s) => s.id === sjabloonId)
@@ -72,23 +89,59 @@ function NieuweInkooporderForm({ onCreated, onCancel }) {
           inkooporder kunt aanmaken.
         </div>
       ) : (
-        <div className="field">
-          <label>Leverancier</label>
-          <select
-            value={leverancierId}
-            onChange={(e) => {
-              setLeverancierId(e.target.value)
-              setSjabloonId('')
-            }}
-          >
-            <option value="">Kies leverancier…</option>
-            {leveranciers.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.leverancierscode} — {l.naam}
-              </option>
-            ))}
-          </select>
-        </div>
+        <>
+          <div className="field">
+            <label>Zoek leverancier</label>
+            <input
+              type="text"
+              value={zoek}
+              onChange={(e) => setZoek(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter mag het formulier niet versturen zolang er nog geen
+                // leverancier gekozen is. Bij één treffer wel meteen kiezen.
+                if (e.key !== 'Enter') return
+                if (leverancier && gefilterd.some((l) => l.id === leverancier.id)) return
+                e.preventDefault()
+                if (gefilterd.length === 1) kiesLeverancier(gefilterd[0].id)
+              }}
+              placeholder="Code, naam of plaats…"
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label>Leverancier</label>
+            <div className="klant-keuze" role="listbox" aria-label="Leverancier">
+              {loading ? (
+                <div className="hint" style={{ padding: '8px 10px' }}>
+                  Leveranciers laden…
+                </div>
+              ) : gefilterd.length === 0 ? (
+                <div className="hint" style={{ padding: '8px 10px' }}>
+                  Geen leveranciers gevonden.
+                </div>
+              ) : (
+                gefilterd.map((l) => (
+                  <button
+                    type="button"
+                    key={l.id}
+                    role="option"
+                    aria-selected={leverancierId === l.id}
+                    className={leverancierId === l.id ? 'geselecteerd' : ''}
+                    onClick={() => kiesLeverancier(l.id)}
+                  >
+                    {l.leverancierscode} — {l.naam}
+                    {l.plaats ? ` (${l.plaats})` : ''}
+                  </button>
+                ))
+              )}
+            </div>
+            {leverancier && (
+              <div className="hint">
+                Gekozen: {leverancier.leverancierscode} — {leverancier.naam}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {sjablonen.length > 0 && (
