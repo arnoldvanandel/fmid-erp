@@ -24,6 +24,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
     email: leverancier?.email || '',
     inkooporderEmails: (leverancier?.inkooporderEmails || []).join(', '),
     taal: leverancier?.taal || 'nl',
+    orderformaat: leverancier?.orderformaat || 'pdf',
     leveringsvoorwaarde: leverancier?.leveringsvoorwaarde || '',
     telefoon: leverancier?.telefoon || '',
     straat: leverancier?.straat || '',
@@ -69,6 +70,7 @@ export default function LeverancierForm({ leverancier, onDone }) {
         .map((e) => e.trim())
         .filter(Boolean),
       taal: form.taal,
+      orderformaat: form.orderformaat,
       leveringsvoorwaarde: form.leveringsvoorwaarde,
       telefoon: form.telefoon.trim(),
       straat: form.straat.trim(),
@@ -238,6 +240,14 @@ export default function LeverancierForm({ leverancier, onDone }) {
                 ))}
               </select>
               <span className="hint">Onderwerp, aanhef en tekst van de inkooporder-mail</span>
+            </div>
+            <div className="field">
+              <label>Formaat bijlage</label>
+              <select value={form.orderformaat} onChange={(e) => set('orderformaat', e.target.value)}>
+                <option value="pdf">PDF</option>
+                <option value="rtf">RTF</option>
+              </select>
+              <span className="hint">Bestandstype van de inkooporder in de mail</span>
             </div>
             <div className="field">
               <label>Standaard levering</label>

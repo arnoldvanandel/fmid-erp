@@ -8,7 +8,7 @@ import './afdruk.css'
 export { BEDRIJF, datumKort, datumLang } from './bedrijf'
 
 // Teksten op de inkooporder, in de taal van de leverancier (veld `taal`).
-const T = {
+export const T = {
   nl: {
     titel: 'Inkooporder',
     tav: 't.a.v.',

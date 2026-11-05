@@ -5,6 +5,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase'
 import InkooporderDocument from '../pages/inkooporders/InkooporderDocument'
 import { inkooporderEmailadressen, laadInkooporderVoorAfdruk, wijzigInkooporder } from './inkooporders'
+import { maakRtfBase64 } from './inkooporderRtf'
 
 // Rendert de A4-pagina buiten beeld en zet 'm om naar een PDF (base64).
 // Zelfde opmaak als de afdrukpagina, dus wat de ontvanger krijgt is precies
@@ -139,12 +140,19 @@ export async function maakInkooporderBericht({ gegevens, gebruiker, handtekening
     text: tekst,
     html: `<div style="${MAIL_FONT};color:#000">${tekstNaarHtml(tekst)}</div>`,
     attachments: [
-      {
-        filename: `Inkooporder ${order.ordernummer}.pdf`,
-        content: await maakPdfBase64(gegevens),
-        encoding: 'base64',
-        contentType: 'application/pdf',
-      },
+      leverancier?.orderformaat === 'rtf'
+        ? {
+            filename: `Inkooporder ${order.ordernummer}.rtf`,
+            content: maakRtfBase64(gegevens),
+            encoding: 'base64',
+            contentType: 'application/rtf',
+          }
+        : {
+            filename: `Inkooporder ${order.ordernummer}.pdf`,
+            content: await maakPdfBase64(gegevens),
+            encoding: 'base64',
+            contentType: 'application/pdf',
+          },
     ],
   }
 }
