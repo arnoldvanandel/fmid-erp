@@ -66,17 +66,17 @@ export default function PicklijstenList() {
     return map
   }, [orders])
 
-  const suggesties = useMemo(() => {
+  // De keuzelijst wordt bij elke toetsaanslag opnieuw gefilterd.
+  const gefilterd = useMemo(() => {
     const q = zoek.trim().toLowerCase()
-    if (!q) return []
-    return klanten
-      .filter(
-        (k) =>
-          k.klantcode?.toLowerCase().includes(q) ||
-          k.naam?.toLowerCase().includes(q) ||
-          k.zoeknaam?.toLowerCase().includes(q)
-      )
-      .slice(0, 12)
+    if (!q) return klanten
+    return klanten.filter(
+      (k) =>
+        k.klantcode?.toLowerCase().includes(q) ||
+        k.naam?.toLowerCase().includes(q) ||
+        k.zoeknaam?.toLowerCase().includes(q) ||
+        k.plaats?.toLowerCase().includes(q)
+    )
   }, [klanten, zoek])
 
   const gekozen = useMemo(
@@ -86,24 +86,18 @@ export default function PicklijstenList() {
 
   function kiesKlant(k) {
     setGekozenId(k.id)
-    setZoek(`${k.klantcode} — ${k.naam || ''}`.trim())
     setFout(null)
   }
 
   function vindKlantUitZoek() {
+    // Een aangeklikte klant telt zolang die nog in de gefilterde lijst staat.
+    if (gekozen && gefilterd.some((k) => k.id === gekozen.id)) return gekozen
     const q = zoek.trim().toLowerCase()
     if (!q) return null
-    if (gekozen && `${gekozen.klantcode} — ${gekozen.naam || ''}`.trim().toLowerCase() === q) {
-      return gekozen
-    }
-    // Exact klantnummer (bijv. 5013) of de tekst uit de keuzelijst ("5013 — Bonfix").
+    // Exact klantnummer intypen (bijv. 5013) of een unieke treffer werkt ook.
     const exact = klanten.find((k) => String(k.klantcode || '').trim().toLowerCase() === q)
     if (exact) return exact
-    const uitLijst = klanten.find((k) => `${k.klantcode} — ${k.naam || ''}`.trim().toLowerCase() === q)
-    if (uitLijst) return uitLijst
-    // Unieke suggestie
-    if (suggesties.length === 1) return suggesties[0]
-    return gekozen
+    return gefilterd.length === 1 ? gefilterd[0] : null
   }
 
   function gekozenKlant() {
@@ -194,57 +188,53 @@ export default function PicklijstenList() {
         <div className="card-pad">
             <form onSubmit={handleMobiel}>
             <div className="field">
-              <label>Klant</label>
+              <label>Zoek klant</label>
               <input
                 type="text"
                 value={zoek}
                 onChange={(e) => {
                   setZoek(e.target.value)
-                  setGekozenId('')
                   setFout(null)
                 }}
-                placeholder="Typ klantnummer of naam, bijv. 5013 of Bonhoff…"
+                placeholder="Klantnummer, naam of plaats, bijv. 5013 of Bonhoff…"
                 autoComplete="off"
-                list="picklijst-klanten"
               />
-              <datalist id="picklijst-klanten">
-                {klanten.slice(0, 500).map((k) => (
-                  <option key={k.id} value={`${k.klantcode} — ${k.naam || ''}`} />
-                ))}
-              </datalist>
+            </div>
+            <div className="field">
+              <label>Klant</label>
+              <div className="klant-keuze" role="listbox" aria-label="Klant">
+                {loadingKlanten ? (
+                  <div className="hint" style={{ padding: '8px 10px' }}>
+                    Klanten laden…
+                  </div>
+                ) : gefilterd.length === 0 ? (
+                  <div className="hint" style={{ padding: '8px 10px' }}>
+                    Geen klanten gevonden.
+                  </div>
+                ) : (
+                  gefilterd.map((k) => (
+                    <button
+                      type="button"
+                      key={k.id}
+                      role="option"
+                      aria-selected={gekozenId === k.id}
+                      className={gekozenId === k.id ? 'geselecteerd' : ''}
+                      onClick={() => kiesKlant(k)}
+                    >
+                      {k.klantcode} — {k.naam}
+                      {k.plaats ? ` (${k.plaats})` : ''}
+                      {openPerKlant[k.id] ? ` · ${openPerKlant[k.id].aantalOrders} open` : ''}
+                    </button>
+                  ))
+                )}
+              </div>
               <p className="hint">
-                Bijvoorbeeld 5013 voor Bonhoff. Eerst picken, daarna inpakken: per regel de doos, aan het eind het rapport.
+                {klantInVeld
+                  ? `Gekozen: ${klantInVeld.klantcode} — ${klantInVeld.naam || ''}. `
+                  : ''}
+                Eerst picken, daarna inpakken: per regel de doos, aan het eind het rapport.
               </p>
             </div>
-
-            {zoek.trim() && !gekozen && suggesties.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Code</th>
-                      <th>Naam</th>
-                      <th className="num">Open orders</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {suggesties.map((k) => (
-                      <tr key={k.id}>
-                        <td>{k.klantcode}</td>
-                        <td>{k.naam}</td>
-                        <td className="num">{openPerKlant[k.id]?.aantalOrders || 0}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => kiesKlant(k)}>
-                            Kiezen
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
 
             {(fout || error) && (
               <div className="banner banner-danger" style={{ marginBottom: 12 }}>
