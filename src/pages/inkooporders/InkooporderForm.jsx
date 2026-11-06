@@ -1,7 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
-import { formatCurrency, formatNumber } from '../../lib/format'
+import { formatCurrency, formatDate, formatNumber } from '../../lib/format'
+import { useOpenInkoopVoorArtikel } from '../../hooks/useOpenInkoopVoorArtikel'
+import { useOpenVerkoopVoorArtikel } from '../../hooks/useOpenVerkoopVoorArtikel'
+import { STATUS_BADGE as VERKOOP_STATUS_BADGE, STATUS_LABEL as VERKOOP_STATUS_LABEL } from '../../lib/verkooporders'
 import { mailInkooporder } from '../../lib/inkooporderMail'
 import { haalArtikelenOp, haalArtikelOpNummer } from '../../lib/artikelZoeken'
 import { inkoopprijsPerEenheid, staffelRegels } from '../../lib/staffel'
@@ -38,6 +41,92 @@ async function zoekBonTegenhanger(artikel) {
     if (bon && !bon.geblokkeerd) return bon
   }
   return null
+}
+
+// Overzicht van wat er van één artikel openstaat: nog te leveren aan klanten
+// (verkoop) en nog te ontvangen van leveranciers (inkoop). De regels van de
+// order die je nu bewerkt tellen mee, maar staan gemarkeerd.
+function OpenOrdersPaneel({ artikel, openVerkoop, openInkoop, huidigeOrderId }) {
+  const eenheid = artikel.eenheid ? ` ${artikel.eenheid}` : ''
+  const blok = (titel, data, kolomNaam, rij) => (
+    <div style={{ flex: 1, minWidth: 320 }}>
+      <h4 style={{ margin: '0 0 6px' }}>
+        {titel}:{' '}
+        <strong>{data.loading ? '…' : formatNumber(data.totaal)}</strong>
+        {eenheid}
+      </h4>
+      {data.error && <div className="banner banner-danger">{data.error}</div>}
+      {data.loading ? null : data.regels.length === 0 ? (
+        <p className="hint" style={{ margin: 0 }}>
+          Niets open.
+        </p>
+      ) : (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>{kolomNaam}</th>
+              <th className="num">Open</th>
+              <th>Leverdatum</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>{data.regels.map(rij)}</tbody>
+        </table>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="card" style={{ marginTop: 14, padding: 12 }}>
+      <h3 style={{ margin: '0 0 10px' }}>Openstaand voor {artikel.artikelnummer}</h3>
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+        {blok('Te leveren aan klanten', openVerkoop, 'Klant', (r) => (
+          <tr key={r.id} style={{ cursor: 'default' }}>
+            <td>{r.ordernummer}</td>
+            <td>
+              {r.klantcode}
+              {r.klantNaam ? ` — ${r.klantNaam}` : ''}
+            </td>
+            <td className="num">{formatNumber(r.open)}</td>
+            <td>{r.leverdatum ? formatDate(r.leverdatum) : '-'}</td>
+            <td>
+              <span className={'badge ' + (VERKOOP_STATUS_BADGE[r.status] || 'badge-neutral')}>
+                {VERKOOP_STATUS_LABEL[r.status] || r.status}
+              </span>
+            </td>
+          </tr>
+        ))}
+        {blok('Nog te ontvangen van leveranciers', openInkoop, 'Leverancier', (r) => (
+          <tr key={r.id} style={{ cursor: 'default' }}>
+            <td>
+              {r.ordernummer}
+              {r.order.id === huidigeOrderId && <span className="hint"> (deze order)</span>}
+            </td>
+            <td>
+              {r.leverancierscode}
+              {r.leverancierNaam ? ` — ${r.leverancierNaam}` : ''}
+            </td>
+            <td className="num">{formatNumber(r.open)}</td>
+            <td>{r.leverdatum ? formatDate(r.leverdatum) : '-'}</td>
+            <td>
+              <span className={'badge ' + (INKOOP_STATUS_BADGE[r.status] || 'badge-neutral')}>
+                {STATUS_LABEL[r.status] || r.status}
+              </span>
+            </td>
+          </tr>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const INKOOP_STATUS_BADGE = {
+  concept: 'badge-neutral',
+  besteld: 'badge-warning',
+  'deels ontvangen': 'badge-warning',
+  ontvangen: 'badge-success',
+  geannuleerd: 'badge-danger',
 }
 
 export default function InkooporderForm({ inkooporder, onDone }) {
@@ -104,6 +193,16 @@ export default function InkooporderForm({ inkooporder, onDone }) {
     setNieuweRegelState(nieuweRegelRef.current)
   }
   const nieuwArtikel = nieuweRegel.artikel
+
+  // Openstaande orders van het artikel waar je mee bezig bent: dat van de
+  // nieuwe regel, of van de regel die je hebt aangeklikt.
+  const gekozenRegel = regelsVoorOrder.find((r) => r.id === geselecteerdeRegel)
+  const paneelArtikel =
+    gekozenRegel && geselecteerdeRegel !== 'nieuw'
+      ? { id: gekozenRegel.artikelId, artikelnummer: gekozenRegel.artikelnummer, eenheid: gekozenRegel.eenheid }
+      : nieuwArtikel
+  const openVerkoop = useOpenVerkoopVoorArtikel(paneelArtikel?.id)
+  const openInkoop = useOpenInkoopVoorArtikel(paneelArtikel?.id)
 
   // Aangeroepen door ArtikelKiezer zodra de ingetypte tekst een bestaand
   // artikelnummer is (of juist niet meer).
@@ -707,6 +806,15 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         onderste regel in en druk op Enter. Bij een A-artikel met een BON-artikel (zelfde nummer) komt 20% op het
         A-artikel en 80% op het BON-artikel. Met ↑ en ↓ ga je naar de regel erboven of eronder.
       </p>
+
+      {paneelArtikel?.id && (
+        <OpenOrdersPaneel
+          artikel={paneelArtikel}
+          openVerkoop={openVerkoop}
+          openInkoop={openInkoop}
+          huidigeOrderId={inkooporder.id}
+        />
+      )}
 
       <div className="modal-actions" style={{ justifyContent: isAdmin ? 'space-between' : 'flex-end' }}>
         {isAdmin && (

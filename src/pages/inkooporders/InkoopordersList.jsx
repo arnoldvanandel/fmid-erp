@@ -7,6 +7,7 @@ import { STATUS_LABEL, maakInkooporder } from '../../lib/inkooporders'
 import { maakInkooporderUitSjabloon } from '../../lib/inkoopsjablonen'
 import Modal from '../../components/Modal'
 import InkooporderForm from './InkooporderForm'
+import OpenPerArtikel from './OpenPerArtikel'
 import { OvergeslagenMelding } from './InkoopsjablonenList'
 
 const STATUS_BADGE = {
@@ -188,6 +189,7 @@ export default function InkoopordersList() {
   })
   const { data: regels } = useCollection('inkooporderregels')
   const [showNieuw, setShowNieuw] = useState(false)
+  const [showOpenPerArtikel, setShowOpenPerArtikel] = useState(false)
   const [editing, setEditing] = useState(null)
   const [overgeslagen, setOvergeslagen] = useState(null)
 
@@ -207,6 +209,9 @@ export default function InkoopordersList() {
           <div className="page-header-sub">{orders.length} inkooporders</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={() => setShowOpenPerArtikel(true)}>
+            Openstaand per artikel
+          </button>
           <Link className="btn btn-secondary" to="/inkoopsjablonen">
             Sjablonen
           </Link>
@@ -256,6 +261,12 @@ export default function InkoopordersList() {
           </div>
         )}
       </div>
+
+      {showOpenPerArtikel && (
+        <Modal title="Openstaand per artikel" onClose={() => setShowOpenPerArtikel(false)} width={1120}>
+          <OpenPerArtikel />
+        </Modal>
+      )}
 
       {showNieuw && (
         <Modal title="Nieuwe inkooporder" onClose={() => setShowNieuw(false)}>
