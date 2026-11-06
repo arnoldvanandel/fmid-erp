@@ -104,7 +104,12 @@ export default function PickrapportAfdruk() {
                     {r.artikelnaam}
                     {r.vervangt ? <div className="pick-vervangt">omboeken naar {r.vervangt}</div> : null}
                   </td>
-                  <td className="num pick-aantal">{aantal(r.aantal)}</td>
+                  <td className="num pick-aantal">
+                    {aantal(r.aantal)}
+                    {r.gevraagd != null && Number(r.gevraagd) !== Number(r.aantal) ? (
+                      <div className="pick-vervangt">gevraagd {aantal(r.gevraagd)}</div>
+                    ) : null}
+                  </td>
                   <td className="doc-nowrap">{r.eenheid}</td>
                   <td className="num">{r.blijft == null ? '—' : aantal(r.blijft)}</td>
                   <td className="doc-nowrap">{(r.ordernummers || []).join(', ')}</td>

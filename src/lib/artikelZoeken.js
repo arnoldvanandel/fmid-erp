@@ -35,10 +35,11 @@ function voorvoegsels(woord) {
 }
 
 // Zoektermen voor het veld `zoek` van een artikel.
-export function zoekTermen({ artikelnummer, naam, zoeknaam, barcode, barcodeDoos, barcodeZak }) {
+export function zoekTermen({ artikelnummer, naam, zoeknaam, barcode, barcodeDoos, barcodeZak, labels }) {
   const termen = new Set()
   const nummer = String(artikelnummer || '').toLowerCase().trim()
   for (const t of voorvoegsels(nummer)) termen.add(t)
+  const labeltekst = (labels || []).flatMap((l) => [l?.artNr, l?.id, l?.barcode, l?.type, l?.nl1])
   for (const w of [
     ...woorden(artikelnummer),
     ...woorden(naam),
@@ -46,6 +47,7 @@ export function zoekTermen({ artikelnummer, naam, zoeknaam, barcode, barcodeDoos
     ...woorden(barcode),
     ...woorden(barcodeDoos),
     ...woorden(barcodeZak),
+    ...labeltekst.flatMap((t) => woorden(t)),
   ]) {
     for (const t of voorvoegsels(w)) termen.add(t)
   }

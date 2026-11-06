@@ -1,0 +1,281 @@
+.label-pagina .page-header {
+  align-items: flex-end;
+}
+
+.label-balk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.label-balk .field {
+  margin: 0;
+  min-width: 220px;
+}
+
+.label-werk {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.label-keuze,
+.label-snelkeuze {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.label-snelkeuze {
+  margin: 0;
+}
+
+.label-snelkeuze .is-actief {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.label-voorbeeld {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.etiket-kaart {
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(20, 24, 32, 0.15);
+}
+
+.etiket-locatie {
+  width: 70mm;
+}
+
+.etiket-locatie img {
+  width: 100%;
+  height: auto;
+  background: #fff;
+  border: 1px solid var(--color-border);
+}
+
+.etiket-locatie figcaption {
+  margin-top: 6px;
+  color: var(--color-muted, #5c6570);
+  font-size: 13px;
+}
+
+.etiket {
+  position: relative;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Tekst staat onder in de cel, zoals de standaarduitlijning in Excel. */
+.vlak {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  box-sizing: border-box;
+  padding: 0 0.4mm 0.15mm;
+  overflow: hidden;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.vlak.vet,
+.etiket-tabel .vet {
+  font-weight: 700;
+}
+
+.vlak-calibri {
+  font-family: Calibri, Arial, sans-serif;
+}
+
+.vlak-adres {
+  padding: 0 0.6mm;
+}
+
+.vlak-code {
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 1.5mm;
+}
+
+.etiket-lijn {
+  position: absolute;
+  height: 0.35mm;
+  background: #000;
+  z-index: 2;
+}
+
+.etiket-foto-abs,
+.etiket-logo {
+  object-fit: contain;
+}
+
+.etiket-foto-abs {
+  position: absolute;
+  z-index: 1;
+}
+
+.etiket-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.etiket-tabel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  z-index: 1;
+}
+
+.etiket-tabel td {
+  padding: 0 0.5mm 0.2mm;
+  vertical-align: bottom;
+  white-space: nowrap;
+  overflow: hidden;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.etiket-tabel .ha-c {
+  text-align: center;
+}
+
+.etiket-tabel .ha-r {
+  text-align: right;
+}
+
+.etiket-tabel .ha-l {
+  text-align: left;
+}
+
+.etiket-tabel .vc {
+  vertical-align: middle;
+}
+
+/* Dunne zwarte kaders, dezelfde lijndikte als de thin-rand in Excel. */
+.etiket-tabel .kader-cel {
+  border: 0.35mm solid #000;
+}
+
+.etiket-tabel .kader-mid {
+  border: 0.7mm solid #000;
+}
+
+.etiket-tabel .rand-l {
+  border-left: 0.35mm solid #000;
+}
+
+.etiket-tabel .rand-r {
+  border-right: 0.35mm solid #000;
+}
+
+.etiket-tabel .rand-t {
+  border-top: 0.35mm solid #000;
+}
+
+.etiket-tabel .rand-b {
+  border-bottom: 0.35mm solid #000;
+}
+
+.etiket-tabel .bn-l {
+  border-left: 0.35mm solid #000;
+  border-top: 0.35mm solid #000;
+  border-bottom: 0.35mm solid #000;
+}
+
+.etiket-tabel .bn-m {
+  border-top: 0.35mm solid #000;
+  border-bottom: 0.35mm solid #000;
+}
+
+.etiket-tabel .bn-s {
+  border-right: 0.35mm solid #000;
+  border-top: 0.35mm solid #000;
+  border-bottom: 0.35mm solid #000;
+}
+
+.etiket-tabel .bn-r {
+  border-right: 0.35mm solid #000;
+  border-bottom: 0.35mm solid #000;
+}
+
+.etiket-tabel .cel-code {
+  padding: 0.4mm 0.6mm 0;
+  vertical-align: bottom;
+}
+
+.kader-abs {
+  position: absolute;
+  box-sizing: border-box;
+  border: 0.35mm solid #000;
+  z-index: 2;
+}
+
+.etiket-barcode {
+  display: block;
+  width: 100%;
+}
+
+.etiket-cijfers {
+  font-size: 8pt;
+  text-align: center;
+}
+
+.label-afdruk {
+  position: absolute;
+  left: -200mm;
+  top: 0;
+}
+
+@media print {
+  @page {
+    size: 96mm 98mm;
+    margin: 0;
+  }
+
+  html,
+  body,
+  #root,
+  .app-shell,
+  .content,
+  .label-pagina {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+  }
+
+  .sidebar,
+  .label-werk {
+    display: none !important;
+  }
+
+  .label-afdruk {
+    position: static;
+    left: auto;
+  }
+
+  .etiket {
+    box-shadow: none;
+    break-after: page;
+    page-break-after: always;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

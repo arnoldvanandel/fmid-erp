@@ -5,11 +5,14 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ArtikelenList from './pages/artikelen/ArtikelenList'
+import Labels from './pages/labels/Labels'
 import LeveranciersList from './pages/leveranciers/LeveranciersList'
 import KlantenList from './pages/klanten/KlantenList'
+import PostnlLabels from './pages/postnl/PostnlLabels'
 import InkoopordersList from './pages/inkooporders/InkoopordersList'
 import OpenstaandeInkooporders from './pages/inkooporders/OpenstaandeInkooporders'
 import InkooporderAfdruk from './pages/inkooporders/InkooporderAfdruk'
+import OntvangstMobiel from './pages/inkooporders/OntvangstMobiel'
 import InkoopsjablonenList from './pages/inkooporders/InkoopsjablonenList'
 import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
 import OpenstaandeOrders from './pages/verkooporders/OpenstaandeOrders'
@@ -79,11 +82,31 @@ export default function App() {
             }
           />
           <Route
+            path="/labels"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Labels />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/klanten"
             element={
               <ProtectedRoute>
                 <Layout>
                   <KlantenList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/postnl"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PostnlLabels />
                 </Layout>
               </ProtectedRoute>
             }
@@ -105,6 +128,14 @@ export default function App() {
                 <Layout>
                   <InkoopordersList />
                 </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inkooporders/ontvangst"
+            element={
+              <ProtectedRoute>
+                <OntvangstMobiel />
               </ProtectedRoute>
             }
           />

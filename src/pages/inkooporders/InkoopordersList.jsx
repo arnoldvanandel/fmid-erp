@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { TelefoonQr } from '../../components/PicklijstQrVenster'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
 import { formatCurrency, formatDateTime } from '../../lib/format'
@@ -192,6 +193,7 @@ export default function InkoopordersList() {
   const [showOpenPerArtikel, setShowOpenPerArtikel] = useState(false)
   const [editing, setEditing] = useState(null)
   const [overgeslagen, setOvergeslagen] = useState(null)
+  const [qrOpen, setQrOpen] = useState(false)
 
   const totaalPerOrder = useMemo(() => {
     const map = {}
@@ -208,13 +210,16 @@ export default function InkoopordersList() {
           <h1>Inkooporders</h1>
           <div className="page-header-sub">{orders.length} inkooporders</div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" onClick={() => setShowOpenPerArtikel(true)}>
             Openstaand per artikel
           </button>
           <Link className="btn btn-secondary" to="/inkoopsjablonen">
             Sjablonen
           </Link>
+          <button type="button" className="btn btn-secondary" onClick={() => setQrOpen(true)}>
+            Goederen ontvangen
+          </button>
           <button className="btn btn-primary" onClick={() => setShowNieuw(true)}>
             + Nieuwe inkooporder
           </button>
@@ -265,6 +270,19 @@ export default function InkoopordersList() {
       {showOpenPerArtikel && (
         <Modal title="Openstaand per artikel" onClose={() => setShowOpenPerArtikel(false)} width={1120}>
           <OpenPerArtikel />
+        </Modal>
+      )}
+
+      {qrOpen && (
+        <Modal title="Goederen ontvangen" onClose={() => setQrOpen(false)} width={440}>
+          <TelefoonQr
+            pad="/inkooporders/ontvangst"
+            tekst="Scan de code met de telefoon. Kies daarna een artikel uit de openstaande inkooporders."
+            alt="QR-code om goederen te ontvangen"
+          />
+          <p style={{ marginTop: 12 }}>
+            <Link to="/inkooporders/ontvangst">Open op dit apparaat</Link>
+          </p>
         </Modal>
       )}
 

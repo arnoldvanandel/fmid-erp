@@ -5,7 +5,9 @@ import { useInstellingen } from '../hooks/useInstellingen'
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/artikelen', label: 'Artikelen' },
+  { to: '/labels', label: 'Labels' },
   { to: '/klanten', label: 'Klanten' },
+  { to: '/postnl', label: 'PostNL-labels' },
   { to: '/verkooporders', label: 'Verkooporders', end: true },
   { to: '/verkooporders/openstaand', label: 'Openstaande orders' },
   { to: '/picklijsten', label: 'Picklijsten' },
@@ -13,6 +15,7 @@ const navItems = [
   { to: '/leveranciers', label: 'Leveranciers' },
   { to: '/inkooporders', label: 'Inkooporders', end: true },
   { to: '/inkooporders/openstaand', label: 'Openstaande inkoop' },
+  { to: '/inkooporders/ontvangst', label: 'Goederen ontvangen' },
   { to: '/inkoopsjablonen', label: 'Inkoopsjablonen' },
   { to: '/voorraad', label: 'Voorraad', end: true },
   { to: '/voorraad/mutaties', label: 'Voorraadmutaties' },

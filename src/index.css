@@ -1138,6 +1138,14 @@ td .picklijst-acties {
   border-top: 1px solid var(--color-border);
 }
 
+.pick-mobiel-voet .field {
+  margin: 0 0 4px;
+}
+
+.pick-mobiel-voet .hint {
+  margin: 0;
+}
+
 .pick-mobiel-vorige {
   min-height: 40px;
   font-size: 15px;

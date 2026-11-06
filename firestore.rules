@@ -217,5 +217,13 @@ service cloud.firestore {
       allow create, update: if isActive();
       allow delete: if isAdmin();
     }
+
+    // Snelkoppelingen voor PostNL-verzendlabels. Iedereen mag een tegel
+    // toevoegen of het adres verbeteren; verwijderen blijft voor een admin.
+    match /postnlSnelkoppelingen/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
   }
 }

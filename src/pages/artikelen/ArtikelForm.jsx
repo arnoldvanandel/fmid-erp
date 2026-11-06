@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -15,6 +16,7 @@ import {
 } from '../../lib/stuklijst'
 import { verwijderRouteRegel, voegRouteRegelToe, wijzigRouteRegel } from '../../lib/route'
 import { barcodeCodesVan, useArtikelenOpId, zoekTermen } from '../../lib/artikelZoeken'
+import { verpakkingVan } from '../../lib/labels'
 import { STAFFEL_SOORTEN, staffelRegels } from '../../lib/staffel'
 import { bonfixCode, isBonArtikel } from '../../lib/stickers'
 import { STATUS_LABEL as INKOOP_STATUS_LABEL } from '../../lib/inkooporders'
@@ -169,7 +171,7 @@ export default function ArtikelForm({ artikel, onDone }) {
     }
     // Bonfix-nummer alleen bij BON-artikelen (voor het bestellen van stickers).
     if (isBonArtikel(payload.artikelnummer)) payload.bonfixNummer = form.bonfixNummer.trim()
-    payload.zoek = zoekTermen({ ...payload, zoeknaam: artikel?.zoeknaam })
+    payload.zoek = zoekTermen({ ...payload, zoeknaam: artikel?.zoeknaam, labels: artikel?.labels })
 
     setSaving(true)
     try {
@@ -310,6 +312,23 @@ export default function ArtikelForm({ artikel, onDone }) {
               <span className="hint">Leeg laten als dit artikel niet per zakje binnenkomt.</span>
             </div>
           </div>
+
+          {!isNew && artikel?.labels?.length > 0 && (
+            <div className="field">
+              <label>Labels</label>
+              <ul className="hint" style={{ margin: '4px 0 8px', paddingLeft: 18 }}>
+                {artikel.labels.map((label) => (
+                  <li key={`${label.id}-${label.barcode}`}>
+                    {verpakkingVan(label)} · {label.soort} · {label.aantal} stuks
+                    {label.barcode ? ` · ${label.barcode}` : ''}
+                  </li>
+                ))}
+              </ul>
+              <Link to={`/labels?artikel=${artikel.id}`} className="btn btn-secondary btn-sm">
+                Label afdrukken
+              </Link>
+            </div>
+          )}
 
           {isBonArtikel(form.artikelnummer) && (
             <div className="field">

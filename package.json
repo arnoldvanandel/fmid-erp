@@ -10,6 +10,7 @@
     "seed:emulator": "node scripts/emulator-seed.mjs",
     "build": "vite build",
     "preview": "vite preview",
+    "labelprinter": "node scripts/labelprinter.mjs",
     "deploy": "npm run build && firebase deploy"
   },
   "dependencies": {

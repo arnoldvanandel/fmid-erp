@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { TelefoonQr } from '../../components/PicklijstQrVenster'
 import { useCollection } from '../../hooks/useCollection'
 import { formatDate, formatNumber } from '../../lib/format'
 import { pastBijEenVan, pastBijPatroon } from '../../lib/filterPatroon'
@@ -69,6 +71,7 @@ export default function OpenstaandeInkooporders() {
   const [leverancierFilter, setLeverancierFilter] = useState('')
   const [sortering, setSortering] = useState({ kolom: 'artikelnummer', richting: 'asc' })
   const [editing, setEditing] = useState(null)
+  const [qrOpen, setQrOpen] = useState(false)
 
   const openRegels = useMemo(() => {
     const orderById = Object.fromEntries(orders.map((o) => [o.id, o]))
@@ -134,6 +137,9 @@ export default function OpenstaandeInkooporders() {
               : `${formatNumber(gefilterd.length)} openstaande ${gefilterd.length === 1 ? 'regel' : 'regels'} in ${formatNumber(aantalOrders)} ${aantalOrders === 1 ? 'order' : 'orders'}`}
           </div>
         </div>
+        <button type="button" className="btn btn-primary" onClick={() => setQrOpen(true)}>
+          Goederen ontvangen
+        </button>
       </div>
 
       <div className="card">
@@ -240,6 +246,19 @@ export default function OpenstaandeInkooporders() {
           </div>
         )}
       </div>
+
+      {qrOpen && (
+        <Modal title="Goederen ontvangen" onClose={() => setQrOpen(false)} width={440}>
+          <TelefoonQr
+            pad="/inkooporders/ontvangst"
+            tekst="Scan de code met de telefoon. Kies daarna een artikel uit de openstaande inkooporders."
+            alt="QR-code om goederen te ontvangen"
+          />
+          <p style={{ marginTop: 12 }}>
+            <Link to="/inkooporders/ontvangst">Open op dit apparaat</Link>
+          </p>
+        </Modal>
+      )}
 
       {editing && (
         <Modal title={`Inkooporder ${editing.ordernummer}`} onClose={() => setEditing(null)} width={1120}>

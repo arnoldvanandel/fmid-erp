@@ -3,24 +3,46 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatNumber } from '../../lib/format'
 import { maakPicklijstPerKlant } from '../../lib/picklijst'
-import { bouwPickrapport, leesPickrapportLokaal, schrijfPickrapportLokaal, slaPickrapportOp } from '../../lib/pickrapport'
+import { bouwPickrapport, leesPickrapportLokaal, pasPickHoeveelheid, schrijfPickrapportLokaal, slaPickrapportOp } from '../../lib/pickrapport'
 
 function aantal(v) {
   return formatNumber(v, Number.isInteger(Number(v)) ? 0 : 2)
 }
 
+function leesAantal(waarde) {
+  const tekst = String(waarde ?? '').trim().replace(',', '.')
+  if (!tekst) return null
+  const n = Number(tekst)
+  return Number.isFinite(n) ? n : null
+}
+
+function invoerVan(n) {
+  const afgerond = Math.round((Number(n) || 0) * 1000) / 1000
+  if (Number.isInteger(afgerond)) return String(afgerond)
+  return String(afgerond).replace('.', ',')
+}
+
 function leesVoortgang(sleutel) {
   try {
-    const n = Number(sessionStorage.getItem(sleutel))
-    return Number.isInteger(n) && n >= 0 ? n : 0
+    const raw = sessionStorage.getItem(sleutel)
+    if (!raw) return { index: 0, gepickt: {} }
+    if (raw.startsWith('{')) {
+      const data = JSON.parse(raw)
+      return {
+        index: Number.isInteger(data.index) && data.index >= 0 ? data.index : 0,
+        gepickt: data.gepickt && typeof data.gepickt === 'object' ? data.gepickt : {},
+      }
+    }
+    const n = Number(raw)
+    return { index: Number.isInteger(n) && n >= 0 ? n : 0, gepickt: {} }
   } catch {
-    return 0
+    return { index: 0, gepickt: {} }
   }
 }
 
-function schrijfVoortgang(sleutel, index) {
+function schrijfVoortgang(sleutel, voortgang) {
   try {
-    sessionStorage.setItem(sleutel, String(index))
+    sessionStorage.setItem(sleutel, JSON.stringify(voortgang))
   } catch {
     // Opslag kan geblokkeerd zijn; de loop gaat gewoon door.
   }
@@ -35,6 +57,9 @@ export default function PicklijstMobiel() {
   const [lijst, setLijst] = useState(null)
   const [error, setError] = useState(null)
   const [index, setIndex] = useState(0)
+  const [gepickt, setGepickt] = useState({})
+  const [invoer, setInvoer] = useState('')
+  const [fout, setFout] = useState(null)
   const [rapportFout, setRapportFout] = useState(null)
   const [rapportKlaar, setRapportKlaar] = useState(false)
   const inhoudRef = useRef(null)
@@ -48,8 +73,10 @@ export default function PicklijstMobiel() {
     maakPicklijstPerKlant(klantId)
       .then((l) => {
         if (!actief) return
+        const voortgang = leesVoortgang(voortgangSleutel)
         setLijst(l)
-        setIndex(Math.min(leesVoortgang(voortgangSleutel), l.picks.length))
+        setGepickt(voortgang.gepickt)
+        setIndex(Math.min(voortgang.index, l.picks.length))
       })
       .catch((err) => actief && setError(err.message))
     return () => {
@@ -58,8 +85,8 @@ export default function PicklijstMobiel() {
   }, [klantId, voortgangSleutel])
 
   useEffect(() => {
-    if (lijst) schrijfVoortgang(voortgangSleutel, index)
-  }, [index, lijst, voortgangSleutel])
+    if (lijst) schrijfVoortgang(voortgangSleutel, { index, gepickt })
+  }, [index, gepickt, lijst, voortgangSleutel])
 
   useEffect(() => {
     if (lijst?.klant) document.title = `Picken ${lijst.klant.klantcode}`
@@ -69,12 +96,12 @@ export default function PicklijstMobiel() {
     setRapportKlaar(Boolean(leesPickrapportLokaal(klantId)))
   }, [klantId])
 
-  function bewaarRapport() {
+  function bewaarRapport(bevestigd = gepickt) {
     if (!lijst?.picks?.length) return
     const rapport = bouwPickrapport({
       klant: lijst.klant,
       orders: lijst.orders,
-      picks: lijst.picks,
+      picks: lijst.picks.map((p) => pasPickHoeveelheid(p, bevestigd[p.sleutel])),
       tekorten: lijst.tekorten,
       gebruiker: profile?.naam || profile?.email || '',
     })
@@ -88,13 +115,48 @@ export default function PicklijstMobiel() {
     inhoudRef.current?.scrollTo(0, 0)
   }, [index])
 
-  function gepikt() {
+  const huidigePick = lijst?.picks?.[index]
+  useEffect(() => {
+    if (!huidigePick) return
+    const bekend = gepickt[huidigePick.sleutel]
+    setInvoer(invoerVan(bekend == null ? huidigePick.aantal : bekend))
+    setFout(null)
+    // Alleen bij een andere regel, niet terwijl het aantal wordt ingetypt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [huidigePick?.sleutel])
+
+  function bevestig() {
     const nu = Date.now()
     if (nu - laatstGeklikt.current < 400) return
     laatstGeklikt.current = nu
+    if (!pick) return
+    const gevraagd = Number(pick.aantal) || 0
+    const n = leesAantal(invoer)
+    if (n == null || n < 0) {
+      setFout('Vul het gepickte aantal in.')
+      return
+    }
+    if (n > gevraagd + 1e-9) {
+      setFout(`Maximaal ${aantal(gevraagd)} ${pick.eenheid || 'stuks'}.`)
+      setInvoer(invoerVan(gevraagd))
+      return
+    }
+    const nieuw = { ...gepickt, [pick.sleutel]: n }
+    setGepickt(nieuw)
+    setFout(null)
     const volgend = index + 1
     setIndex(volgend)
-    if (lijst && volgend >= lijst.picks.length && lijst.picks.length > 0) bewaarRapport()
+    if (lijst && volgend >= lijst.picks.length && lijst.picks.length > 0) bewaarRapport(nieuw)
+  }
+
+  function stapAantal(delta) {
+    if (!pick) return
+    const gevraagd = Number(pick.aantal) || 0
+    const huidig = leesAantal(invoer)
+    const basis = huidig == null ? gevraagd : huidig
+    const volgende = Math.min(gevraagd, Math.max(0, basis + delta))
+    setInvoer(invoerVan(volgende))
+    setFout(null)
   }
 
   function openRapport() {
@@ -108,7 +170,8 @@ export default function PicklijstMobiel() {
 
   function opnieuw() {
     setIndex(0)
-    schrijfVoortgang(voortgangSleutel, 0)
+    setGepickt({})
+    setFout(null)
   }
 
   if (error) {
@@ -135,6 +198,11 @@ export default function PicklijstMobiel() {
   const { klant, picks, tekorten } = lijst
   const klaar = index >= picks.length
   const pick = picks[index]
+  const ingevuld = leesAantal(invoer)
+  const minder = picks.filter((p) => {
+    const bevestigd = gepickt[p.sleutel]
+    return bevestigd != null && Number(bevestigd) < (Number(p.aantal) || 0) - 1e-9
+  }).length
 
   return (
     <div className="pick-mobiel">
@@ -153,6 +221,7 @@ export default function PicklijstMobiel() {
             klant={klant}
             klantId={klantId}
             aantalRegels={picks.length}
+            minder={minder}
             tekorten={tekorten}
             rapportFout={rapportFout}
             onRapport={openRapport}
@@ -160,7 +229,7 @@ export default function PicklijstMobiel() {
             onOpnieuw={opnieuw}
           />
         ) : (
-          <Regel pick={pick} />
+          <Regel pick={pick} gepicktAantal={ingevuld} />
         )}
       </div>
 
@@ -171,8 +240,43 @@ export default function PicklijstMobiel() {
               Vorige
             </button>
           )}
-          <button type="button" className="btn btn-primary pick-mobiel-gepikt" onClick={gepikt}>
-            Gepikt
+          <div className="field">
+            <label htmlFor="gepickt-aantal">Gepickt</label>
+            <div className="inpak-doos">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-label="Minder"
+                onClick={() => stapAantal(-1)}
+                disabled={ingevuld != null && ingevuld <= 0}
+              >
+                −
+              </button>
+              <input
+                id="gepickt-aantal"
+                value={invoer}
+                onChange={(e) => {
+                  setInvoer(e.target.value)
+                  setFout(null)
+                }}
+                inputMode="decimal"
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-label="Meer"
+                onClick={() => stapAantal(1)}
+                disabled={ingevuld != null && ingevuld >= (Number(pick.aantal) || 0) - 1e-9}
+              >
+                +
+              </button>
+            </div>
+            <p className="hint">Minder gepakt? Pas het aantal aan en bevestig.</p>
+          </div>
+          {fout && <div className="banner banner-danger">{fout}</div>}
+          <button type="button" className="btn btn-primary pick-mobiel-gepikt" onClick={bevestig}>
+            {ingevuld === 0 ? 'Niets gepickt' : ingevuld == null ? 'Bevestig' : `Bevestig ${aantal(ingevuld)}`}
           </button>
         </footer>
       )}
@@ -207,9 +311,9 @@ function blijftLiggen(pick) {
   return Math.max(0, voorraad - (Number(pick.aantal) || 0))
 }
 
-function Regel({ pick }) {
+function Regel({ pick, gepicktAantal }) {
   const orders = (pick.ordernummers || [pick.ordernummer]).filter(Boolean)
-  const blijft = blijftLiggen(pick)
+  const blijft = blijftLiggen({ ...pick, aantal: gepicktAantal == null ? pick.aantal : gepicktAantal })
   return (
     <div className="pick-mobiel-kaart">
       <div>
@@ -259,13 +363,18 @@ function Leeg({ tekorten }) {
   )
 }
 
-function Klaar({ klant, klantId, aantalRegels, tekorten, rapportFout, onRapport, onVorige, onOpnieuw }) {
+function Klaar({ klant, klantId, aantalRegels, minder = 0, tekorten, rapportFout, onRapport, onVorige, onOpnieuw }) {
   return (
     <div className="pick-mobiel-klaar">
       <h1>Klaar</h1>
       <p>
-        {`${aantalRegels} ${aantalRegels === 1 ? 'regel' : 'regels'} gepikt voor ${klant.klantcode}${klant.naam ? ` — ${klant.naam}` : ''}.`}
+        {`${aantalRegels} ${aantalRegels === 1 ? 'regel' : 'regels'} bevestigd voor ${klant.klantcode}${klant.naam ? ` — ${klant.naam}` : ''}.`}
       </p>
+      {minder > 0 && (
+        <p>
+          {`${minder} ${minder === 1 ? 'regel is' : 'regels zijn'} met minder gepickt dan gevraagd. Alleen dat aantal kan ingepakt worden.`}
+        </p>
+      )}
       <p className="pick-mobiel-extra">De voorraad wordt afgeboekt bij de pakbon.</p>
       {rapportFout && <div className="banner banner-danger">{rapportFout}</div>}
       <div className="pick-mobiel-klaar-acties">

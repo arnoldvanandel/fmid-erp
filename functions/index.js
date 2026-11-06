@@ -4,6 +4,9 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import { defineSecret, defineString } from 'firebase-functions/params'
 import { logger } from 'firebase-functions'
 import nodemailer from 'nodemailer'
+import { postnlLabel } from './postnlLabel.js'
+
+export { postnlLabel }
 
 initializeApp()
 const db = getFirestore()
