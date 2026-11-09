@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import AantalInput from '../../components/AantalInput'
 import LocatieKiezer from '../../components/LocatieKiezer'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
-import { haalArtikelOpNummer, zoekArtikelen } from '../../lib/artikelZoeken'
+import { haalArtikelOpNummer, haalArtikelenOp, zoekArtikelen } from '../../lib/artikelZoeken'
 import { formatNumber } from '../../lib/format'
-import { boekOntvangst, standaardLocaties } from '../../lib/inkooporders'
+import { boekOntvangst } from '../../lib/inkooporders'
+import { evalueerAantal, isVerzamellocatie, leesRecenteArtikelen, onthoudArtikel } from '../../lib/magazijnInvoer'
 import { leesOpenSessieId, sluitOntvangstsessie, voegOntvangstregelToe } from '../../lib/ontvangstrapport'
-import { boekVoorraadMutatie } from '../../lib/voorraad'
+import { boekVoorraadMutatie, haalStandenVanArtikel } from '../../lib/voorraad'
 
 function artikelLabel(artikel) {
   return artikel.artikelnaam ? `${artikel.artikelnummer} — ${artikel.artikelnaam}` : artikel.artikelnummer
@@ -40,8 +42,14 @@ export default function OntvangstMobiel() {
   const [gekozenArtikel, setGekozenArtikel] = useState(null)
   const [gekozenRegels, setGekozenRegels] = useState([])
   const [aantal, setAantal] = useState('')
-  const [locatie, setLocatie] = useState(null)
-  const [locatieCode, setLocatieCode] = useState('')
+  const [dozen, setDozen] = useState('')
+  const [restDoos, setRestDoos] = useState('')
+  const [stuksPerDoos, setStuksPerDoos] = useState(0)
+  const [standen, setStanden] = useState([])
+  const [extraLocaties, setExtraLocaties] = useState([])
+  const [perLocatie, setPerLocatie] = useState({})
+  const [andereOpen, setAndereOpen] = useState(false)
+  const [andereCode, setAndereCode] = useState('')
   const [ladenLocatie, setLadenLocatie] = useState(false)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
@@ -172,7 +180,28 @@ export default function OntvangstMobiel() {
               )
           )
       : []
-    return [...openLijst, ...extra].slice(0, 40)
+    const recente = leesRecenteArtikelen()
+    const rang = (a) => {
+      const idx = recente.findIndex((r) => r.artikelnummer === a.artikelnummer)
+      if (idx !== -1) return idx
+      if (a.regels?.length) return 20
+      return 60
+    }
+    const basis =
+      !q || q === label
+        ? [
+            ...recente.map((r) => metOpenRegels(r)),
+            ...openLijst.filter((a) => !recente.some((r) => r.artikelnummer === a.artikelnummer)),
+          ]
+        : [...openLijst, ...extra]
+    return basis
+      .filter((a, i, lijst) => lijst.findIndex((b) => b.artikelnummer === a.artikelnummer) === i)
+      .sort(
+        (a, b) =>
+          rang(a) - rang(b) ||
+          String(a.artikelnummer).localeCompare(String(b.artikelnummer), 'nl', { numeric: true })
+      )
+      .slice(0, 40)
     // metOpenRegels hangt af van openRegels, dat al in openArtikelen zit
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openArtikelen, gezocht, tekst, gekozenLabel])
@@ -190,29 +219,36 @@ export default function OntvangstMobiel() {
     setGekozenArtikel(null)
     setGekozenRegels([])
     setAantal('')
-    setLocatie(null)
-    setLocatieCode('')
+    setDozen('')
+    setRestDoos('')
+    setStuksPerDoos(0)
+    setStanden([])
+    setExtraLocaties([])
+    setPerLocatie({})
+    setAndereOpen(false)
+    setAndereCode('')
     setLadenLocatie(false)
     setBevestiging(null)
   }
 
-  function laadLocatie(artikelId) {
-    setLocatie(null)
-    setLocatieCode('')
+  function laadPlekken(artikelId, bekendPerDoos) {
+    setStanden([])
+    setExtraLocaties([])
+    setPerLocatie({})
+    setAndereOpen(false)
+    setStuksPerDoos(Number(bekendPerDoos) > 0 ? Number(bekendPerDoos) : 0)
     if (!artikelId) {
       setLadenLocatie(false)
       return
     }
     setLadenLocatie(true)
     const vraag = ++locatieVraag.current
-    standaardLocaties([artikelId])
-      .then((voorstel) => {
+    Promise.all([haalStandenVanArtikel(artikelId), haalArtikelenOp([artikelId])])
+      .then(([lijst, artikelen]) => {
         if (vraag !== locatieVraag.current) return
-        const plek = voorstel[artikelId]
-        if (plek) {
-          setLocatie({ id: plek.id, code: plek.code })
-          setLocatieCode(plek.code || '')
-        }
+        setStanden(lijst.filter((s) => !isVerzamellocatie(s.locatieCode)))
+        const perDoos = Number(artikelen[artikelId]?.stuksPerDoos)
+        if (perDoos > 0) setStuksPerDoos(perDoos)
       })
       .catch((err) => {
         if (vraag === locatieVraag.current) setFout(err.message)
@@ -248,7 +284,10 @@ export default function OntvangstMobiel() {
     setFout(null)
     setMelding(null)
     setBevestiging(null)
-    laadLocatie(keuze.artikelId)
+    setDozen('')
+    setRestDoos('')
+    onthoudArtikel(keuze)
+    laadPlekken(keuze.artikelId, keuze.stuksPerDoos)
     if (keuze.regels.length === 1) {
       setGekozenRegels([keuze.regels[0].id])
       setAantal(aantalTekst(keuze.regels[0].open))
@@ -261,6 +300,57 @@ export default function OntvangstMobiel() {
       setGekozenRegels([])
       setAantal('')
     }
+  }
+
+  function zetLocatieAantal(id, waarde) {
+    setPerLocatie((huidig) => ({ ...huidig, [id]: waarde }))
+    setBevestiging(null)
+  }
+
+  function neemTotaalOver(id) {
+    const n = evalueerAantal(aantal)
+    if (!Number.isFinite(n) || n <= 0) {
+      setFout('Vul eerst het totaal aantal in.')
+      return
+    }
+    setPerLocatie((huidig) => ({ ...huidig, [id]: aantalTekst(n) }))
+    setBevestiging(null)
+    setFout(null)
+  }
+
+  function klikLocatie(e, id) {
+    if (e.target.closest('input')?.value.trim()) return
+    neemTotaalOver(id)
+  }
+
+  function zetDozen(waarde) {
+    setDozen(waarde)
+    setBevestiging(null)
+    const d = evalueerAantal(waarde)
+    const r = evalueerAantal(restDoos)
+    const totaal = (Number.isFinite(d) ? d : 0) * stuksPerDoos + (Number.isFinite(r) ? r : 0)
+    setAantal(String(waarde).trim() || restDoos.trim() ? aantalTekst(totaal) : '')
+  }
+
+  function zetRest(waarde) {
+    setRestDoos(waarde)
+    setBevestiging(null)
+    const d = evalueerAantal(dozen)
+    const r = evalueerAantal(waarde)
+    const totaal = (Number.isFinite(d) ? d : 0) * stuksPerDoos + (Number.isFinite(r) ? r : 0)
+    setAantal(dozen.trim() || String(waarde).trim() ? aantalTekst(totaal) : '')
+  }
+
+  function kiesAndereLocatie(l) {
+    if (!l) return
+    if (isVerzamellocatie(l.code)) {
+      setFout('Locatie 1111-1 is de verzamellocatie en kan hier niet gekozen worden.')
+      return
+    }
+    setExtraLocaties((huidig) => (huidig.some((e) => e.id === l.id) ? huidig : [...huidig, { id: l.id, code: l.code }]))
+    setAndereCode('')
+    setAndereOpen(false)
+    neemTotaalOver(l.id)
   }
 
   function toggleRegel(id) {
@@ -334,13 +424,35 @@ export default function OntvangstMobiel() {
       setFout('Kies één of meer inkooporders.')
       return
     }
-    if (!locatie?.id) {
-      setFout(locatieCode.trim() ? `Locatie "${locatieCode.trim()}" bestaat niet.` : 'Dit artikel ligt nog nergens. Kies een locatie.')
+    const ingetypt = evalueerAantal(aantal)
+    const tegels = [
+      ...standen.map((s) => ({ id: s.locatieId, code: s.locatieCode })),
+      ...extraLocaties
+        .filter((e) => !standen.some((s) => s.locatieId === e.id) && !isVerzamellocatie(e.code))
+        .map((e) => ({ id: e.id, code: e.code })),
+    ]
+    const ingevuld = tegels
+      .map((t) => ({ ...t, aantal: evalueerAantal(perLocatie[t.id] || '') }))
+      .filter((t) => Number.isFinite(t.aantal) && t.aantal > 0)
+    const somLocatiesVooraf = ingevuld.reduce((s, p) => s + p.aantal, 0)
+    const n = Number.isFinite(ingetypt) && ingetypt > 0 ? ingetypt : somLocatiesVooraf
+    const plaatsingen =
+      ingevuld.length > 0
+        ? ingevuld
+        : Number.isFinite(n) && n > 0 && tegels.length === 1
+          ? [{ ...tegels[0], aantal: n }]
+          : []
+    if (!Number.isFinite(n) || n <= 0) {
+      setFout('Vul een totaal aantal in. Een berekening zoals 80*2+20 mag ook.')
       return
     }
-    const n = Number(String(aantal).replace(',', '.'))
-    if (!Number.isFinite(n) || n <= 0) {
-      setFout('Vul in hoeveel stuks op voorraad zijn gezet.')
+    if (plaatsingen.length === 0) {
+      setFout('Kies per locatie hoeveel stuks daar zijn geplaatst. Een volle locatie vult u niet verder; de rest komt op een andere locatie.')
+      return
+    }
+    const somLocaties = plaatsingen.reduce((s, p) => s + p.aantal, 0)
+    if (Math.abs(somLocaties - n) > 0.001) {
+      setFout(`Per locatie staat ${toon(somLocaties)} ${eenheid}, het totaal is ${toon(n)}. Maak die gelijk voor u boekt.`)
       return
     }
     const zonderOrder = gekozenArtikel.regels.length === 0
@@ -358,50 +470,57 @@ export default function OntvangstMobiel() {
     const geboekteIds = []
     try {
       const delen = zonderOrder ? [] : verdeel(gekozenLijst, n)
+      const gekoppeld = []
       if (zonderOrder) {
         if (!gekozenArtikel.artikelId) throw new Error('Dit artikel ontbreekt in het artikelbestand.')
-        await boekVoorraadMutatie({
-          artikelId: gekozenArtikel.artikelId,
-          locatieId: locatie.id,
-          type: 'in',
-          aantal: n,
-          reden: 'Op voorraad gezet',
-          gebruiker,
-          bron: 'opvoorraad',
-        })
-      } else {
-        const perOrder = new Map()
-        for (const deel of delen) {
-          if (!perOrder.has(deel.inkooporderId)) perOrder.set(deel.inkooporderId, {})
-          perOrder.get(deel.inkooporderId)[deel.id] = { aantal: deel.aantal, locatieId: locatie.id }
+        for (const plek of plaatsingen) {
+          await boekVoorraadMutatie({
+            artikelId: gekozenArtikel.artikelId,
+            locatieId: plek.id,
+            type: 'in',
+            aantal: plek.aantal,
+            reden: 'Op voorraad gezet',
+            gebruiker,
+            bron: 'opvoorraad',
+          })
+          gekoppeld.push({ aantal: plek.aantal, locatieCode: plek.code, ordernummer: '', leverancier: '', eenheid })
         }
-        for (const [inkooporderId, ontvangst] of perOrder) {
-          await boekOntvangst({ inkooporderId, ontvangst, gebruiker })
-          geboekteIds.push(...Object.keys(ontvangst))
+      } else {
+        const locRest = plaatsingen.map((p) => ({ ...p, rest: p.aantal }))
+        let li = 0
+        for (const deel of delen) {
+          let nog = deel.aantal
+          while (nog > 1e-9 && li < locRest.length) {
+            const nemen = Math.min(nog, locRest[li].rest)
+            if (nemen > 1e-9) {
+              gekoppeld.push({ ...deel, aantal: nemen, locatieId: locRest[li].id, locatieCode: locRest[li].code })
+            }
+            locRest[li].rest -= nemen
+            nog -= nemen
+            if (locRest[li].rest <= 1e-9) li += 1
+          }
+        }
+        const groepen = new Map()
+        for (const deel of gekoppeld) {
+          const key = `${deel.inkooporderId}|${deel.locatieId}`
+          if (!groepen.has(key)) groepen.set(key, { inkooporderId: deel.inkooporderId, ontvangst: {} })
+          groepen.get(key).ontvangst[deel.id] = { aantal: deel.aantal, locatieId: deel.locatieId }
+        }
+        for (const groep of groepen.values()) {
+          await boekOntvangst({ inkooporderId: groep.inkooporderId, ontvangst: groep.ontvangst, gebruiker })
+          geboekteIds.push(...Object.keys(groep.ontvangst))
         }
       }
 
-      const rapportRegels = zonderOrder
-        ? [
-            {
-              artikelnummer: gekozenArtikel.artikelnummer,
-              artikelnaam: gekozenArtikel.artikelnaam,
-              aantal: n,
-              eenheid,
-              locatieCode: locatie.code,
-              ordernummer: '',
-              leverancier: '',
-            },
-          ]
-        : delen.map((deel) => ({
-            artikelnummer: deel.artikelnummer,
-            artikelnaam: deel.artikelnaam,
-            aantal: deel.aantal,
-            eenheid: deel.eenheid || eenheid,
-            locatieCode: locatie.code,
-            ordernummer: deel.ordernummer,
-            leverancier: deel.leverancier,
-          }))
+      const rapportRegels = gekoppeld.map((deel) => ({
+        artikelnummer: deel.artikelnummer || gekozenArtikel.artikelnummer,
+        artikelnaam: deel.artikelnaam || gekozenArtikel.artikelnaam,
+        aantal: deel.aantal,
+        eenheid: deel.eenheid || eenheid,
+        locatieCode: deel.locatieCode,
+        ordernummer: deel.ordernummer || '',
+        leverancier: deel.leverancier || '',
+      }))
       let rapportMelding = ''
       try {
         let rapport
@@ -414,10 +533,9 @@ export default function OntvangstMobiel() {
         if (id) setSessieId(id)
         rapportMelding = ` Het rapport staat op dit apparaat, maar kon niet worden opgeslagen voor de pc: ${err.message}`
       }
-      const ordersTekst = zonderOrder
-        ? ' Zonder open inkooporder.'
-        : ` Orders: ${[...new Set(delen.map((d) => d.ordernummer))].join(', ')}.`
-      setMelding(`${toon(n)} ${eenheid} ${gekozenArtikel.artikelnummer} op ${locatie.code} gezet.${ordersTekst}${rapportMelding}`)
+      const locatieTekst = [...new Set(plaatsingen.map((p) => p.code))].join(', ')
+      const ordersTekst = zonderOrder ? ' Zonder open inkooporder.' : ` Orders: ${[...new Set(delen.map((d) => d.ordernummer))].join(', ')}.`
+      setMelding(`${toon(n)} ${eenheid} ${gekozenArtikel.artikelnummer} op ${locatieTekst} gezet.${ordersTekst}${rapportMelding}`)
       setTekst('')
       wisKeuze()
     } catch (err) {
@@ -462,7 +580,7 @@ export default function OntvangstMobiel() {
         </Link>
       </header>
 
-      <form id="ontvangst-boek" className="pick-mobiel-inhoud" onSubmit={plaats}>
+      <form id="ontvangst-boek" className="pick-mobiel-inhoud" onSubmit={(e) => e.preventDefault()}>
         {laden ? (
           <div className="pick-mobiel-midden">
             <div className="spinner" />
@@ -553,49 +671,108 @@ export default function OntvangstMobiel() {
 
             {klaarVoorAantal && (
               <>
+                {stuksPerDoos > 0 && (
+                  <div className="aantal-rij">
+                    <div className="field">
+                      <label htmlFor="ontvangst-dozen">Volle dozen</label>
+                      <AantalInput id="ontvangst-dozen" value={dozen} onValue={zetDozen} placeholder="bijv. 4 of 2x2" />
+                      <span className="hint">1 doos = {toon(stuksPerDoos)} {eenheid}</span>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="ontvangst-rest">Rest in doos</label>
+                      <AantalInput id="ontvangst-rest" value={restDoos} onValue={zetRest} placeholder="bijv. 12" />
+                    </div>
+                  </div>
+                )}
+                <div className="field">
+                  <label htmlFor="ontvangst-aantal">Totaal aantal</label>
+                  <AantalInput
+                    id="ontvangst-aantal"
+                    value={aantal}
+                    onValue={(waarde) => {
+                      setAantal(waarde)
+                      setDozen('')
+                      setRestDoos('')
+                      setBevestiging(null)
+                    }}
+                    placeholder="bijv. 80x2 of 80*2+20"
+                  />
+                  <span className="hint">
+                    {gekozenArtikel.regels.length === 0
+                      ? 'Voor dit artikel staat geen inkooporder open. Klik daarna een locatie: het totaal komt in die tegel.'
+                      : `Op de gekozen orders staat samen ${toon(somOpen)} ${eenheid} open. Klik een locatie om het totaal daar te plaatsen.`}
+                  </span>
+                </div>
                 <div>
-                  <div className="pick-mobiel-label">Locatie</div>
+                  <div className="pick-mobiel-label">Locaties</div>
                   {ladenLocatie ? (
                     <div className="spinner" />
-                  ) : locatie?.code ? (
-                    <div className="pick-mobiel-locatie">{locatie.code}</div>
                   ) : (
                     <>
-                      <p className="hint">Dit artikel ligt nog nergens. Kies waar het komt te liggen.</p>
-                      <LocatieKiezer
-                        value={locatieCode}
-                        onChange={setLocatieCode}
-                        onKies={(l) => setLocatie(l ? { id: l.id, code: l.code } : null)}
-                        placeholder="Locatie…"
-                      />
+                      {standen.length === 0 && extraLocaties.length === 0 && (
+                        <p className="hint">Dit artikel ligt nog nergens, of alleen op de verzamellocatie. Kies een andere locatie.</p>
+                      )}
+                      <div className="locatie-tegels">
+                        {standen.map((s) => (
+                          <div
+                            key={s.locatieId}
+                            className={'locatie-tegel' + (perLocatie[s.locatieId] ? ' actief' : '')}
+                            onClick={(e) => klikLocatie(e, s.locatieId)}
+                          >
+                            <strong>{s.locatieCode}</strong>
+                            <span>ligt er {toon(s.aantal)}</span>
+                            <AantalInput
+                              value={perLocatie[s.locatieId] || ''}
+                              onValue={(waarde) => zetLocatieAantal(s.locatieId, waarde)}
+                              placeholder="Aantal"
+                              aria-label={`Aantal op ${s.locatieCode}`}
+                            />
+                          </div>
+                        ))}
+                        {extraLocaties
+                          .filter((e) => !standen.some((s) => s.locatieId === e.id))
+                          .map((e) => (
+                            <div
+                              key={e.id}
+                              className={'locatie-tegel' + (perLocatie[e.id] ? ' actief' : '')}
+                              onClick={(ev) => klikLocatie(ev, e.id)}
+                            >
+                              <strong>{e.code}</strong>
+                              <span>nieuwe locatie</span>
+                              <AantalInput
+                                value={perLocatie[e.id] || ''}
+                                onValue={(waarde) => zetLocatieAantal(e.id, waarde)}
+                                placeholder="Aantal"
+                                aria-label={`Aantal op ${e.code}`}
+                              />
+                            </div>
+                          ))}
+                        {andereOpen ? (
+                          <div className="locatie-tegel actief">
+                            <strong>Locatie</strong>
+                            <LocatieKiezer
+                              className="locatie-code"
+                              value={andereCode}
+                              onChange={setAndereCode}
+                              onKies={kiesAndereLocatie}
+                              placeholder="Locatiecode"
+                              autoFocus
+                              aria-label="Andere locatie"
+                            />
+                          </div>
+                        ) : (
+                          <button type="button" className="locatie-tegel" onClick={() => setAndereOpen(true)}>
+                            <strong>Andere locatie</strong>
+                            <span>typ de code</span>
+                          </button>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
                 {gekozenLijst.length > 0 && (
-                  <div className="pick-mobiel-extra">
-                    {gekozenLijst.map((r) => r.ordernummer).join(', ')}
-                  </div>
+                  <div className="pick-mobiel-extra">{gekozenLijst.map((r) => r.ordernummer).join(', ')}</div>
                 )}
-                <div className="field">
-                  <label htmlFor="ontvangst-aantal">Aantal op voorraad gezet</label>
-                  <input
-                    id="ontvangst-aantal"
-                    type="number"
-                    min="0"
-                    step="any"
-                    inputMode="decimal"
-                    value={aantal}
-                    onChange={(e) => {
-                      setAantal(e.target.value)
-                      setBevestiging(null)
-                    }}
-                  />
-                  <span className="hint">
-                    {gekozenArtikel.regels.length === 0
-                      ? 'Voor dit artikel staat geen inkooporder open.'
-                      : `Op de gekozen orders staat samen ${toon(somOpen)} ${eenheid} open. Het aantal wordt vanaf de bovenste order verdeeld.`}
-                  </span>
-                </div>
               </>
             )}
           </div>
@@ -615,7 +792,7 @@ export default function OntvangstMobiel() {
               Let op, voor dit artikel staat geen inkooporder open. Weet u zeker dat u het toch op voorraad wil zetten?
             </div>
           )}
-          <button type="submit" form="ontvangst-boek" className="btn btn-primary pick-mobiel-gepikt" disabled={bezig || ladenLocatie}>
+          <button type="button" className="btn btn-primary pick-mobiel-gepikt" onClick={plaats} disabled={bezig || ladenLocatie}>
             {bezig ? 'Boeken…' : bevestiging === 'geen' ? 'Ja, op voorraad zetten' : bevestiging === 'meer' ? 'Ja, inboeken' : 'Ontvangst boeken'}
           </button>
         </footer>

@@ -434,10 +434,193 @@
   margin: 0;
 }
 
+/* Magazijnrapporten: leesbaar op het scherm en één pagina bij een korte lijst.
+   De briefpapier-pagina is 8,5 pt en minstens een volle A4; op de telefoon
+   werd dat tot drie kleine pagina's uitgerekt. */
+.magazijn-afdruk .afdruk-pagina {
+  width: min(210mm, 100%);
+  min-height: 0;
+  padding: 12mm 10mm;
+  font-size: 12pt;
+}
+
+.ontvangst-afdruk {
+  background: #e6e8ec;
+}
+
+.ontvangst-afdruk .ontvangst-pagina {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(20, 24, 32, 0.15);
+}
+
+.magazijn-afdruk .doc-titel {
+  font-size: 18pt;
+}
+
+.magazijn-afdruk .doc-nummer,
+.magazijn-afdruk .doc-instructie {
+  font-size: 12pt;
+}
+
+.magazijn-afdruk .doc-regels,
+.magazijn-afdruk .doc-regels th,
+.magazijn-afdruk .doc-regels td,
+.magazijn-afdruk .pick-locatie,
+.magazijn-afdruk .pick-aantal {
+  font-size: 11pt;
+  white-space: normal;
+}
+
+.magazijn-afdruk .doc-regels {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.ontvangst-pagina {
+  box-sizing: border-box;
+  padding: 12mm;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11pt;
+  color: #111;
+  overflow: visible;
+}
+
+.ontvangst-logo {
+  width: 34mm;
+  height: auto;
+}
+
+.ontvangst-tabel {
+  width: 100%;
+  margin-top: 6mm;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11pt;
+  line-height: 1.3;
+}
+
+.ontvangst-col-tijd { width: 14%; }
+.ontvangst-col-artikel { width: 34%; }
+.ontvangst-col-locatie { width: 16%; }
+.ontvangst-col-aantal { width: 16%; }
+.ontvangst-col-order { width: 20%; }
+
+.ontvangst-tabel th,
+.ontvangst-tabel td {
+  white-space: normal;
+  overflow-wrap: break-word;
+  vertical-align: top;
+  padding: 2.2mm 2mm;
+  text-align: left;
+}
+
+.ontvangst-tabel th {
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: normal;
+  color: #fff;
+  background: var(--fmid-blauw, #3a4899);
+}
+
+.ontvangst-tabel td {
+  border-bottom: 1px solid #d5d8e2;
+}
+
+.ontvangst-tabel .num {
+  text-align: right;
+  font-weight: 700;
+}
+
+.ontvangst-nummer,
+.ontvangst-locatie {
+  font-weight: 700;
+}
+
+.ontvangst-naam,
+.ontvangst-eenheid {
+  font-weight: 400;
+  color: #333;
+}
+
+@page ontvangstrapport {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@media print {
+  body:has(.ontvangst-afdruk) {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .ontvangst-afdruk {
+    page: ontvangstrapport;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .ontvangst-afdruk .ontvangst-pagina {
+    width: 210mm !important;
+    max-width: 210mm !important;
+    min-width: 210mm !important;
+    min-height: 297mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 12mm !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .ontvangst-tabel {
+    width: 100% !important;
+    margin-top: 6mm;
+    font-size: 12pt;
+  }
+
+  .ontvangst-tabel th,
+  .ontvangst-tabel td {
+    font-size: 12pt;
+    white-space: normal !important;
+  }
+
+  .ontvangst-tabel th {
+    font-size: 9pt;
+  }
+
+  .ontvangst-tabel tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
 @media print {
   .afdruk-scherm {
     padding: 0;
     background: #fff;
+  }
+
+  .magazijn-afdruk .afdruk-pagina {
+    width: 210mm;
+    min-height: 0 !important;
+    margin: 0 auto;
+    font-size: 12pt;
+  }
+
+  .magazijn-afdruk .doc-regels tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .afdruk-toolbar {

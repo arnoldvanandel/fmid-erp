@@ -91,7 +91,7 @@ export default function OpVoorraadRapport() {
   const periode = periodeTekst(van, tot)
 
   return (
-    <div className="afdruk-scherm">
+    <div className="afdruk-scherm magazijn-afdruk">
       <div className="afdruk-toolbar rapport-balk">
         <div className="rapport-filters">
           <div className="field">

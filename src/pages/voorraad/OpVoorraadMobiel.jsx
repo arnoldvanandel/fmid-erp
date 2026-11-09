@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
+import AantalInput from '../../components/AantalInput'
 import LocatieKiezer from '../../components/LocatieKiezer'
 import { useAuth } from '../../contexts/AuthContext'
-import { haalArtikelOpBarcode } from '../../lib/artikelZoeken'
+import { haalArtikelOpBarcode, haalArtikelenOp } from '../../lib/artikelZoeken'
 import { formatNumber } from '../../lib/format'
-import { boekVoorraadMutatie, haalStandenVanArtikel, stuksUitVerpakking } from '../../lib/voorraad'
+import { evalueerAantal, isVerzamellocatie, leesRecenteArtikelen, onthoudArtikel } from '../../lib/magazijnInvoer'
+import { boekVoorraadMutatie, haalStandenVanArtikel } from '../../lib/voorraad'
 
 function toon(n) {
   const x = Number(n)
@@ -34,9 +36,12 @@ export default function OpVoorraadMobiel() {
   const [barcode, setBarcode] = useState('')
   const [zoek, setZoek] = useState('')
   const [camera, setCamera] = useState(false)
-  const [locatieCode, setLocatieCode] = useState('')
-  const [locatie, setLocatie] = useState(null)
-  const [modus, setModus] = useState('stuks')
+  const [extraLocaties, setExtraLocaties] = useState([])
+  const [perLocatie, setPerLocatie] = useState({})
+  const [andereOpen, setAndereOpen] = useState(false)
+  const [andereCode, setAndereCode] = useState('')
+  const [dozen, setDozen] = useState('')
+  const [restDoos, setRestDoos] = useState('')
   const [aantal, setAantal] = useState('')
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
@@ -59,19 +64,17 @@ export default function OpVoorraadMobiel() {
     setBarcode('')
     setFout(null)
     setMelding(null)
-    setModus('stuks')
     setAantal('')
-    setLocatie(null)
-    setLocatieCode('')
+    setDozen('')
+    setRestDoos('')
+    setExtraLocaties([])
+    setPerLocatie({})
+    setAndereOpen(false)
+    setAndereCode('')
     setLadenStanden(true)
+    onthoudArtikel(gevonden)
     haalStandenVanArtikel(gevonden.id)
-      .then((lijst) => {
-        setStanden(lijst)
-        if (lijst.length === 1) {
-          setLocatie({ id: lijst[0].locatieId, code: lijst[0].locatieCode })
-          setLocatieCode(lijst[0].locatieCode || '')
-        }
-      })
+      .then((lijst) => setStanden(lijst.filter((s) => !isVerzamellocatie(s.locatieCode))))
       .catch((err) => setFout(err.message))
       .finally(() => setLadenStanden(false))
   }
@@ -79,10 +82,13 @@ export default function OpVoorraadMobiel() {
   function anderArtikel() {
     setArtikel(null)
     setStanden([])
-    setLocatie(null)
-    setLocatieCode('')
+    setExtraLocaties([])
+    setPerLocatie({})
+    setAndereOpen(false)
+    setAndereCode('')
     setAantal('')
-    setModus('stuks')
+    setDozen('')
+    setRestDoos('')
     setFout(null)
     setMelding(null)
   }
@@ -111,48 +117,92 @@ export default function OpVoorraadMobiel() {
     }
   }
 
+  function zetLocatieAantal(id, waarde) {
+    setPerLocatie((h) => ({ ...h, [id]: waarde }))
+  }
+
+  function neemTotaalOver(id) {
+    const n = evalueerAantal(aantal)
+    if (!Number.isFinite(n) || n <= 0) {
+      setFout('Vul eerst het totaal aantal in.')
+      return
+    }
+    setPerLocatie((h) => ({ ...h, [id]: String(n) }))
+    setFout(null)
+  }
+
+  function klikLocatie(e, id) {
+    if (e.target.closest('input')?.value.trim()) return
+    neemTotaalOver(id)
+  }
+
+  function kiesAndereLocatie(l) {
+    if (!l) return
+    if (isVerzamellocatie(l.code)) {
+      setFout('Locatie 1111-1 is de verzamellocatie en kan hier niet gekozen worden.')
+      return
+    }
+    setExtraLocaties((h) => (h.some((e) => e.id === l.id) ? h : [...h, { id: l.id, code: l.code }]))
+    setAndereCode('')
+    setAndereOpen(false)
+    neemTotaalOver(l.id)
+  }
+
   async function verversStanden() {
-    const lijst = await haalStandenVanArtikel(artikel.id)
+    const lijst = (await haalStandenVanArtikel(artikel.id)).filter((s) => !isVerzamellocatie(s.locatieCode))
     setStanden(lijst)
     return lijst
   }
 
   async function opVoorraad(e) {
-    e.preventDefault()
+    e?.preventDefault()
     setFout(null)
     setMelding(null)
-    if (!locatie?.id) {
-      setFout(locatieCode.trim() ? `Locatie "${locatieCode.trim()}" bestaat niet.` : 'Kies een locatie.')
-      return
-    }
-    const stuks = stuksUitVerpakking(artikel, modus, aantal)
-    if (stuks <= 0) {
-      setFout('Vul een aantal in.')
-      return
-    }
-    const pak = verpakking(artikel)
     const eenheid = artikel.eenheid || 'stuks'
-    let reden = 'Op voorraad gezet'
-    if (modus === 'doos') reden = `${toon(aantal)} dozen × ${toon(pak.doos)} ${eenheid}`
-    if (modus === 'zak') reden = `${toon(aantal)} zakjes × ${toon(pak.zak)} ${eenheid}`
+    const ingetypt = evalueerAantal(aantal)
+    const tegels = [
+      ...standen.map((s) => ({ id: s.locatieId, code: s.locatieCode })),
+      ...extraLocaties.filter((l) => !standen.some((s) => s.locatieId === l.id)).map((l) => ({ id: l.id, code: l.code })),
+    ]
+    const ingevuld = tegels
+      .map((t) => ({ ...t, aantal: evalueerAantal(perLocatie[t.id] || '') }))
+      .filter((t) => Number.isFinite(t.aantal) && t.aantal > 0)
+    const somVooraf = ingevuld.reduce((s, p) => s + p.aantal, 0)
+    const n = Number.isFinite(ingetypt) && ingetypt > 0 ? ingetypt : somVooraf
+    const plaatsingen = ingevuld.length > 0 ? ingevuld : Number.isFinite(n) && n > 0 && tegels.length === 1 ? [{ ...tegels[0], aantal: n }] : []
+    if (!Number.isFinite(n) || n <= 0) {
+      setFout('Vul een totaal aantal in. Een berekening zoals 80*2+20 mag ook.')
+      return
+    }
+    if (plaatsingen.length === 0) {
+      setFout('Kies per locatie hoeveel stuks daar zijn geplaatst. Een volle locatie vult u niet verder; de rest komt op een andere locatie.')
+      return
+    }
+    const som = plaatsingen.reduce((s, p) => s + p.aantal, 0)
+    if (Math.abs(som - n) > 0.001) {
+      setFout(`Per locatie staat ${toon(som)} ${eenheid}, het totaal is ${toon(n)}. Maak die gelijk voor u boekt.`)
+      return
+    }
 
     setBezig(true)
     try {
-      await boekVoorraadMutatie({
-        artikelId: artikel.id,
-        locatieId: locatie.id,
-        type: 'in',
-        aantal: stuks,
-        reden,
-        bron: 'opvoorraad',
-        gebruiker: profile?.naam || profile?.email,
-      })
-      const lijst = await verversStanden()
-      const stand = lijst.find((s) => s.locatieId === locatie.id)
-      const via =
-        modus === 'doos' ? `${toon(aantal)} dozen (${toon(stuks)} ${eenheid})` : modus === 'zak' ? `${toon(aantal)} zakjes (${toon(stuks)} ${eenheid})` : `${toon(stuks)} ${eenheid}`
-      setMelding(`${via} op ${locatie.code} gezet. Daar liggen er nu ${toon(stand?.aantal ?? stuks)}.`)
+      for (const plek of plaatsingen) {
+        await boekVoorraadMutatie({
+          artikelId: artikel.id,
+          locatieId: plek.id,
+          type: 'in',
+          aantal: plek.aantal,
+          reden: 'Op voorraad gezet',
+          bron: 'opvoorraad',
+          gebruiker: profile?.naam || profile?.email,
+        })
+      }
+      await verversStanden().then((lijst) => setStanden(lijst.filter((s) => !isVerzamellocatie(s.locatieCode))))
+      setMelding(`${toon(n)} ${eenheid} op ${plaatsingen.map((p) => p.code).join(', ')} gezet.`)
       setAantal('')
+      setDozen('')
+      setRestDoos('')
+      setPerLocatie({})
     } catch (err) {
       setFout(err.message)
     } finally {
@@ -161,13 +211,29 @@ export default function OpVoorraadMobiel() {
   }
 
   const pak = verpakking(artikel)
-  const modi = [
-    { id: 'stuks', label: artikel?.eenheid || 'Stuks' },
-    ...(pak.doos ? [{ id: 'doos', label: 'Dozen' }] : []),
-    ...(pak.zak ? [{ id: 'zak', label: 'Zakjes' }] : []),
-  ]
-  const stuks = artikel ? stuksUitVerpakking(artikel, modus, aantal) : 0
   const eenheid = artikel?.eenheid || 'stuks'
+
+  async function kiesRecent(kort) {
+    if (!kort.artikelId) {
+      setFout('Zoek dit artikel opnieuw op artikelnummer.')
+      return
+    }
+    setBezig(true)
+    setFout(null)
+    try {
+      const map = await haalArtikelenOp([kort.artikelId])
+      const volledig = map[kort.artikelId]
+      if (!volledig) {
+        setFout('Artikel niet gevonden.')
+        return
+      }
+      kiesArtikel(volledig)
+    } catch (err) {
+      setFout(err.message)
+    } finally {
+      setBezig(false)
+    }
+  }
 
   return (
     <div className="pick-mobiel opv">
@@ -195,11 +261,12 @@ export default function OpVoorraadMobiel() {
               zoekCode(barcode)
             }}
             onArtikel={kiesArtikel}
+            onRecent={kiesRecent}
             onCamera={() => setCamera(true)}
             toonCamera={cameraBeschikbaar()}
           />
         ) : (
-          <form id="opv-boek" className="opv-form" onSubmit={opVoorraad}>
+          <form id="opv-boek" className="opv-form" onSubmit={(e) => e.preventDefault()}>
             <div className="opv-artikel">
               <div className="pick-mobiel-label">Artikel</div>
               <div className="pick-mobiel-artikel">{artikel.artikelnummer}</div>
@@ -220,101 +287,123 @@ export default function OpVoorraadMobiel() {
             {fout && <div className="banner banner-danger">{fout}</div>}
             {melding && <div className="banner banner-info">{melding}</div>}
 
-            <div>
-              <div className="pick-mobiel-label">Ligt al op</div>
-              {ladenStanden ? (
-                <div className="spinner" />
-              ) : standen.length === 0 ? (
-                <p className="hint">Dit artikel ligt nog nergens. Kies hieronder een locatie.</p>
-              ) : (
-                <div className="opv-locaties">
-                  {standen.map((s) => (
-                    <button
-                      key={s.locatieId}
-                      type="button"
-                      className={'opv-locatie' + (locatie?.id === s.locatieId ? ' actief' : '')}
-                      onClick={() => {
-                        setLocatie({ id: s.locatieId, code: s.locatieCode })
-                        setLocatieCode(s.locatieCode || '')
-                      }}
-                    >
-                      <strong>{s.locatieCode}</strong>
-                      <span>
-                        {toon(s.aantal)} {eenheid}
-                      </span>
-                    </button>
-                  ))}
+            {pak.doos > 0 && (
+              <div className="aantal-rij">
+                <div className="field">
+                  <label htmlFor="opv-dozen">Volle dozen</label>
+                  <AantalInput
+                    id="opv-dozen"
+                    value={dozen}
+                    onValue={(waarde) => {
+                      setDozen(waarde)
+                      const d = evalueerAantal(waarde)
+                      const r = evalueerAantal(restDoos)
+                      const totaal = (Number.isFinite(d) ? d : 0) * pak.doos + (Number.isFinite(r) ? r : 0)
+                      setAantal(String(waarde).trim() || restDoos.trim() ? String(totaal) : '')
+                    }}
+                    placeholder="bijv. 4 of 2x2"
+                  />
+                  <span className="hint">1 doos = {toon(pak.doos)} {eenheid}</span>
                 </div>
-              )}
-            </div>
+                <div className="field">
+                  <label htmlFor="opv-rest">Rest in doos</label>
+                  <AantalInput
+                    id="opv-rest"
+                    value={restDoos}
+                    onValue={(waarde) => {
+                      setRestDoos(waarde)
+                      const d = evalueerAantal(dozen)
+                      const r = evalueerAantal(waarde)
+                      const totaal = (Number.isFinite(d) ? d : 0) * pak.doos + (Number.isFinite(r) ? r : 0)
+                      setAantal(dozen.trim() || String(waarde).trim() ? String(totaal) : '')
+                    }}
+                    placeholder="bijv. 12"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="field">
-              <label htmlFor="opv-locatie">Locatie</label>
-              <LocatieKiezer
-                id="opv-locatie"
-                value={locatieCode}
-                onChange={(code) => {
-                  setLocatieCode(code)
-                  const stand = standen.find(
-                    (s) => String(s.locatieCode).toUpperCase() === String(code).trim().toUpperCase()
-                  )
-                  setLocatie(stand ? { id: stand.locatieId, code: stand.locatieCode } : null)
-                }}
-                onKies={(l) => {
-                  if (l) setLocatie({ id: l.id, code: l.code })
-                }}
-                placeholder="Typ een locatiecode, bijv. 1343-1"
-              />
-              {locatieCode.trim() && !locatie && <span className="hint">Onbekende locatie</span>}
-            </div>
-
-            <div className="field">
-              <label htmlFor="opv-aantal">Aantal erbij</label>
-              {modi.length > 1 && (
-                <div className="opv-modus" role="group" aria-label="Invoeren als">
-                  {modi.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      className={modus === m.id ? 'actief' : ''}
-                      onClick={() => {
-                        setModus(m.id)
-                        setAantal('')
-                      }}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <input
+              <label htmlFor="opv-aantal">Totaal aantal</label>
+              <AantalInput
                 id="opv-aantal"
-                type="number"
-                min="0"
-                step="any"
-                inputMode="decimal"
                 value={aantal}
-                onChange={(e) => setAantal(e.target.value)}
+                onValue={(waarde) => {
+                  setAantal(waarde)
+                  setDozen('')
+                  setRestDoos('')
+                }}
+                placeholder="bijv. 80x2 of 80*2+20"
                 autoFocus
               />
-              {modus === 'doos' && (
-                <span className="hint">
-                  1 doos = {toon(pak.doos)} {eenheid}
-                  {stuks > 0 ? ` → ${toon(stuks)} ${eenheid}` : ''}
-                </span>
-              )}
-              {modus === 'zak' && (
-                <span className="hint">
-                  1 zakje = {toon(pak.zak)} {eenheid}
-                  {stuks > 0 ? ` → ${toon(stuks)} ${eenheid}` : ''}
-                </span>
-              )}
-              {modus === 'stuks' && (pak.doos > 0 || pak.zak > 0) && (
-                <span className="hint">
-                  {pak.doos > 0 ? `1 doos = ${toon(pak.doos)} ${eenheid}` : ''}
-                  {pak.doos > 0 && pak.zak > 0 ? ' · ' : ''}
-                  {pak.zak > 0 ? `1 zakje = ${toon(pak.zak)} ${eenheid}` : ''}
-                </span>
+              <span className="hint">Klik daarna een locatie: het totaal komt in die tegel. Enter boekt nog niet.</span>
+            </div>
+
+            <div>
+              <div className="pick-mobiel-label">Locaties</div>
+              {ladenStanden ? (
+                <div className="spinner" />
+              ) : (
+                <>
+                  {standen.length === 0 && extraLocaties.length === 0 && (
+                    <p className="hint">Dit artikel ligt nog nergens, of alleen op de verzamellocatie. Kies een andere locatie.</p>
+                  )}
+                  <div className="locatie-tegels">
+                    {standen.map((s) => (
+                      <div
+                        key={s.locatieId}
+                        className={'locatie-tegel' + (perLocatie[s.locatieId] ? ' actief' : '')}
+                        onClick={(e) => klikLocatie(e, s.locatieId)}
+                      >
+                        <strong>{s.locatieCode}</strong>
+                        <span>ligt er {toon(s.aantal)}</span>
+                        <AantalInput
+                          value={perLocatie[s.locatieId] || ''}
+                          onValue={(waarde) => zetLocatieAantal(s.locatieId, waarde)}
+                          placeholder="Aantal"
+                          aria-label={`Aantal op ${s.locatieCode}`}
+                        />
+                      </div>
+                    ))}
+                    {extraLocaties
+                      .filter((l) => !standen.some((s) => s.locatieId === l.id))
+                      .map((l) => (
+                        <div
+                          key={l.id}
+                          className={'locatie-tegel' + (perLocatie[l.id] ? ' actief' : '')}
+                          onClick={(e) => klikLocatie(e, l.id)}
+                        >
+                          <strong>{l.code}</strong>
+                          <span>nieuwe locatie</span>
+                          <AantalInput
+                            value={perLocatie[l.id] || ''}
+                            onValue={(waarde) => zetLocatieAantal(l.id, waarde)}
+                            placeholder="Aantal"
+                            aria-label={`Aantal op ${l.code}`}
+                          />
+                        </div>
+                      ))}
+                    {andereOpen ? (
+                      <div className="locatie-tegel actief">
+                        <strong>Locatie</strong>
+                        <LocatieKiezer
+                          className="locatie-code"
+                          value={andereCode}
+                          onChange={setAndereCode}
+                          onKies={kiesAndereLocatie}
+                          placeholder="Locatiecode"
+                          autoFocus
+                          aria-label="Andere locatie"
+                        />
+                      </div>
+                    ) : (
+                      <button type="button" className="locatie-tegel" onClick={() => setAndereOpen(true)}>
+                        <strong>Andere locatie</strong>
+                        <span>typ de code</span>
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </form>
@@ -323,7 +412,7 @@ export default function OpVoorraadMobiel() {
 
       {artikel && (
         <footer className="pick-mobiel-voet">
-          <button type="submit" form="opv-boek" className="btn btn-primary pick-mobiel-gepikt" disabled={bezig || !locatie?.id}>
+          <button type="button" className="btn btn-primary pick-mobiel-gepikt" onClick={opVoorraad} disabled={bezig}>
             {bezig ? 'Bezig…' : 'Op voorraad zetten'}
           </button>
         </footer>
@@ -353,6 +442,7 @@ function KiesArtikel({
   fout,
   onBarcode,
   onArtikel,
+  onRecent,
   onCamera,
   toonCamera,
 }) {
@@ -385,6 +475,19 @@ function KiesArtikel({
         <button type="button" className="btn btn-secondary" onClick={onCamera}>
           Scan met camera
         </button>
+      )}
+      {leesRecenteArtikelen().length > 0 && (
+        <div>
+          <div className="pick-mobiel-label">Laatst gekozen</div>
+          <div className="locatie-tegels">
+            {leesRecenteArtikelen().map((a) => (
+              <button key={a.artikelnummer} type="button" className="locatie-tegel" onClick={() => onRecent(a)}>
+                <strong>{a.artikelnummer}</strong>
+                {a.artikelnaam ? <span>{a.artikelnaam}</span> : null}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
       <div className="opv-of">of kies een artikel</div>
       <div className="field">

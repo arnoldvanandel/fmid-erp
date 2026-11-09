@@ -12,6 +12,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
+import { isVerzamellocatie } from './magazijnInvoer'
 import { voorraadstandId } from './voorraad'
 
 // Genereert een oplopend inkoopordernummer (IO-000001, IO-000002, ...) via
@@ -166,6 +167,7 @@ export async function standaardLocaties(artikelIds) {
     const snap = await getDocs(query(collection(db, 'voorraadstanden'), where('artikelId', 'in', uniek.slice(i, i + 30))))
     for (const d of snap.docs) {
       const s = d.data()
+      if (isVerzamellocatie(s.locatieCode)) continue
       if (!beste[s.artikelId] || Number(s.aantal) > Number(beste[s.artikelId].aantal)) beste[s.artikelId] = s
     }
   }

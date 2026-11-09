@@ -1133,8 +1133,14 @@ td .picklijst-acties {
   color: var(--color-text-muted);
 }
 
-.pick-mobiel-kaart .banner {
+.pick-mobiel-kaart .banner,
+.pick-mobiel-voet .banner {
   margin: 0;
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 700;
+  padding: 16px;
+  border: 3px solid currentColor;
 }
 
 .pick-mobiel-voet {
@@ -1633,6 +1639,67 @@ td .picklijst-acties {
 .ontvangst-artikelen {
   max-height: 240px;
   overflow: auto;
+}
+
+.locatie-tegels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.locatie-tegel {
+  flex: 1 1 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-height: 88px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.locatie-tegel.actief {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+  box-shadow: 0 0 0 3px var(--color-primary-tint);
+}
+
+.locatie-tegel strong {
+  font-size: 18px;
+}
+
+.locatie-tegel span {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.locatie-tegel input {
+  width: 100%;
+  min-height: 48px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.locatie-tegel input.locatie-code {
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.aantal-rij {
+  display: flex;
+  gap: 8px;
+}
+
+.aantal-rij .field {
+  flex: 1;
+  margin: 0;
 }
 
 .opv-modus {
