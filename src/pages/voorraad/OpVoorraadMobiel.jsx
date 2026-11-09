@@ -6,6 +6,7 @@ import LocatieKiezer from '../../components/LocatieKiezer'
 import { useAuth } from '../../contexts/AuthContext'
 import { haalArtikelOpBarcode, haalArtikelenOp } from '../../lib/artikelZoeken'
 import { formatNumber } from '../../lib/format'
+import { zorgLocatie } from '../../lib/locatieZoeken'
 import { evalueerAantal, isVerzamellocatie, leesRecenteArtikelen, onthoudArtikel } from '../../lib/magazijnInvoer'
 import { boekVoorraadMutatie, haalStandenVanArtikel } from '../../lib/voorraad'
 
@@ -40,6 +41,7 @@ export default function OpVoorraadMobiel() {
   const [perLocatie, setPerLocatie] = useState({})
   const [andereOpen, setAndereOpen] = useState(false)
   const [andereCode, setAndereCode] = useState('')
+  const [andereAantal, setAndereAantal] = useState('')
   const [dozen, setDozen] = useState('')
   const [restDoos, setRestDoos] = useState('')
   const [aantal, setAantal] = useState('')
@@ -71,6 +73,7 @@ export default function OpVoorraadMobiel() {
     setPerLocatie({})
     setAndereOpen(false)
     setAndereCode('')
+    setAndereAantal('')
     setLadenStanden(true)
     onthoudArtikel(gevonden)
     haalStandenVanArtikel(gevonden.id)
@@ -86,6 +89,7 @@ export default function OpVoorraadMobiel() {
     setPerLocatie({})
     setAndereOpen(false)
     setAndereCode('')
+    setAndereAantal('')
     setAantal('')
     setDozen('')
     setRestDoos('')
@@ -142,10 +146,50 @@ export default function OpVoorraadMobiel() {
       setFout('Locatie 1111-1 is de verzamellocatie en kan hier niet gekozen worden.')
       return
     }
+    const ingevuld = String(andereAantal).trim()
     setExtraLocaties((h) => (h.some((e) => e.id === l.id) ? h : [...h, { id: l.id, code: l.code }]))
     setAndereCode('')
+    setAndereAantal('')
     setAndereOpen(false)
-    neemTotaalOver(l.id)
+    setFout(null)
+    if (ingevuld) setPerLocatie((h) => ({ ...h, [l.id]: ingevuld }))
+    else neemTotaalOver(l.id)
+  }
+
+  async function enterAndereLocatie(e) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const code = andereCode.trim().toUpperCase()
+    if (!code) return
+    if (isVerzamellocatie(code)) {
+      setFout('Locatie 1111-1 is de verzamellocatie en kan hier niet gekozen worden.')
+      return
+    }
+    try {
+      kiesAndereLocatie(await zorgLocatie(code))
+    } catch (err) {
+      setFout(err.message)
+    }
+  }
+
+  async function openLocatieMeenemen() {
+    const code = andereCode.trim().toUpperCase()
+    if (!andereOpen || !code) return { extra: extraLocaties, aantallen: perLocatie }
+    if (isVerzamellocatie(code)) {
+      throw new Error('Locatie 1111-1 is de verzamellocatie en kan hier niet gekozen worden.')
+    }
+    const l = await zorgLocatie(code)
+    const extra = extraLocaties.some((e) => e.id === l.id) ? extraLocaties : [...extraLocaties, { id: l.id, code: l.code }]
+    const ingevuld = String(andereAantal).trim()
+    const totaal = evalueerAantal(aantal)
+    const qty = ingevuld || (Number.isFinite(totaal) && totaal > 0 ? String(totaal) : '')
+    const aantallen = qty ? { ...perLocatie, [l.id]: perLocatie[l.id] || qty } : perLocatie
+    setExtraLocaties(extra)
+    setPerLocatie(aantallen)
+    setAndereCode('')
+    setAndereAantal('')
+    setAndereOpen(false)
+    return { extra, aantallen }
   }
 
   async function verversStanden() {
@@ -159,13 +203,23 @@ export default function OpVoorraadMobiel() {
     setFout(null)
     setMelding(null)
     const eenheid = artikel.eenheid || 'stuks'
+    let extraNu = extraLocaties
+    let aantallenNu = perLocatie
+    try {
+      const meegenomen = await openLocatieMeenemen()
+      extraNu = meegenomen.extra
+      aantallenNu = meegenomen.aantallen
+    } catch (err) {
+      setFout(err.message)
+      return
+    }
     const ingetypt = evalueerAantal(aantal)
     const tegels = [
       ...standen.map((s) => ({ id: s.locatieId, code: s.locatieCode })),
-      ...extraLocaties.filter((l) => !standen.some((s) => s.locatieId === l.id)).map((l) => ({ id: l.id, code: l.code })),
+      ...extraNu.filter((l) => !standen.some((s) => s.locatieId === l.id)).map((l) => ({ id: l.id, code: l.code })),
     ]
     const ingevuld = tegels
-      .map((t) => ({ ...t, aantal: evalueerAantal(perLocatie[t.id] || '') }))
+      .map((t) => ({ ...t, aantal: evalueerAantal(aantallenNu[t.id] || '') }))
       .filter((t) => Number.isFinite(t.aantal) && t.aantal > 0)
     const somVooraf = ingevuld.reduce((s, p) => s + p.aantal, 0)
     const n = Number.isFinite(ingetypt) && ingetypt > 0 ? ingetypt : somVooraf
@@ -384,16 +438,30 @@ export default function OpVoorraadMobiel() {
                         </div>
                       ))}
                     {andereOpen ? (
-                      <div className="locatie-tegel actief">
+                      <div
+                        className="locatie-tegel actief"
+                        onClick={(e) => {
+                          if (e.target.closest('input')?.value.trim()) return
+                          const n = evalueerAantal(aantal)
+                          if (Number.isFinite(n) && n > 0) setAndereAantal(String(n))
+                        }}
+                      >
                         <strong>Locatie</strong>
                         <LocatieKiezer
                           className="locatie-code"
                           value={andereCode}
                           onChange={setAndereCode}
                           onKies={kiesAndereLocatie}
+                          onKeyDown={enterAndereLocatie}
                           placeholder="Locatiecode"
                           autoFocus
                           aria-label="Andere locatie"
+                        />
+                        <AantalInput
+                          value={andereAantal}
+                          onValue={setAndereAantal}
+                          placeholder="Aantal"
+                          aria-label="Aantal op deze locatie"
                         />
                       </div>
                     ) : (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { collection, getCountFromServer, getDocs, limit, orderBy, query, where } from 'firebase/firestore'
+import { addDoc, collection, getCountFromServer, getDocs, limit, orderBy, query, where } from 'firebase/firestore'
 import { db } from '../firebase'
 
 // Met ~3.600 magazijnlocaties uit Axapta laden we nooit de hele collectie,
@@ -21,6 +21,16 @@ export async function haalLocatieOpCode(code) {
   if (!c) return null
   const snap = await getDocs(query(collection(db, 'locaties'), where('code', '==', c), limit(1)))
   return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() }
+}
+
+// Bestaande locatie op code, of een nieuwe als die code nog niet in het magazijn staat.
+export async function zorgLocatie(code) {
+  const c = String(code || '').trim().toUpperCase()
+  if (!c) return null
+  const bestaand = await haalLocatieOpCode(c)
+  if (bestaand) return bestaand
+  const ref = await addDoc(collection(db, 'locaties'), { code: c, naam: '', sorteercode: 0 })
+  return { id: ref.id, code: c, naam: '', sorteercode: 0 }
 }
 
 export async function telLocaties() {

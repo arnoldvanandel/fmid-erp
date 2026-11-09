@@ -7,6 +7,7 @@ import { useCollection } from '../../hooks/useCollection'
 import { haalArtikelOpNummer, haalArtikelenOp, zoekArtikelen } from '../../lib/artikelZoeken'
 import { formatNumber } from '../../lib/format'
 import { boekOntvangst } from '../../lib/inkooporders'
+import { zorgLocatie } from '../../lib/locatieZoeken'
 import { evalueerAantal, isVerzamellocatie, leesRecenteArtikelen, onthoudArtikel } from '../../lib/magazijnInvoer'
 import { leesOpenSessieId, sluitOntvangstsessie, voegOntvangstregelToe } from '../../lib/ontvangstrapport'
 import { boekVoorraadMutatie, haalStandenVanArtikel } from '../../lib/voorraad'
@@ -50,6 +51,7 @@ export default function OntvangstMobiel() {
   const [perLocatie, setPerLocatie] = useState({})
   const [andereOpen, setAndereOpen] = useState(false)
   const [andereCode, setAndereCode] = useState('')
+  const [andereAantal, setAndereAantal] = useState('')
   const [ladenLocatie, setLadenLocatie] = useState(false)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
@@ -227,6 +229,7 @@ export default function OntvangstMobiel() {
     setPerLocatie({})
     setAndereOpen(false)
     setAndereCode('')
+    setAndereAantal('')
     setLadenLocatie(false)
     setBevestiging(null)
   }
@@ -236,6 +239,8 @@ export default function OntvangstMobiel() {
     setExtraLocaties([])
     setPerLocatie({})
     setAndereOpen(false)
+    setAndereCode('')
+    setAndereAantal('')
     setStuksPerDoos(Number(bekendPerDoos) > 0 ? Number(bekendPerDoos) : 0)
     if (!artikelId) {
       setLadenLocatie(false)
@@ -347,10 +352,50 @@ export default function OntvangstMobiel() {
       setFout('Locatie 1111-1 is de verzamellocatie en kan hier niet gekozen worden.')
       return
     }
+    const ingevuld = String(andereAantal).trim()
     setExtraLocaties((huidig) => (huidig.some((e) => e.id === l.id) ? huidig : [...huidig, { id: l.id, code: l.code }]))
     setAndereCode('')
+    setAndereAantal('')
     setAndereOpen(false)
-    neemTotaalOver(l.id)
+    setFout(null)
+    if (ingevuld) setPerLocatie((huidig) => ({ ...huidig, [l.id]: ingevuld }))
+    else neemTotaalOver(l.id)
+  }
+
+  async function enterAndereLocatie(e) {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const code = andereCode.trim().toUpperCase()
+    if (!code) return
+    if (isVerzamellocatie(code)) {
+      setFout('Locatie 1111-1 is de verzamellocatie en kan hier niet gekozen worden.')
+      return
+    }
+    try {
+      kiesAndereLocatie(await zorgLocatie(code))
+    } catch (err) {
+      setFout(err.message)
+    }
+  }
+
+  async function openLocatieMeenemen() {
+    const code = andereCode.trim().toUpperCase()
+    if (!andereOpen || !code) return { extra: extraLocaties, aantallen: perLocatie }
+    if (isVerzamellocatie(code)) {
+      throw new Error('Locatie 1111-1 is de verzamellocatie en kan hier niet gekozen worden.')
+    }
+    const l = await zorgLocatie(code)
+    const extra = extraLocaties.some((e) => e.id === l.id) ? extraLocaties : [...extraLocaties, { id: l.id, code: l.code }]
+    const ingevuld = String(andereAantal).trim()
+    const totaal = evalueerAantal(aantal)
+    const qty = ingevuld || (Number.isFinite(totaal) && totaal > 0 ? aantalTekst(totaal) : '')
+    const aantallen = qty ? { ...perLocatie, [l.id]: perLocatie[l.id] || qty } : perLocatie
+    setExtraLocaties(extra)
+    setPerLocatie(aantallen)
+    setAndereCode('')
+    setAndereAantal('')
+    setAndereOpen(false)
+    return { extra, aantallen }
   }
 
   function toggleRegel(id) {
@@ -424,15 +469,25 @@ export default function OntvangstMobiel() {
       setFout('Kies één of meer inkooporders.')
       return
     }
+    let extraNu = extraLocaties
+    let aantallenNu = perLocatie
+    try {
+      const meegenomen = await openLocatieMeenemen()
+      extraNu = meegenomen.extra
+      aantallenNu = meegenomen.aantallen
+    } catch (err) {
+      setFout(err.message)
+      return
+    }
     const ingetypt = evalueerAantal(aantal)
     const tegels = [
       ...standen.map((s) => ({ id: s.locatieId, code: s.locatieCode })),
-      ...extraLocaties
+      ...extraNu
         .filter((e) => !standen.some((s) => s.locatieId === e.id) && !isVerzamellocatie(e.code))
         .map((e) => ({ id: e.id, code: e.code })),
     ]
     const ingevuld = tegels
-      .map((t) => ({ ...t, aantal: evalueerAantal(perLocatie[t.id] || '') }))
+      .map((t) => ({ ...t, aantal: evalueerAantal(aantallenNu[t.id] || '') }))
       .filter((t) => Number.isFinite(t.aantal) && t.aantal > 0)
     const somLocatiesVooraf = ingevuld.reduce((s, p) => s + p.aantal, 0)
     const n = Number.isFinite(ingetypt) && ingetypt > 0 ? ingetypt : somLocatiesVooraf
@@ -748,16 +803,30 @@ export default function OntvangstMobiel() {
                             </div>
                           ))}
                         {andereOpen ? (
-                          <div className="locatie-tegel actief">
+                          <div
+                            className="locatie-tegel actief"
+                            onClick={(e) => {
+                              if (e.target.closest('input')?.value.trim()) return
+                              const n = evalueerAantal(aantal)
+                              if (Number.isFinite(n) && n > 0) setAndereAantal(aantalTekst(n))
+                            }}
+                          >
                             <strong>Locatie</strong>
                             <LocatieKiezer
                               className="locatie-code"
                               value={andereCode}
                               onChange={setAndereCode}
                               onKies={kiesAndereLocatie}
+                              onKeyDown={enterAndereLocatie}
                               placeholder="Locatiecode"
                               autoFocus
                               aria-label="Andere locatie"
+                            />
+                            <AantalInput
+                              value={andereAantal}
+                              onValue={setAndereAantal}
+                              placeholder="Aantal"
+                              aria-label="Aantal op deze locatie"
                             />
                           </div>
                         ) : (
