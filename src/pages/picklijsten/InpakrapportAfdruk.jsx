@@ -76,7 +76,7 @@ export default function InpakrapportAfdruk() {
 
         <p className="doc-instructie">
           Ingepakt door {rapport.gebruiker || '—'}. {dozen.length} {dozen.length === 1 ? 'doos' : 'dozen'}.
-          De voorraad wordt afgeboekt bij de pakbon.
+          Per regel staat op welke verkooporder dit geboekt moet worden. De voorraad gaat af bij de pakbon.
         </p>
 
         {dozen.map(([doos, regels]) => (
@@ -95,7 +95,7 @@ export default function InpakrapportAfdruk() {
               <tbody>
                 {regels.map((r, i) => (
                   <tr key={`${r.ordernummer}-${r.artikelnummer}-${i}`}>
-                    <td className="doc-nowrap">{r.ordernummer}</td>
+                    <td className="pick-locatie doc-nowrap">{r.ordernummer || '—'}</td>
                     <td className="doc-artikelnummer doc-nowrap">{r.artikelnummer}</td>
                     <td>{r.artikelnaam}</td>
                     <td className="num pick-aantal">{aantal(r.aantal)}</td>

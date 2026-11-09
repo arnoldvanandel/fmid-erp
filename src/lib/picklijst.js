@@ -366,6 +366,22 @@ async function lijnenUitOudRapport(klantId, gepickt) {
   return lijnen
 }
 
+async function vulOntbrekendeOrdernummers(lijnen) {
+  const ids = [...new Set(lijnen.filter((l) => l.orderId && !l.ordernummer).map((l) => l.orderId))]
+  if (ids.length === 0) return lijnen
+  const gevonden = {}
+  for (let i = 0; i < ids.length; i += 30) {
+    const deel = ids.slice(i, i + 30)
+    const snaps = await Promise.all(deel.map((id) => getDoc(doc(db, 'verkooporders', id))))
+    for (const snap of snaps) {
+      if (snap.exists()) gevonden[snap.id] = snap.data().ordernummer || ''
+    }
+  }
+  return lijnen.map((l) =>
+    l.ordernummer || !l.orderId ? l : { ...l, ordernummer: gevonden[l.orderId] || l.ordernummer || '' }
+  )
+}
+
 // Alleen wat er gepickt is, per orderregel. Niet-gepickte regels komen er niet op.
 export async function maakInpaklijst(klantId) {
   if (!klantId) throw new Error('Geen klant gekozen.')
@@ -381,14 +397,21 @@ export async function maakInpaklijst(klantId) {
   }
 
   const heeftVerdeling = gepickt.some((r) => Array.isArray(r.verdeling) && r.verdeling.length > 0)
-  const lijnen = heeftVerdeling ? lijnenUitVerdeling(gepickt) : await lijnenUitOudRapport(klantId, gepickt)
+  let lijnen = heeftVerdeling ? lijnenUitVerdeling(gepickt) : await lijnenUitOudRapport(klantId, gepickt)
+  lijnen = await vulOntbrekendeOrdernummers(lijnen)
+
+  // Fallback: verdeling zonder ordergegevens → alsnog via open orderregels.
+  if (lijnen.length > 0 && lijnen.every((l) => !l.ordernummer)) {
+    lijnen = await lijnenUitOudRapport(klantId, gepickt)
+  }
 
   const orders = []
   const gezien = new Set()
   for (const lijn of lijnen) {
-    if (!lijn.orderId || gezien.has(lijn.orderId)) continue
-    gezien.add(lijn.orderId)
-    orders.push({ id: lijn.orderId, ordernummer: lijn.ordernummer })
+    const key = lijn.orderId || lijn.ordernummer
+    if (!key || gezien.has(key)) continue
+    gezien.add(key)
+    orders.push({ id: lijn.orderId || '', ordernummer: lijn.ordernummer || '' })
   }
 
   return { klant, orders, lijnen, zonderPick: false, gepicktOp: rapport.gepicktOp || '' }

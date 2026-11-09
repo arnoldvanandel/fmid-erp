@@ -91,11 +91,22 @@ export default function InpaklijstAfdruk() {
         <p className="doc-instructie">
           {lijst.zonderPick
             ? 'Er is nog niets gepickt. Loop eerst de picklijst af. Alleen die regels kunnen ingepakt worden.'
-            : 'Alleen wat gepickt is. Noteer per regel het doosnummer. Eén regel mag over meerdere dozen, en één doos mag regels van verschillende orders bevatten.'}
-          {!lijst.zonderPick && lijst.orders?.length
-            ? ` Orders: ${lijst.orders.map((o) => o.ordernummer).filter(Boolean).join(', ')}.`
-            : ''}
+            : 'Alleen wat gepickt is. Per regel staat op welke verkooporder dit geboekt moet worden bij de pakbon. Noteer het doosnummer; één regel mag over meerdere dozen.'}
         </p>
+
+        {!lijst.zonderPick && lijst.orders?.length > 0 && (
+          <div className="doc-gegevens" style={{ marginBottom: '4mm' }}>
+            <div className="doc-veld doc-veld-breed" style={{ gridColumn: 'span 5' }}>
+              <div className="doc-label">Verkooporders (boeken op)</div>
+              <div className="doc-waarde">
+                {lijst.orders
+                  .map((o) => o.ordernummer)
+                  .filter(Boolean)
+                  .join(' · ') || '—'}
+              </div>
+            </div>
+          </div>
+        )}
 
         {lijnen.length === 0 ? (
           <p className="doc-instructie">
@@ -105,7 +116,7 @@ export default function InpaklijstAfdruk() {
           <table className="doc-regels pick-regels">
             <thead>
               <tr>
-                <th>Order</th>
+                <th>Verkooporder</th>
                 <th>Artikelnr.</th>
                 <th>Omschrijving</th>
                 <th className="num">Aantal</th>
@@ -116,7 +127,7 @@ export default function InpaklijstAfdruk() {
             <tbody>
               {lijnen.map((l) => (
                 <tr key={l.sleutel}>
-                  <td className="doc-nowrap">{l.ordernummer}</td>
+                  <td className="pick-locatie doc-nowrap">{l.ordernummer || '—'}</td>
                   <td className="doc-artikelnummer doc-nowrap">{l.artikelnummer}</td>
                   <td>{l.artikelnaam}</td>
                   <td className="num pick-aantal">{aantal(l.aantal)}</td>
@@ -128,6 +139,13 @@ export default function InpaklijstAfdruk() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {!lijst.zonderPick && lijnen.length > 0 && (
+          <p className="doc-instructie">
+            Bij het maken van de pakbon: boeken op de verkooporder in de kolom links. Zelfde artikel op
+            meerdere orders staat als aparte regels.
+          </p>
         )}
       </div>
     </div>
