@@ -61,11 +61,16 @@ export function TelefoonQr({ pad, tekst, alt = 'QR-code', onClose }) {
           wifi-adres van deze computer.
         </div>
       ) : (
-        <p className="hint">De telefoon moet op hetzelfde wifi-netwerk zitten en ingelogd zijn.</p>
+        <p className="hint">
+          De telefoon moet op hetzelfde wifi-netwerk zitten en ingelogd zijn. Op een tablet kun je de
+          link hieronder openen.
+        </p>
       )}
       {fout && <div className="banner banner-danger">{fout}</div>}
       {src ? <img src={src} alt={alt} /> : <div className="spinner" />}
-      <div className="pick-qr-url">{url}</div>
+      <a className="pick-qr-url" href={url}>
+        {url}
+      </a>
       {onClose && (
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           Sluiten

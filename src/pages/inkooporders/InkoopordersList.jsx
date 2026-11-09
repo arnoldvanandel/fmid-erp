@@ -217,6 +217,9 @@ export default function InkoopordersList() {
           <Link className="btn btn-secondary" to="/inkoopsjablonen">
             Sjablonen
           </Link>
+          <Link className="btn btn-secondary" to="/inkooporders/ontvangst/rapporten">
+            PDF rapport
+          </Link>
           <button type="button" className="btn btn-secondary" onClick={() => setQrOpen(true)}>
             Goederen ontvangen
           </button>

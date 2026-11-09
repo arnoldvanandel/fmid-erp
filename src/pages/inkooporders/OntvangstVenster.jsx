@@ -1,9 +1,35 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatNumber } from '../../lib/format'
 import { boekOntvangst, standaardLocaties } from '../../lib/inkooporders'
+import { maakOntvangstrapport } from '../../lib/ontvangstrapport'
 import Modal from '../../components/Modal'
 import LocatieKiezer from '../../components/LocatieKiezer'
 import { GetalCel } from '../../components/RegelGrid'
+
+function MeerDanOpen({ open, aantallen }) {
+  const teveel = open.filter((r) => {
+    const n = Number(aantallen[r.id]) || 0
+    const rest = Number(r.aantal) - (Number(r.ontvangen) || 0)
+    return n > rest + 1e-9
+  })
+  if (teveel.length === 0) return null
+  if (teveel.length === 1) {
+    const r = teveel[0]
+    const rest = Number(r.aantal) - (Number(r.ontvangen) || 0)
+    return (
+      <div className="banner banner-warning">
+        Let op, er staan er nog {formatNumber(rest, Number.isInteger(rest) ? 0 : 2)} {r.eenheid} open op de inkooporder.
+        Weet u zeker dat u dit aantal wil inboeken?
+      </div>
+    )
+  }
+  return (
+    <div className="banner banner-warning">
+      Let op, bij {teveel.map((r) => r.artikelnummer).join(', ')} staat er meer ingevuld dan er op de inkooporder openstaat.
+      Weet u zeker dat u dit aantal wil inboeken?
+    </div>
+  )
+}
 
 // Ontvangst boeken bij een inkooporder: per regel hoeveel er binnen is (standaard
 // alles wat nog openstaat) en op welke locatie het komt te liggen. Voorstel voor de
@@ -19,6 +45,9 @@ export default function OntvangstVenster({ order, regels, gebruiker, onKlaar }) 
   const [pakbon, setPakbon] = useState('')
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
+  const [meerBevestigen, setMeerBevestigen] = useState(false)
+  const [geboekt, setGeboekt] = useState(false)
+  const resultaatRef = useRef(null)
 
   useEffect(() => {
     standaardLocaties(open.map((r) => r.artikelId))
@@ -38,14 +67,18 @@ export default function OntvangstVenster({ order, regels, gebruiker, onKlaar }) 
   }
 
   async function handleBoeken() {
+    if (geboekt) {
+      onKlaar(resultaatRef.current)
+      return
+    }
     setFout(null)
     const ontvangst = {}
     for (const r of open) {
       const n = Number(aantallen[r.id]) || 0
       if (n <= 0) continue
       const rest = Number(r.aantal) - (Number(r.ontvangen) || 0)
-      if (n > rest) {
-        setFout(`${r.artikelnummer}: er staat nog ${formatNumber(rest, 2)} open; meer ontvangen kan niet.`)
+      if (n > rest + 1e-9 && !meerBevestigen) {
+        setMeerBevestigen(true)
         return
       }
       const locatie = locaties[r.id]
@@ -59,9 +92,27 @@ export default function OntvangstVenster({ order, regels, gebruiker, onKlaar }) 
       }
       ontvangst[r.id] = { aantal: n, locatieId: locatie.id }
     }
+    setMeerBevestigen(false)
     setBezig(true)
     try {
       const resultaat = await boekOntvangst({ inkooporderId: order.id, ontvangst, pakbonLeverancier: pakbon, gebruiker })
+      resultaatRef.current = resultaat
+      setGeboekt(true)
+      const leverancier = [order.leverancierscode, order.leverancierNaam].filter(Boolean).join(' — ')
+      await maakOntvangstrapport(
+        open
+          .filter((r) => ontvangst[r.id])
+          .map((r) => ({
+            artikelnummer: r.artikelnummer,
+            artikelnaam: r.artikelnaam,
+            aantal: ontvangst[r.id].aantal,
+            eenheid: r.eenheid,
+            locatieCode: locaties[r.id]?.code || codes[r.id] || '',
+            ordernummer: order.ordernummer,
+            leverancier,
+          })),
+        gebruiker
+      )
       onKlaar(resultaat)
     } catch (err) {
       setFout(err.message)
@@ -72,6 +123,7 @@ export default function OntvangstVenster({ order, regels, gebruiker, onKlaar }) 
   return (
     <Modal title={`Ontvangst boeken — ${order.ordernummer}`} onClose={bezig ? undefined : () => onKlaar(null)} width={900}>
       {fout && <div className="banner banner-danger">{fout}</div>}
+      {meerBevestigen && <MeerDanOpen open={open} aantallen={aantallen} />}
 
       <div className="field-row">
         <div className="field">
@@ -111,7 +163,10 @@ export default function OntvangstVenster({ order, regels, gebruiker, onKlaar }) 
                     value={aantallen[r.id]}
                     decimalen={0}
                     maxDecimalen={2}
-                    onCommit={(v) => setAantallen((a) => ({ ...a, [r.id]: v === '' ? 0 : v }))}
+                    onCommit={(v) => {
+                      setMeerBevestigen(false)
+                      setAantallen((a) => ({ ...a, [r.id]: v === '' ? 0 : v }))
+                    }}
                   />
                 </td>
                 <td className="alleen-lezen">{r.eenheid}</td>
@@ -138,7 +193,7 @@ export default function OntvangstVenster({ order, regels, gebruiker, onKlaar }) 
           Annuleren
         </button>
         <button type="button" className="btn btn-primary" onClick={handleBoeken} disabled={bezig}>
-          {bezig ? 'Boeken…' : 'Ontvangst boeken'}
+          {bezig ? 'Boeken…' : geboekt ? 'Sluiten' : meerBevestigen ? 'Ja, inboeken' : 'Ontvangst boeken'}
         </button>
       </div>
     </Modal>

@@ -69,13 +69,15 @@ function periodeGrenzen(van, tot) {
   return delen
 }
 
-// Boeking van de pagina "Op voorraad zetten". Nieuwe boekingen hebben bron
-// opvoorraad; eerdere hebben die herkomst nog niet en zijn te herkennen aan de reden.
+// Bijboeking op een locatie: de pagina "Op voorraad zetten", of een ontvangst
+// van een inkooporder. Oudere op-voorraad-boekingen hebben nog geen bron en
+// zijn te herkennen aan de reden.
 export function isOpVoorraadGezet(m) {
   if (m?.bron === 'opvoorraad') return true
   if (m?.type !== 'in') return false
+  if (m?.bron === 'inkooporder') return true
   const reden = m.reden || ''
-  return reden === 'Op voorraad gezet' || /dozen ×/.test(reden) || /zakjes ×/.test(reden)
+  return reden === 'Op voorraad gezet' || /dozen ×/.test(reden) || /zakjes ×/.test(reden) || reden.startsWith('Ontvangst ')
 }
 
 // Die boekingen in een periode, oudste eerst. De periode beperkt de query;

@@ -137,9 +137,14 @@ export default function OpenstaandeInkooporders() {
               : `${formatNumber(gefilterd.length)} openstaande ${gefilterd.length === 1 ? 'regel' : 'regels'} in ${formatNumber(aantalOrders)} ${aantalOrders === 1 ? 'order' : 'orders'}`}
           </div>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setQrOpen(true)}>
-          Goederen ontvangen
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link className="btn btn-secondary" to="/inkooporders/ontvangst/rapporten">
+            PDF rapport
+          </Link>
+          <button type="button" className="btn btn-primary" onClick={() => setQrOpen(true)}>
+            Goederen ontvangen
+          </button>
+        </div>
       </div>
 
       <div className="card">

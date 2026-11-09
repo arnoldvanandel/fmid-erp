@@ -34,6 +34,12 @@ function periodeTekst(van, tot) {
   return 'Kies een periode'
 }
 
+function toelichting(m) {
+  if (m.bron === 'inkooporder') return m.bronNummer || m.reden || '—'
+  if (m.reden && m.reden !== 'Op voorraad gezet') return m.reden
+  return '—'
+}
+
 function toon(n) {
   const x = Number(n)
   if (!Number.isFinite(x)) return '-'
@@ -108,7 +114,7 @@ export default function OpVoorraadRapport() {
             Terug
           </Link>
           <button type="button" className="btn btn-primary" onClick={() => window.print()} disabled={loading}>
-            Afdrukken
+            PDF
           </button>
         </div>
       </div>
@@ -123,7 +129,7 @@ export default function OpVoorraadRapport() {
         </div>
 
         <p className="doc-instructie">
-          Wat er via op voorraad zetten op een locatie is bijgeboekt.
+          Wat er op een locatie is bijgeboekt, via op voorraad zetten of via een ontvangst.
           {mutaties.length > 0
             ? ` ${mutaties.length} ${mutaties.length === 1 ? 'boeking' : 'boekingen'}` +
               (totalen.length
@@ -154,7 +160,7 @@ export default function OpVoorraadRapport() {
                 <th>Locatie</th>
                 <th className="num">Aantal</th>
                 <th>Eenh.</th>
-                <th>Verpakking</th>
+                <th>Order / verpakking</th>
                 <th>Door</th>
               </tr>
             </thead>
@@ -167,7 +173,7 @@ export default function OpVoorraadRapport() {
                   <td className="pick-locatie doc-nowrap">{m.locatieCode || '—'}</td>
                   <td className="num pick-aantal">{toon(m.aantal)}</td>
                   <td className="doc-nowrap">{m.eenheid || ''}</td>
-                  <td>{m.reden && m.reden !== 'Op voorraad gezet' ? m.reden : '—'}</td>
+                  <td>{toelichting(m)}</td>
                   <td>{m.gebruiker || '—'}</td>
                 </tr>
               ))}

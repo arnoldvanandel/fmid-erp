@@ -198,6 +198,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Eén ontvangstrapport per inboeksessie.
+    match /ontvangstrapporten/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
     // Laatste pickrapport per klant: wat er op de telefoon is afgevinkt.
     match /pickrapporten/{docId} {
       allow read: if isActive();

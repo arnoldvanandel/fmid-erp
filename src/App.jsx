@@ -13,6 +13,8 @@ import InkoopordersList from './pages/inkooporders/InkoopordersList'
 import OpenstaandeInkooporders from './pages/inkooporders/OpenstaandeInkooporders'
 import InkooporderAfdruk from './pages/inkooporders/InkooporderAfdruk'
 import OntvangstMobiel from './pages/inkooporders/OntvangstMobiel'
+import OntvangstrapportenList from './pages/inkooporders/OntvangstrapportenList'
+import OntvangstrapportAfdruk from './pages/inkooporders/OntvangstrapportAfdruk'
 import InkoopsjablonenList from './pages/inkooporders/InkoopsjablonenList'
 import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
 import OpenstaandeOrders from './pages/verkooporders/OpenstaandeOrders'
@@ -136,6 +138,24 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <OntvangstMobiel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inkooporders/ontvangst/rapporten"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <OntvangstrapportenList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inkooporders/ontvangst/rapport/:id"
+            element={
+              <ProtectedRoute>
+                <OntvangstrapportAfdruk />
               </ProtectedRoute>
             }
           />
