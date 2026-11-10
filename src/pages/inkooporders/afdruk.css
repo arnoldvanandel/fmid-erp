@@ -606,6 +606,10 @@
 }
 
 @media print {
+  body {
+    background: #fff;
+  }
+
   .afdruk-scherm {
     padding: 0;
     background: #fff;

@@ -1,51 +1,15 @@
-import { createElement } from 'react'
-import { createRoot } from 'react-dom/client'
-import { flushSync } from 'react-dom'
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase'
 import InkooporderDocument from '../pages/inkooporders/InkooporderDocument'
 import { inkooporderEmailadressen, laadInkooporderVoorAfdruk, wijzigInkooporder } from './inkooporders'
 import { maakRtfBase64 } from './inkooporderRtf'
+import { maakDocumentPdfBase64 } from './documentPdf'
 
-// Rendert de A4-pagina buiten beeld en zet 'm om naar een PDF (base64).
-// Zelfde opmaak als de afdrukpagina, dus wat de ontvanger krijgt is precies
-// wat je via "PDF / afdrukken" ziet. `Document` is het component dat de pagina
-// tekent (InkooporderDocument, VerkoopDocument, ...).
-export async function maakPdfBase64(gegevens, Document = InkooporderDocument) {
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
-
-  const container = document.createElement('div')
-  container.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;background:#fff;'
-  document.body.appendChild(container)
-  const root = createRoot(container)
-  try {
-    flushSync(() => root.render(createElement(Document, gegevens)))
-    const pagina = container.querySelector('.afdruk-pagina')
-    await Promise.all(
-      [...pagina.querySelectorAll('img')].map((img) => (img.complete ? null : img.decode().catch(() => null)))
-    )
-    await document.fonts?.ready
-
-    const canvas = await html2canvas(pagina, { scale: 2, backgroundColor: '#ffffff', useCORS: true })
-    const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true })
-    // Langer dan één A4 (veel regels): in stukken van een A4-hoogte over meerdere pagina's.
-    const paginaHoogtePx = Math.round((canvas.width * 297) / 210)
-    const stuk = document.createElement('canvas')
-    stuk.width = canvas.width
-    stuk.height = paginaHoogtePx
-    const ctx = stuk.getContext('2d')
-    for (let y = 0; y < canvas.height - 2; y += paginaHoogtePx) {
-      if (y > 0) pdf.addPage()
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, stuk.width, stuk.height)
-      ctx.drawImage(canvas, 0, -y)
-      pdf.addImage(stuk.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, 210, 297)
-    }
-    return pdf.output('datauristring').split(',')[1]
-  } finally {
-    root.unmount()
-    container.remove()
-  }
+// Zet een document op het briefpapier om naar een PDF (base64), zie
+// lib/documentPdf.js. `Document` is het component dat de pagina tekent
+// (InkooporderDocument, VerkoopDocument, ...).
+export function maakPdfBase64(gegevens, Document = InkooporderDocument) {
+  return maakDocumentPdfBase64(gegevens, Document)
 }
 
 // Standaardhandtekening voor uitgaande mail. Een gebruiker kan een eigen

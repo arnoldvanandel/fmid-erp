@@ -35,5 +35,11 @@ service firebase.storage {
         && request.resource.contentType == 'application/pdf';
       allow delete: if isAdmin();
     }
+
+    // Tekeningen uit Axapta (H:\Drawing\Axapta), geüpload met
+    // scripts/upload-tekeningen.mjs. Alleen lezen vanuit de app.
+    match /tekeningen/{pad=**} {
+      allow read: if isActive();
+    }
   }
 }

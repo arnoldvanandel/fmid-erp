@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { laadInkooporderVoorAfdruk } from '../../lib/inkooporders'
 import InkooporderDocument from './InkooporderDocument'
+import DocumentKnoppen from '../../components/DocumentKnoppen'
 
 // Printbare inkooporder (A4). Opent in een eigen tabblad vanuit het
-// inkooporderformulier; via de printdialoog van de browser sla je 'm op als PDF.
+// inkooporderformulier. "PDF downloaden" en "Afdrukken" gebruiken dezelfde
+// A4-PDF als de mailbijlage (zie lib/documentPdf.js).
 export default function InkooporderAfdruk() {
   const { id } = useParams()
   const [gegevens, setGegevens] = useState(null)
@@ -42,11 +44,7 @@ export default function InkooporderAfdruk() {
 
   return (
     <div className="afdruk-scherm">
-      <div className="afdruk-toolbar">
-        <button className="btn btn-primary" onClick={() => window.print()}>
-          Afdrukken / opslaan als PDF
-        </button>
-      </div>
+      <DocumentKnoppen gegevens={gegevens} Document={InkooporderDocument} bestandsnaam={`Inkooporder ${gegevens.order.ordernummer}`} />
 
       <InkooporderDocument {...gegevens} />
     </div>

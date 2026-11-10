@@ -905,7 +905,7 @@ function DocumentenTab({ artikel }) {
             {tekeningen.map((t) => (
               <tr key={t.pad} style={{ cursor: 'default' }}>
                 <td>
-                  <a href={tekeningHref(t.pad)} target="_blank" rel="noopener noreferrer">
+                  <a href={tekeningHref(t)} target="_blank" rel="noopener noreferrer">
                     {t.bestand || t.naam}
                   </a>
                 </td>

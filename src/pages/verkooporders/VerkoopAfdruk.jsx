@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { laadDocumentVoorAfdruk, laadVerkooporderVoorAfdruk } from '../../lib/verkooporders'
 import { documentTitel } from '../../lib/verkoopMail'
 import VerkoopDocument from './VerkoopDocument'
+import DocumentKnoppen from '../../components/DocumentKnoppen'
 
 // Printbare orderbevestiging, pakbon of factuur (A4), zoals InkooporderAfdruk.
 // `soort` komt uit de route: bevestiging (/verkooporders/:id/afdruk),
@@ -46,11 +47,7 @@ export default function VerkoopAfdruk({ soort }) {
 
   return (
     <div className="afdruk-scherm">
-      <div className="afdruk-toolbar">
-        <button className="btn btn-primary" onClick={() => window.print()}>
-          Afdrukken / opslaan als PDF
-        </button>
-      </div>
+      <DocumentKnoppen gegevens={gegevens} Document={VerkoopDocument} bestandsnaam={documentTitel(gegevens)} />
 
       <VerkoopDocument {...gegevens} />
     </div>
