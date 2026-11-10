@@ -38,10 +38,29 @@ Cron, elke 5 minuten:
 */5 * * * * cd /home/pi/fmid-koppeling && /usr/bin/python3 axapta_sync.py >> /home/pi/fmid-koppeling/sync.log 2>&1
 ```
 
+**Zuinig met Firestore.** Firestore rekent per gelezen document. De sync
+onthoudt daarom in `sync_staat.json` (naast het script, niet in git) wat er in
+Firestore staat. Een gewone run leest alleen de boekingen uit de app sinds de
+vorige run, nieuw aangemaakte artikelen/klanten en, als de open orders in Axapta
+veranderd zijn, de Axapta-orders: meestal een paar reads. Eén keer per week
+(`FMID_VOLLEDIG_DAGEN` in `.env`, standaard 7) leest hij alles opnieuw
+(±22.000 reads), net als met `--volledig`. Dat werkt ook als de sync maar één
+keer per dag draait: dan leest een gewone run de boekingen van die dag en zo
+nodig de orders, samen een paar honderd reads. Breekt een run af, dan is de staat
+weg en is de volgende run volledig. De regel `Modus: …, gelezen uit Firestore: …`
+in `sync.log` laat zien hoeveel er gelezen is.
+
+Zonder Raspberry Pi kan het ook op een Windows-pc of -server in het netwerk:
+Python 3 met `pip install -r requirements.txt pyodbc`, in `.env`
+`AX_SQL_DRIVER=SQL Server`, en in de Taakplanner elke 5 minuten
+`python axapta_sync.py` starten in deze map.
+
 De voorraad komt in `voorraadstanden` (partijen op dezelfde locatie opgeteld).
 Open verkooporders komen in `verkooporders` / `verkooporderregels`, met het
-Axapta-ordernummer. Een wijziging in FMID op die documenten is bij de volgende
-run weer gelijk aan Axapta. Orders die je alleen in FMID aanmaakt (`VO-…`)
+Axapta-ordernummer. Een wijziging in FMID op die documenten wordt weer gelijk
+aan Axapta zodra die order in Axapta verandert, en anders bij de wekelijkse
+volledige run. Voorraad die in FMID geboekt wordt, staat na de volgende run
+weer gelijk aan Axapta. Orders die je alleen in FMID aanmaakt (`VO-…`)
 blijven buiten de sync.
 
 Tekeningen (Axapta-documenttype `Tekening` op het artikel) komen op het

@@ -23,14 +23,27 @@ Proef (leest Axapta, schrijft niets):
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pyodbc
 
 MAP = Path(__file__).resolve().parent
+
+# Lokaal geheugen van de sync (zie lees_staat). Hiermee leest een gewone run
+# alleen wat er sinds de vorige run veranderd is, niet heel Firestore.
+STAAT_PAD = MAP / 'sync_staat.json'
+STAAT_VERSIE = 1
+# Marge bij het ophalen van nieuwe mutaties/artikelen, voor klokverschil.
+MARGE = timedelta(minutes=10)
+ARTIKEL_VELDEN = (
+    'artikelnummer', 'naam', 'eenheid', 'btwGroep', 'tekeningen', 'barcodeDoos',
+    'barcodeZak', 'barcode', 'barcodeCodes', 'stuksPerDoos', 'stuksPerZak', 'zoek',
+)
 EENHEID = {
     'stuks': 'Stuks',
     'stk': 'Stuks',
@@ -83,8 +96,9 @@ def cs_waarde(waarde):
 def verbind():
     # Zelfde stuurprogramma als AantalAcs.py op de Pi. FreeTDS staat daar al
     # goed voor SQL Server 2005; de versie zit in freetds.conf, niet hier.
+    # Op Windows: AX_SQL_DRIVER=SQL Server (of ODBC Driver 17 for SQL Server).
     cs = (
-        'DRIVER={FreeTDS};'
+        f'DRIVER={{{os.environ.get("AX_SQL_DRIVER", "FreeTDS")}}};'
         f'SERVER={vereist("AX_SQL_SERVER")};PORT=1433;'
         f'DATABASE={vereist("AX_SQL_DATABASE")};'
         f'UID={cs_waarde(vereist("AX_SQL_GEBRUIKER"))};'
@@ -97,11 +111,15 @@ def neem_slot():
     try:
         import fcntl
     except ImportError:
-        return None
+        fcntl = None
     slot = open(MAP / 'axapta_sync.lock', 'w', encoding='utf-8')
     try:
-        fcntl.flock(slot, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
+        if fcntl:
+            fcntl.flock(slot, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        else:
+            import msvcrt  # Windows
+            msvcrt.locking(slot.fileno(), msvcrt.LK_NBLCK, 1)
+    except OSError:
         print('Vorige sync loopt nog. Deze run slaat over.')
         raise SystemExit(0)
     return slot
@@ -384,6 +402,7 @@ def schrijf_barcodes(db, barcodes, artikelen):
         if barcodes_gelijk(payload, artikel):
             continue
         batches.set('artikelen', artikel['id'], payload)
+        artikel.update(payload)  # lokale kopie bijhouden
         bijgewerkt += 1
     leeg = {'barcodeDoos': '', 'barcodeZak': '', 'barcode': '', 'barcodeCodes': []}
     for nummer, artikel in artikelen.items():
@@ -392,6 +411,7 @@ def schrijf_barcodes(db, barcodes, artikelen):
         if not (artikel.get('barcodeDoos') or artikel.get('barcodeZak') or artikel.get('barcodeCodes')):
             continue
         batches.set('artikelen', artikel['id'], leeg)
+        artikel.update(leeg)
         gewist += 1
     batches.klaar()
     return {
@@ -420,14 +440,24 @@ def schrijf_tekeningen(db, tekeningen, artikelen):
         if not artikel:
             overgeslagen += 1
             continue
-        if tekeningen_gelijk(lijst, artikel.get('tekeningen')):
+        oud = artikel.get('tekeningen')
+        if tekeningen_gelijk(lijst, oud):
             continue
+        # Link naar de kopie in Firebase Storage (scripts/upload-tekeningen.mjs) bewaren.
+        online = {t.get('pad'): t for t in (oud if isinstance(oud, list) else []) if t.get('url')}
+        lijst = [
+            {**t, 'url': online[t['pad']]['url'], 'storagePath': online[t['pad']].get('storagePath', '')}
+            if t.get('pad') in online else t
+            for t in lijst
+        ]
         batches.set('artikelen', artikel['id'], {'tekeningen': lijst})
+        artikel['tekeningen'] = lijst  # lokale kopie bijhouden
         bijgewerkt += 1
     for nummer, artikel in artikelen.items():
         if nummer in tekeningen or not artikel.get('tekeningen'):
             continue
         batches.wisveld('artikelen', artikel['id'], 'tekeningen')
+        artikel.pop('tekeningen', None)
         gewist += 1
     batches.klaar()
     return {
@@ -637,6 +667,8 @@ class Firestore:
         )
         self._token = None
         self._token_tot = 0
+        self.gelezen = 0  # aantal gelezen documenten (Firestore rekent per document)
+        self.leestijd = None
 
     def _toegang(self):
         import time
@@ -697,31 +729,38 @@ class Firestore:
             for doc in data.get('documents') or []:
                 doc_id = unquote(doc['name'].rsplit('/', 1)[-1])
                 docs[doc_id] = velden_van(doc.get('fields'))
+            self.gelezen += len(data.get('documents') or [])
             token = data.get('nextPageToken')
             if not token:
                 return docs
 
-    def waar(self, collectie, veld, waarde):
+    def vraag_op(self, collectie, veld=None, op='EQUAL', waarde=None, sorteer=None, aflopend=False, aantal=None):
         from urllib.parse import unquote
-        body = {
-            'structuredQuery': {
-                'from': [{'collectionId': collectie}],
-                'where': {
-                    'fieldFilter': {
-                        'field': {'fieldPath': veld},
-                        'op': 'EQUAL',
-                        'value': naar_veld(waarde),
-                    }
-                },
+        query = {'from': [{'collectionId': collectie}]}
+        if veld:
+            query['where'] = {
+                'fieldFilter': {'field': {'fieldPath': veld}, 'op': op, 'value': naar_veld(waarde)}
             }
-        }
+        if sorteer:
+            query['orderBy'] = [{
+                'field': {'fieldPath': sorteer},
+                'direction': 'DESCENDING' if aflopend else 'ASCENDING',
+            }]
+        if aantal:
+            query['limit'] = aantal
         docs = {}
-        for item in self._vraag('POST', f'{self.basis}:runQuery', body):
+        for item in self._vraag('POST', f'{self.basis}:runQuery', {'structuredQuery': query}):
+            if item.get('readTime'):
+                self.leestijd = item['readTime']  # tijd van de server
             doc = item.get('document')
             if not doc:
                 continue
             docs[unquote(doc['name'].rsplit('/', 1)[-1])] = velden_van(doc.get('fields'))
+        self.gelezen += max(1, len(docs))  # een lege query telt als 1
         return docs
+
+    def waar(self, collectie, veld, waarde):
+        return self.vraag_op(collectie, veld, 'EQUAL', waarde)
 
     def bestaat(self, collectie, veld, waarde):
         return bool(self.waar(collectie, veld, waarde))
@@ -791,10 +830,18 @@ class Batches:
             self.writes = []
 
 
-def schrijf_voorraad(db, standen, artikelen, locaties):
+def schrijf_voorraad(db, standen, artikelen, locaties, bestaand=None):
+    """Zet de Axapta-voorraad in `voorraadstanden`.
+
+    `bestaand` is wat er nu in Firestore staat. Zonder `bestaand` wordt het
+    gelezen; anders komt het uit de lokale staat. Na afloop klopt `bestaand`
+    weer met Firestore en kan het bewaard worden.
+    """
     import uuid
 
-    bestaand = db.alle('voorraadstanden')
+    if bestaand is None:
+        bestaand = db.alle('voorraadstanden')
+    nieuw = {}
 
     batches = Batches(db)
     gezien = set()
@@ -826,6 +873,7 @@ def schrijf_voorraad(db, standen, artikelen, locaties):
         if oud and zelfde(payload, oud, ('artikelId', 'artikelnummer', 'locatieId', 'locatieCode', 'aantal', 'bron')):
             continue
         batches.set('voorraadstanden', doc_id, payload)
+        nieuw[doc_id] = {**(oud or {}), **payload}
         voor = getal(oud.get('aantal')) if oud else 0.0
         if voor != aantal:
             batches.set('voorraadmutaties', uuid.uuid4().hex, {
@@ -866,10 +914,17 @@ def schrijf_voorraad(db, standen, artikelen, locaties):
                 'datum': datetime.utcnow(),
             })
         batches.delete('voorraadstanden', doc_id)
+        nieuw[doc_id] = None
         verwijderd += 1
 
     batches.klaar()
+    for doc_id, stand in nieuw.items():
+        if stand is None:
+            bestaand.pop(doc_id, None)
+        else:
+            bestaand[doc_id] = stand
     return {
+        'standen': bestaand,
         'axapta': len(standen),
         'bijgewerkt': bijgewerkt,
         'verwijderd': verwijderd,
@@ -1024,6 +1079,164 @@ def schrijf_orders(db, orders, artikelen, klanten):
     }
 
 
+# ---------------------------------------------------------------------------
+# Lokale staat
+#
+# Firestore rekent per gelezen document. Alles opnieuw lezen kost ±22.000
+# reads per run (vooral de 17.000 artikelen). Daarom onthoudt de sync in
+# sync_staat.json wat er in Firestore staat:
+#   - artikelen, locaties en klanten (alleen de velden die de sync gebruikt)
+#   - de voorraadstanden
+#   - een vingerafdruk van de open orders uit Axapta
+# Een gewone run leest dan alleen:
+#   - voorraadmutaties die de app sinds de vorige run boekte (ontvangst,
+#     pakbon, handmatig), zodat Axapta leidend blijft voor de voorraad
+#   - artikelen en klanten die sindsdien in FMID zijn aangemaakt
+#   - de Axapta-orders in FMID, alleen als de open orders in Axapta veranderd zijn
+# Eén keer per week (FMID_VOLLEDIG_DAGEN in .env, standaard 7) en met
+# --volledig leest de sync alles opnieuw, zoals vroeger. Dat ruimt ook op wat
+# de sync niet ziet, zoals een artikel dat in FMID van naam veranderde.
+# ---------------------------------------------------------------------------
+
+def utc_nu():
+    return datetime.utcnow().replace(microsecond=0)
+
+
+def tijdstip(waarde):
+    """Firestore-tijd ('2026-11-10T14:40:45.123456Z') als naive UTC-datetime."""
+    if isinstance(waarde, datetime):
+        return waarde.replace(tzinfo=None)
+    tekstwaarde = str(waarde or '').strip().rstrip('Z')
+    if len(tekstwaarde) < 19:
+        return None
+    try:
+        basis = datetime.strptime(tekstwaarde[:19], '%Y-%m-%dT%H:%M:%S')
+    except ValueError:
+        return None
+    if tekstwaarde[19:20] == '.':
+        cijfers = ''.join(c for c in tekstwaarde[20:26] if c.isdigit())
+        basis = basis.replace(microsecond=int(cijfers.ljust(6, '0')))
+    return basis
+
+
+def isotijd(moment):
+    return moment.strftime('%Y-%m-%dT%H:%M:%S.%f') if moment else ''
+
+
+def vingerafdruk(data):
+    tekstvorm = json.dumps(data, sort_keys=True, default=str)
+    return hashlib.sha256(tekstvorm.encode('utf-8')).hexdigest()
+
+
+def artikel_kern(artikel):
+    return {'id': artikel['id'], **{v: artikel[v] for v in ARTIKEL_VELDEN if v in artikel}}
+
+
+def lees_staat():
+    try:
+        staat = json.loads(STAAT_PAD.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    return staat if staat.get('versie') == STAAT_VERSIE else None
+
+
+def bewaar_staat(staat):
+    tijdelijk = STAAT_PAD.with_suffix('.tmp')
+    tijdelijk.write_text(json.dumps(staat, default=str), encoding='utf-8')
+    os.replace(tijdelijk, STAAT_PAD)
+
+
+def volledige_run_nodig(staat):
+    if not staat or not staat.get('volledigOp'):
+        return True
+    try:
+        # strptime i.p.v. fromisoformat: dat bestaat pas vanaf Python 3.7.
+        vorige = datetime.strptime(staat['volledigOp'][:19], '%Y-%m-%dT%H:%M:%S')
+    except ValueError:
+        return True
+    try:
+        dagen = float(os.environ.get('FMID_VOLLEDIG_DAGEN') or 7)
+    except ValueError:
+        dagen = 7
+    # 3 uur speling, zodat een dagelijkse cron niet net een dag te laat is.
+    return datetime.now() - vorige >= timedelta(days=dagen) - timedelta(hours=3)
+
+
+def begin_mutaties(db, staat):
+    """Startpunt voor verwerk_app_mutaties: alles tot nu geldt als verwerkt."""
+    laatste = db.vraag_op('voorraadmutaties', sorteer='datum', aflopend=True, aantal=1)
+    tijden = [tijdstip(m.get('datum')) for m in laatste.values()]
+    tot = max([t for t in tijden if t] + [tijdstip(db.leestijd) or utc_nu()])
+    recent = db.vraag_op('voorraadmutaties', 'datum', 'GREATER_THAN_OR_EQUAL', tot - MARGE)
+    staat['mutatiesTot'] = isotijd(tot)
+    staat['mutatieIds'] = sorted(recent)
+
+
+def verwerk_app_mutaties(db, staat, bestaand):
+    """Werk de lokale voorraadstanden bij met wat de app sinds de vorige run boekte.
+
+    Elke boeking in de app (ontvangst, pakbon, handmatig, omboeking) schrijft
+    een voorraadmutatie met `voorraadNa`. Zo weten we de stand zonder alle
+    voorraadstanden te lezen.
+    """
+    vanaf = tijdstip(staat.get('mutatiesTot')) or utc_nu()
+    al_gezien = set(staat.get('mutatieIds') or [])
+    mutaties = db.vraag_op('voorraadmutaties', 'datum', 'GREATER_THAN_OR_EQUAL', vanaf - MARGE)
+    nieuw = []
+    for mutatie_id, m in mutaties.items():
+        moment = tijdstip(m.get('datum'))
+        if not moment or mutatie_id in al_gezien:
+            continue
+        nieuw.append((moment, mutatie_id, m))
+    nieuw.sort(key=lambda x: (x[0], x[1]))
+
+    toegepast = 0
+    for _, _, m in nieuw:
+        if m.get('bron') == 'import':  # door de sync zelf geschreven
+            continue
+        if not m.get('artikelId') or not m.get('locatieId') or m.get('voorraadNa') is None:
+            continue
+        doc_id = f"{m['artikelId']}__{m['locatieId']}"
+        stand = dict(bestaand.get(doc_id) or {
+            'artikelId': m['artikelId'],
+            'artikelnummer': m.get('artikelnummer') or '',
+            'locatieId': m['locatieId'],
+            'locatieCode': m.get('locatieCode') or '',
+        })
+        stand['aantal'] = getal(m['voorraadNa'])
+        bestaand[doc_id] = stand
+        toegepast += 1
+
+    # Alles tot de leestijd van de server is gezien; boekingen van daarna komen
+    # de volgende run. Zo schuift het venster ook op als er niets geboekt wordt.
+    tot = max([moment for moment, _, _ in nieuw] + [vanaf, tijdstip(db.leestijd) or vanaf])
+    staat['mutatiesTot'] = isotijd(tot)
+    staat['mutatieIds'] = sorted(
+        mutatie_id for mutatie_id, m in mutaties.items()
+        if (tijdstip(m.get('datum')) or tot) >= tot - MARGE
+    )
+    return toegepast
+
+
+def nieuwe_in_fmid(db, staat, artikelen, klanten):
+    """Artikelen en klanten die sinds de vorige run in FMID zijn aangemaakt."""
+    vanaf = (tijdstip(staat.get('indexTot')) or utc_nu()) - MARGE
+    gevonden = 0
+    leestijd = None
+    for collectie, index, veld, kern in (
+        ('artikelen', artikelen, 'artikelnummer', artikel_kern),
+        ('klanten', klanten, 'klantcode', lambda k: k),
+    ):
+        for doc_id, data in db.vraag_op(collectie, 'createdAt', 'GREATER_THAN_OR_EQUAL', vanaf).items():
+            sleutel = tekst(data.get(veld)).upper()
+            if sleutel and sleutel not in index:
+                index[sleutel] = kern({'id': doc_id, **data})
+                gevonden += 1
+        leestijd = leestijd or tijdstip(db.leestijd)
+    staat['indexTot'] = isotijd(leestijd or utc_nu())
+    return gevonden
+
+
 def init_firestore():
     return Firestore(vereist('GOOGLE_APPLICATION_CREDENTIALS'))
 
@@ -1069,25 +1282,72 @@ def main():
         return
 
     db = init_firestore()
-    artikelen = index_op(db, 'artikelen', 'artikelnummer')
-    voorraad = schrijf_voorraad(db, standen, artikelen, index_op(db, 'locaties', 'code'))
-    verkoop = schrijf_orders(db, orders, artikelen, index_op(db, 'klanten', 'klantcode'))
+    oude_staat = lees_staat()
+    # Pas na een geslaagde run komt de staat terug. Breekt de run af, dan
+    # leest de volgende run alles opnieuw in plaats van op een oude staat te bouwen.
+    if STAAT_PAD.exists():
+        STAAT_PAD.unlink()
+    volledig = '--volledig' in sys.argv or volledige_run_nodig(oude_staat)
+    orders_afdruk = vingerafdruk(orders)
+
+    if volledig:
+        print('Volledige run: alles uit Firestore lezen.')
+        staat = {'versie': STAAT_VERSIE}
+        # Vóór het lezen van de standen, zodat geen boeking tussen wal en schip valt.
+        begin_mutaties(db, staat)
+        staat['indexTot'] = isotijd(tijdstip(db.leestijd) or utc_nu())
+        artikelen = {
+            sleutel: artikel_kern(a) for sleutel, a in index_op(db, 'artikelen', 'artikelnummer').items()
+        }
+        locaties = {
+            sleutel: {'id': l['id'], 'code': l.get('code') or ''}
+            for sleutel, l in index_op(db, 'locaties', 'code').items()
+        }
+        klanten = index_op(db, 'klanten', 'klantcode')
+        bestaand = None
+        app_mutaties = 0
+        nieuw_in_fmid = 0
+    else:
+        print('Gewone run: alleen wijzigingen sinds de vorige run.')
+        staat = oude_staat
+        artikelen = staat['artikelen']
+        locaties = staat['locaties']
+        klanten = staat['klanten']
+        bestaand = staat['standen']
+        app_mutaties = verwerk_app_mutaties(db, staat, bestaand)
+        nieuw_in_fmid = nieuwe_in_fmid(db, staat, artikelen, klanten)
+
+    voorraad = schrijf_voorraad(db, standen, artikelen, locaties, bestaand)
+    # Orders lezen kost ±450 reads; alleen als Axapta of de klant/artikellijst veranderde.
+    orders_nodig = volledig or nieuw_in_fmid or orders_afdruk != staat.get('ordersAfdruk')
+    if orders_nodig:
+        verkoop = schrijf_orders(db, orders, artikelen, klanten)
     tekening_sync = schrijf_tekeningen(db, tekeningen, artikelen)
     barcode_sync = schrijf_barcodes(db, barcodes, artikelen)
 
-    db.commit([db.schrijfopdracht('axaptaSync', 'fmid', {
+    staat.update({
+        'artikelen': artikelen,
+        'locaties': locaties,
+        'klanten': klanten,
+        'standen': voorraad['standen'],
+        'ordersAfdruk': orders_afdruk,
+    })
+    if volledig:
+        staat['volledigOp'] = datetime.now().replace(microsecond=0).isoformat()
+    bewaar_staat(staat)
+
+    status = {
         'laatsteSync': datetime.utcnow(),
+        'modus': 'volledig' if volledig else 'wijzigingen',
+        'gelezen': db.gelezen,
+        'appMutaties': app_mutaties,
+        'laatsteVolledig': staat.get('volledigOp') or '',
         'dataAreaId': bedrijf,
         'voorraadRegels': voorraad['axapta'],
         'voorraadBijgewerkt': voorraad['bijgewerkt'],
         'voorraadVerwijderd': voorraad['verwijderd'],
         'voorraadOvergeslagen': voorraad['overgeslagenAantal'],
         'voorraadOvergeslagenVoorbeelden': voorraad['overgeslagen'],
-        'openOrders': verkoop['orders'],
-        'orderregels': verkoop['regels'],
-        'ordersBijgewerkt': verkoop['bijgewerkt'],
-        'ordersGesloten': verkoop['gesloten'],
-        'ordersZonderKlant': verkoop['zonderKlant'],
         'tekeningArtikelen': tekening_sync['artikelen'],
         'tekeningenBijgewerkt': tekening_sync['bijgewerkt'],
         'tekeningenGewist': tekening_sync['gewist'],
@@ -1097,19 +1357,32 @@ def main():
         'barcodesGewist': barcode_sync['gewist'],
         'barcodesOvergeslagen': barcode_sync['overgeslagen'],
         'bron': 'axapta',
-    })])
+    }
+    if orders_nodig:
+        status.update({
+            'openOrders': verkoop['orders'],
+            'orderregels': verkoop['regels'],
+            'ordersBijgewerkt': verkoop['bijgewerkt'],
+            'ordersGesloten': verkoop['gesloten'],
+            'ordersZonderKlant': verkoop['zonderKlant'],
+        })
+    db.commit([db.schrijfopdracht('axaptaSync', 'fmid', status)])
 
+    print(f"Modus: {status['modus']}, gelezen uit Firestore: {db.gelezen}, boekingen uit de app: {app_mutaties}")
     print(
         f"Voorraad bijgewerkt: {voorraad['bijgewerkt']}, verwijderd: {voorraad['verwijderd']}, "
         f"overgeslagen: {voorraad['overgeslagenAantal']}"
     )
     if voorraad['overgeslagen']:
         print('Niet gekoppeld:', '; '.join(voorraad['overgeslagen']))
-    print(
-        f"Orders en regels geschreven: {verkoop['bijgewerkt']}, gesloten of verwijderd: {verkoop['gesloten']}"
-    )
-    if verkoop['zonderKlant']:
-        print('Order zonder klant in FMID:', '; '.join(verkoop['zonderKlant']))
+    if not orders_nodig:
+        print('Orders: niets veranderd in Axapta, niet gelezen.')
+    else:
+        print(
+            f"Orders en regels geschreven: {verkoop['bijgewerkt']}, gesloten of verwijderd: {verkoop['gesloten']}"
+        )
+        if verkoop['zonderKlant']:
+            print('Order zonder klant in FMID:', '; '.join(verkoop['zonderKlant']))
     print(
         f"Tekeningen bijgewerkt: {tekening_sync['bijgewerkt']}, "
         f"gewist: {tekening_sync['gewist']}, zonder artikel in FMID: {tekening_sync['overgeslagen']}"
