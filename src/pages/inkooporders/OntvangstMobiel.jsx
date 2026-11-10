@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AantalInput from '../../components/AantalInput'
+import BarcodeCamera, { CameraIcoon } from '../../components/BarcodeCamera'
 import LocatieKiezer from '../../components/LocatieKiezer'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
-import { haalArtikelOpNummer, haalArtikelenOp, zoekArtikelen } from '../../lib/artikelZoeken'
+import { haalArtikelOpBarcode, haalArtikelOpNummer, haalArtikelenOp, zoekArtikelen } from '../../lib/artikelZoeken'
 import { formatNumber } from '../../lib/format'
 import { boekOntvangst } from '../../lib/inkooporders'
 import { zorgLocatie } from '../../lib/locatieZoeken'
@@ -59,6 +60,8 @@ export default function OntvangstMobiel() {
   const [bevestiging, setBevestiging] = useState(null)
   const [gezocht, setGezocht] = useState([])
   const [zoeken, setZoeken] = useState(false)
+  const [camera, setCamera] = useState(false)
+  const [scanBezig, setScanBezig] = useState(false)
   const [sessieId, setSessieId] = useState(leesOpenSessieId)
   const locatieVraag = useRef(0)
 
@@ -408,6 +411,29 @@ export default function OntvangstMobiel() {
     setAantal(gekozen.length ? aantalTekst(som) : '')
   }
 
+  async function kiesOpBarcode(code) {
+    const waarde = String(code || '').trim()
+    if (!waarde) {
+      setFout('Scan of typ een barcode.')
+      return
+    }
+    setScanBezig(true)
+    setFout(null)
+    try {
+      const gevonden = await haalArtikelOpBarcode(waarde)
+      if (!gevonden) {
+        setFout(`Geen artikel met barcode of artikelnummer "${waarde}". Vul de barcode in bij het artikel.`)
+        setLijstOpen(true)
+        return
+      }
+      kiesArtikel(gevonden)
+    } catch (err) {
+      setFout(err.message)
+    } finally {
+      setScanBezig(false)
+    }
+  }
+
   function wijzigTekst(waarde) {
     setTekst(waarde)
     setLijstOpen(true)
@@ -642,6 +668,15 @@ export default function OntvangstMobiel() {
           </div>
         ) : (
           <div className="pick-mobiel-kaart">
+            {!window.isSecureContext && (
+              <div className="banner banner-warning">
+                De camera werkt alleen op het beveiligde adres.{' '}
+                <a href={`https://${window.location.host}${window.location.pathname}${window.location.search}`}>
+                  Open de beveiligde pagina
+                </a>
+                . Bij de waarschuwing: Geavanceerd, daarna Doorgaan.
+              </div>
+            )}
             {melding && <div className="banner banner-info">{melding}</div>}
             {(laadFout || fout) && <div className="banner banner-danger">{laadFout || fout}</div>}
             {sessieId && (
@@ -653,25 +688,42 @@ export default function OntvangstMobiel() {
 
             <div className="field">
               <label htmlFor="ontvangst-artikel">Artikel</label>
-              <input
-                id="ontvangst-artikel"
-                type="text"
-                value={tekst}
-                onChange={(e) => wijzigTekst(e.target.value)}
-                onFocus={() => setLijstOpen(true)}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter') return
-                  e.preventDefault()
-                  if (gekozenArtikel && tekst.trim().toLowerCase() === gekozenLabel.toLowerCase()) {
-                    document.getElementById('ontvangst-aantal')?.focus()
-                    return
-                  }
-                  bevestigTekst()
-                }}
-                placeholder="Typ artikelnummer of naam"
-                autoComplete="off"
-              />
-              <span className="hint">Ook een artikel zonder open inkooporder kan gekozen worden.</span>
+              <div className="artikel-met-scan">
+                <input
+                  id="ontvangst-artikel"
+                  type="text"
+                  value={tekst}
+                  onChange={(e) => wijzigTekst(e.target.value)}
+                  onFocus={() => setLijstOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    if (gekozenArtikel && tekst.trim().toLowerCase() === gekozenLabel.toLowerCase()) {
+                      document.getElementById('ontvangst-aantal')?.focus()
+                      return
+                    }
+                    bevestigTekst()
+                  }}
+                  placeholder="Typ artikelnummer of naam"
+                  autoComplete="off"
+                  disabled={scanBezig}
+                />
+                <button
+                  type="button"
+                  className="artikel-scan-knop"
+                  onClick={() => setCamera(true)}
+                  disabled={bezig || scanBezig}
+                  aria-label="Barcode scannen met de camera"
+                  title="Barcode scannen met de camera"
+                >
+                  <CameraIcoon />
+                </button>
+              </div>
+              <span className="hint">
+                {scanBezig
+                  ? 'Barcode zoeken…'
+                  : 'Ook een artikel zonder open inkooporder kan gekozen worden. Het fototoestel leest de barcode met de camera.'}
+              </span>
               {lijstOpen && (
                 <div className="opv-locaties ontvangst-artikelen">
                   {zoeken && gevondenArtikelen.length === 0 ? (
@@ -865,6 +917,15 @@ export default function OntvangstMobiel() {
             {bezig ? 'Boeken…' : bevestiging === 'geen' ? 'Ja, op voorraad zetten' : bevestiging === 'meer' ? 'Ja, inboeken' : 'Ontvangst boeken'}
           </button>
         </footer>
+      )}
+      {camera && (
+        <BarcodeCamera
+          onCode={(code) => {
+            setCamera(false)
+            kiesOpBarcode(code)
+          }}
+          onSluiten={() => setCamera(false)}
+        />
       )}
     </div>
   )

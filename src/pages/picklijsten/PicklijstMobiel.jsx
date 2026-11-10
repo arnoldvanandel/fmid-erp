@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import BarcodeCamera, { CameraIcoon, cameraBeschikbaar } from '../../components/BarcodeCamera'
 import { useAuth } from '../../contexts/AuthContext'
+import { haalArtikelOpBarcode } from '../../lib/artikelZoeken'
 import { formatNumber } from '../../lib/format'
 import { maakPicklijstPerKlant } from '../../lib/picklijst'
 import { bouwPickrapport, leesPickrapportLokaal, pasPickHoeveelheid, schrijfPickrapportLokaal, slaPickrapportOp } from '../../lib/pickrapport'
@@ -62,6 +64,9 @@ export default function PicklijstMobiel() {
   const [fout, setFout] = useState(null)
   const [rapportFout, setRapportFout] = useState(null)
   const [rapportKlaar, setRapportKlaar] = useState(false)
+  const [camera, setCamera] = useState(false)
+  const [scan, setScan] = useState(null)
+  const scanVraag = useRef(0)
   const inhoudRef = useRef(null)
   const laatstGeklikt = useRef(0)
   const voortgangSleutel = `picklijst-mobiel-${klantId}`
@@ -121,6 +126,8 @@ export default function PicklijstMobiel() {
     const bekend = gepickt[huidigePick.sleutel]
     setInvoer(invoerVan(bekend == null ? huidigePick.aantal : bekend))
     setFout(null)
+    scanVraag.current += 1
+    setScan(null)
     // Alleen bij een andere regel, niet terwijl het aantal wordt ingetypt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [huidigePick?.sleutel])
@@ -157,6 +164,27 @@ export default function PicklijstMobiel() {
     const volgende = Math.min(gevraagd, Math.max(0, basis + delta))
     setInvoer(invoerVan(volgende))
     setFout(null)
+  }
+
+  // Controle of het gescande artikel het artikel van deze regel is; blokkeert het bevestigen niet.
+  async function controleerScan(code) {
+    const regel = huidigePick
+    if (!regel) return
+    const vraag = ++scanVraag.current
+    setScan({ status: 'bezig', code })
+    try {
+      const artikel = await haalArtikelOpBarcode(code)
+      if (vraag !== scanVraag.current) return
+      if (!artikel) {
+        setScan({ status: 'onbekend', code })
+      } else if (artikel.id === regel.artikelId || artikel.artikelnummer === regel.artikelnummer) {
+        setScan({ status: 'goed', code })
+      } else {
+        setScan({ status: 'fout', code, artikelnummer: artikel.artikelnummer })
+      }
+    } catch (err) {
+      if (vraag === scanVraag.current) setScan({ status: 'onbekend', code, melding: err.message })
+    }
   }
 
   function openRapport() {
@@ -229,7 +257,12 @@ export default function PicklijstMobiel() {
             onOpnieuw={opnieuw}
           />
         ) : (
-          <Regel pick={pick} gepicktAantal={ingevuld} />
+          <Regel
+            pick={pick}
+            gepicktAantal={ingevuld}
+            scan={scan}
+            onScan={cameraBeschikbaar() ? () => setCamera(true) : null}
+          />
         )}
       </div>
 
@@ -280,6 +313,16 @@ export default function PicklijstMobiel() {
           </button>
         </footer>
       )}
+
+      {camera && (
+        <BarcodeCamera
+          onCode={(code) => {
+            setCamera(false)
+            controleerScan(code)
+          }}
+          onSluiten={() => setCamera(false)}
+        />
+      )}
     </div>
   )
 }
@@ -311,7 +354,31 @@ function blijftLiggen(pick) {
   return Math.max(0, voorraad - (Number(pick.aantal) || 0))
 }
 
-function Regel({ pick, gepicktAantal }) {
+function ScanUitslag({ scan, pick }) {
+  if (!scan) return null
+  if (scan.status === 'bezig') return <div className="banner banner-info">Barcode {scan.code} opzoeken…</div>
+  if (scan.status === 'goed') {
+    return (
+      <div>
+        <span className="badge badge-success">Juist artikel gescand</span>
+      </div>
+    )
+  }
+  if (scan.status === 'fout') {
+    return (
+      <div className="banner banner-danger">
+        Verkeerd artikel: dit is {scan.artikelnummer}. Pak {pick.artikelnummer}.
+      </div>
+    )
+  }
+  return (
+    <div className="banner banner-warning">
+      {scan.melding || `Geen artikel met barcode ${scan.code} gevonden. Controleer het artikelnummer.`}
+    </div>
+  )
+}
+
+function Regel({ pick, gepicktAantal, scan, onScan }) {
   const orders = (pick.ordernummers || [pick.ordernummer]).filter(Boolean)
   const blijft = blijftLiggen({ ...pick, aantal: gepicktAantal == null ? pick.aantal : gepicktAantal })
   return (
@@ -335,11 +402,26 @@ function Regel({ pick, gepicktAantal }) {
           </div>
         )}
       </div>
-      <div>
-        <div className="pick-mobiel-label">Artikel</div>
-        <div className="pick-mobiel-artikel">{pick.artikelnummer}</div>
-        {pick.artikelnaam ? <div className="pick-mobiel-naam">{pick.artikelnaam}</div> : null}
+      <div className="artikel-met-scan">
+        <div className="pick-mobiel-artikel-blok">
+          <div className="pick-mobiel-label">Artikel</div>
+          <div className="pick-mobiel-artikel">{pick.artikelnummer}</div>
+          {pick.artikelnaam ? <div className="pick-mobiel-naam">{pick.artikelnaam}</div> : null}
+        </div>
+        {onScan && (
+          <button
+            type="button"
+            className="artikel-scan-knop"
+            onClick={onScan}
+            disabled={scan?.status === 'bezig'}
+            aria-label="Artikel controleren met de camera"
+            title="Artikel controleren met de camera"
+          >
+            <CameraIcoon />
+          </button>
+        )}
       </div>
+      <ScanUitslag scan={scan} pick={pick} />
       {pick.vervangt && <div className="banner banner-warning">Pak dit artikel. Wordt omgeboekt naar {pick.vervangt}.</div>}
       {orders.length > 0 && (
         <div className="pick-mobiel-extra">

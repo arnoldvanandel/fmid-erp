@@ -3,7 +3,9 @@ import os from 'os'
 import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import selfsigned from 'selfsigned'
 import pakket from './package.json'
+import { startTelefoonPoort } from './scripts/telefoonPoort.js'
 
 // Alleen tekeningmappen van Axapta. Geen willekeurig pad op de schijf.
 function tekeningToegestaan(pad) {
@@ -42,12 +44,54 @@ function lokaalAdres() {
   )
 }
 
-export default defineConfig({
+// Certificaat met het wifi-adres als IP. Een naam-certificaat wijst de telefoon af.
+async function httpsOpties() {
+  const ip = lokaalAdres()
+  const map = path.join(process.cwd(), 'node_modules', '.vite', 'fmid-ssl')
+  const sleutelPad = path.join(map, 'key.pem')
+  const certPad = path.join(map, 'cert.pem')
+  const stempelPad = path.join(map, 'adres.txt')
+  const merk = `${ip}|blad`
+  const stempel = fs.existsSync(stempelPad) ? fs.readFileSync(stempelPad, 'utf8').trim() : ''
+  if (!fs.existsSync(certPad) || !fs.existsSync(sleutelPad) || stempel !== merk) {
+    fs.mkdirSync(map, { recursive: true })
+    const altNames = [
+      { type: 2, value: 'localhost' },
+      { type: 7, ip: '127.0.0.1' },
+    ]
+    if (ip) altNames.push({ type: 7, ip })
+    const pem = await selfsigned.generate([{ name: 'commonName', value: 'fmid-lokaal' }], {
+      algorithm: 'sha256',
+      keySize: 2048,
+      extensions: [
+        { name: 'basicConstraints', cA: false },
+        {
+          name: 'keyUsage',
+          digitalSignature: true,
+          keyEncipherment: true,
+        },
+        { name: 'extKeyUsage', serverAuth: true },
+        { name: 'subjectAltName', altNames },
+      ],
+    })
+    fs.writeFileSync(sleutelPad, pem.private)
+    fs.writeFileSync(certPad, pem.cert)
+    fs.writeFileSync(stempelPad, merk)
+  }
+  return {
+    key: fs.readFileSync(sleutelPad),
+    cert: fs.readFileSync(certPad),
+  }
+}
+
+export default defineConfig(async () => ({
   plugins: [
     react(),
     {
       name: 'netwerk-adres',
-      configureServer(server) {
+      async configureServer(server) {
+        const https = await httpsOpties()
+        startTelefoonPoort({ key: https.key, cert: https.cert })
         server.middlewares.use('/netwerk-adres', (_req, res) => {
           res.setHeader('Content-Type', 'application/json')
           res.end(JSON.stringify({ host: lokaalAdres() }))
@@ -83,7 +127,10 @@ export default defineConfig({
     __APP_VERSIE__: JSON.stringify(pakket.version),
   },
   server: {
-    port: 5173,
-    host: true,
+    // Alleen op deze pc. De telefoon komt binnen via scripts/telefoonPoort.js op 5173.
+    host: '127.0.0.1',
+    port: 5174,
+    strictPort: true,
+    hmr: { clientPort: 5173 },
   },
-})
+}))

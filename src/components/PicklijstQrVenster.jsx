@@ -22,7 +22,8 @@ function useTelefoonUrl(pad) {
       .then((data) => {
         if (!actief) return
         const host = data?.host
-        setUrl(host ? `http://${host}:${window.location.port}${pad}` : `${window.location.origin}${pad}`)
+        const protocol = window.location.protocol || 'https:'
+        setUrl(host ? `${protocol}//${host}:${window.location.port}${pad}` : `${window.location.origin}${pad}`)
       })
       .catch(() => {
         if (actief) setUrl(`${window.location.origin}${pad}`)

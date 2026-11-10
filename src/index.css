@@ -1641,6 +1641,46 @@ td .picklijst-acties {
   overflow: auto;
 }
 
+.artikel-met-scan {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.artikel-met-scan input {
+  flex: 1;
+  min-width: 0;
+}
+
+.pick-mobiel-artikel-blok {
+  flex: 1;
+  min-width: 0;
+}
+
+.artikel-scan-knop {
+  flex: 0 0 48px;
+  width: 48px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.artikel-scan-knop:hover:not(:disabled) {
+  background: var(--color-primary-tint);
+}
+
+.artikel-scan-knop:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .locatie-tegels {
   display: flex;
   flex-wrap: wrap;
@@ -1749,5 +1789,26 @@ td .picklijst-acties {
   min-height: 0;
   object-fit: cover;
   border-radius: 12px;
-  background: #000;
+  background: #111;
+}
+
+.camera-knoppen {
+  display: flex;
+  gap: 8px;
+}
+
+.camera-knoppen .btn {
+  flex: 1;
+}
+
+.camera-afstand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.camera-afstand input {
+  flex: 1;
+  accent-color: var(--color-primary);
 }

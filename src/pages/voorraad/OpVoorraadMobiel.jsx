@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
 import AantalInput from '../../components/AantalInput'
+import BarcodeCamera, { cameraBeschikbaar } from '../../components/BarcodeCamera'
 import LocatieKiezer from '../../components/LocatieKiezer'
 import { useAuth } from '../../contexts/AuthContext'
 import { haalArtikelOpBarcode, haalArtikelenOp } from '../../lib/artikelZoeken'
@@ -23,10 +24,6 @@ function verpakking(artikel) {
     doos: Number.isFinite(doos) && doos > 0 ? doos : 0,
     zak: Number.isFinite(zak) && zak > 0 ? zak : 0,
   }
-}
-
-function cameraBeschikbaar() {
-  return window.isSecureContext && 'BarcodeDetector' in window && navigator.mediaDevices?.getUserMedia
 }
 
 export default function OpVoorraadMobiel() {
@@ -532,7 +529,7 @@ function KiesArtikel({
             enterKeyHint="search"
           />
           <span className="hint">
-            Een scanner vult dit veld en stuurt enter. De camera werkt alleen op een beveiligd adres (https), niet via het wifi-adres van de QR-code.
+            Een scanner vult dit veld en stuurt enter. De camera op de telefoon werkt via https. Bij een certificaatwaarschuwing: doorgaan.
           </span>
         </div>
         <button type="submit" className="btn btn-secondary" disabled={bezig}>
@@ -572,67 +569,3 @@ function KiesArtikel({
   )
 }
 
-function BarcodeCamera({ onCode, onSluiten }) {
-  const videoRef = useRef(null)
-  const onCodeRef = useRef(onCode)
-  const [fout, setFout] = useState(null)
-  onCodeRef.current = onCode
-
-  useEffect(() => {
-    let stop = false
-    let stream
-    let detector
-    try {
-      detector = new window.BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'code_93', 'codabar', 'itf', 'upc_a', 'upc_e', 'qr_code'],
-      })
-    } catch {
-      setFout('Dit toestel kan geen barcodes met de camera lezen. Gebruik de scanner of typ de code.')
-      return undefined
-    }
-
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
-      .then(async (s) => {
-        stream = s
-        const video = videoRef.current
-        if (!video || stop) return
-        video.srcObject = s
-        await video.play()
-        const tick = async () => {
-          if (stop) return
-          try {
-            const codes = await detector.detect(video)
-            const waarde = codes[0]?.rawValue?.trim()
-            if (waarde) {
-              stop = true
-              stream?.getTracks().forEach((t) => t.stop())
-              onCodeRef.current(waarde)
-              return
-            }
-          } catch {
-            // Volgende beeld.
-          }
-          if (!stop) setTimeout(tick, 250)
-        }
-        setTimeout(tick, 400)
-      })
-      .catch(() => setFout('Camera niet beschikbaar. Gebruik de scanner of typ de barcode.'))
-
-    return () => {
-      stop = true
-      stream?.getTracks().forEach((t) => t.stop())
-    }
-  }, [])
-
-  return (
-    <div className="opv-camera">
-      <video ref={videoRef} muted playsInline />
-      <p>Richt de camera op de barcode.</p>
-      {fout && <div className="banner banner-warning">{fout}</div>}
-      <button type="button" className="btn btn-secondary" onClick={onSluiten}>
-        Sluiten
-      </button>
-    </div>
-  )
-}
