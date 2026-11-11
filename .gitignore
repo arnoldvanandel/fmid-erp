@@ -19,5 +19,5 @@ migratie/*.json
 # Sleutel en slot van de Axapta-sync op de Raspberry Pi
 firebase-sleutel.json
 koppeling/axapta_sync.lock
-koppeling/sync_staat.json
-koppeling/sync_staat.tmp
+koppeling/sync-staat.json
+koppeling/sync-staat.json.tmp

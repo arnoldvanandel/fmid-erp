@@ -8,14 +8,16 @@ Axapta blijft leidend. Het script zet:
   - streepjescodes van doos en zak op het artikel (`barcodeDoos`, `barcodeZak`)
 
 Orders die alleen in FMID bestaan (VO-…) worden niet aangeraakt.
-Een order of stand die uit Axapta komt krijgt bron 'axapta' en wordt bij
-de volgende run overschreven. Verdwijnt de voorraad of is de order niet
-meer open, dan verdwijnt de Axapta-kopie weer uit FMID.
+Een order of stand die uit Axapta komt krijgt bron 'axapta'. Een order die
+niet meer open is blijft staan met de eindstand uit Axapta (geleverd,
+gefactureerd of geannuleerd); voorraad die weg is wordt verwijderd.
 
-Draaien op de Raspberry Pi (elke 5 minuten), vanuit de map met dit bestand
-en een ingevuld .env:
+De sync leest niet uit Firestore om te vergelijken. Wat de vorige keer is
+weggeschreven staat in sync-staat.json (een hash per order en regel, het
+aantal per voorraadstand). Alleen verschillen gaan naar Firestore.
 
-    */5 * * * * cd /home/pi/fmid-koppeling && /usr/bin/python3 axapta_sync.py >> sync.log 2>&1
+Cron op de Raspberry Pi: overdag elke 5 minuten, 's nachts en in het
+weekend minder vaak, en één keer per nacht --volledig. Zie README.md.
 
 Proef (leest Axapta, schrijft niets):
 
@@ -27,23 +29,13 @@ import hashlib
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import pyodbc
 
 MAP = Path(__file__).resolve().parent
-
-# Lokaal geheugen van de sync (zie lees_staat). Hiermee leest een gewone run
-# alleen wat er sinds de vorige run veranderd is, niet heel Firestore.
-STAAT_PAD = MAP / 'sync_staat.json'
-STAAT_VERSIE = 1
-# Marge bij het ophalen van nieuwe mutaties/artikelen, voor klokverschil.
-MARGE = timedelta(minutes=10)
-ARTIKEL_VELDEN = (
-    'artikelnummer', 'naam', 'eenheid', 'btwGroep', 'tekeningen', 'barcodeDoos',
-    'barcodeZak', 'barcode', 'barcodeCodes', 'stuksPerDoos', 'stuksPerZak', 'zoek',
-)
+STAAT_PAD = MAP / 'sync-staat.json'
 EENHEID = {
     'stuks': 'Stuks',
     'stk': 'Stuks',
@@ -55,8 +47,9 @@ EENHEID = {
     'doos': 'Doos',
 }
 
-# Kopvelden die we vergelijken. `datum` blijft staan na het aanmaken,
-# anders verspringt de sortering in het orderoverzicht bij elke run.
+# Velden waar Axapta eigenaar van is. Na het aanmaken schrijft de sync alleen
+# deze velden (updateMask); wat FMID zelf invult (opmerkingen, verkoper,
+# contactpersoon, adreskeuze, klantartikelnummer, datum) blijft staan.
 ORDER_VELDEN = (
     'ordernummer', 'klantId', 'klantcode', 'klantNaam', 'status', 'orderdatum',
     'gewensteLeverdatum', 'referentie', 'leveringsvoorwaarde', 'leveringswijze',
@@ -402,7 +395,7 @@ def schrijf_barcodes(db, barcodes, artikelen):
         if barcodes_gelijk(payload, artikel):
             continue
         batches.set('artikelen', artikel['id'], payload)
-        artikel.update(payload)  # lokale kopie bijhouden
+        artikel.update(payload)
         bijgewerkt += 1
     leeg = {'barcodeDoos': '', 'barcodeZak': '', 'barcode': '', 'barcodeCodes': []}
     for nummer, artikel in artikelen.items():
@@ -451,13 +444,13 @@ def schrijf_tekeningen(db, tekeningen, artikelen):
             for t in lijst
         ]
         batches.set('artikelen', artikel['id'], {'tekeningen': lijst})
-        artikel['tekeningen'] = lijst  # lokale kopie bijhouden
+        artikel['tekeningen'] = lijst
         bijgewerkt += 1
     for nummer, artikel in artikelen.items():
         if nummer in tekeningen or not artikel.get('tekeningen'):
             continue
         batches.wisveld('artikelen', artikel['id'], 'tekeningen')
-        artikel.pop('tekeningen', None)
+        artikel['tekeningen'] = []
         gewist += 1
     batches.klaar()
     return {
@@ -537,13 +530,9 @@ def sql_waarde(alias, kolommen, kandidaten, uitvoer):
     return f'{alias}.{kolom} AS {uitvoer}'
 
 
-def lees_open_orders(conn, bedrijf):
-    """Alle regels van verkooporders die nog een te leveren restant hebben.
-
-    SALESTYPE 3 is een verkooporder (geen offerte, journaal of retour).
-    Axapta 3.0 heeft geen CREATEDDATETIME; de datumkolom wordt gekozen
-    uit de kolommen die in deze database echt bestaan.
-    """
+def orderkolommen(conn):
+    """Axapta 3.0 heeft geen CREATEDDATETIME; de datumkolom wordt gekozen
+    uit de kolommen die in deze database echt bestaan."""
     kop = tabelkolommen(conn, 'SALESTABLE')
     regel = tabelkolommen(conn, 'SALESLINE')
     if 'SALESID' not in kop or 'SALESID' not in regel:
@@ -552,6 +541,54 @@ def lees_open_orders(conn, bedrijf):
         'Orderdatum-kolom:',
         eerste_kolom(kop, 'CREATEDDATETIME', 'CREATEDDATE') or '(geen)',
     )
+    return kop, regel
+
+
+def lees_open_orders(conn, bedrijf, kolommen):
+    """Alle regels van verkooporders die nog een te leveren restant hebben.
+
+    SALESTYPE 3 is een verkooporder (geen offerte, journaal of retour).
+    """
+    return lees_orders(
+        conn,
+        kolommen,
+        """
+          AND s.SALESTYPE = 3
+          AND s.SALESSTATUS < 4
+          AND EXISTS (
+            SELECT 1
+            FROM SALESLINE openregel
+            WHERE openregel.SALESID = s.SALESID
+              AND openregel.DATAAREAID = s.DATAAREAID
+              AND openregel.REMAINSALESPHYSICAL > 0
+          )
+        """,
+        (bedrijf,),
+    )
+
+
+def lees_orders_op_nummer(conn, bedrijf, kolommen, nummers):
+    """Eindstand van orders die uit de open lijst zijn verdwenen.
+
+    Zo weet de sync of een order geleverd, gefactureerd of geannuleerd is
+    zonder iets uit Firestore te lezen.
+    """
+    orders = {}
+    nummers = sorted(set(nummers))
+    for i in range(0, len(nummers), 50):
+        deel = nummers[i:i + 50]
+        plekken = ', '.join('?' for _ in deel)
+        orders.update(lees_orders(
+            conn,
+            kolommen,
+            f'AND LTRIM(RTRIM(s.SALESID)) IN ({plekken})',
+            (bedrijf, *deel),
+        ))
+    return orders
+
+
+def lees_orders(conn, kolommen, filter_sql, params):
+    kop, regel = kolommen
     cursor = conn.cursor()
     cursor.execute(
         f"""
@@ -588,18 +625,10 @@ def lees_open_orders(conn, bedrijf):
           ON s.SALESID = l.SALESID
          AND s.DATAAREAID = l.DATAAREAID
         WHERE LTRIM(RTRIM(s.DATAAREAID)) = ?
-          AND s.SALESTYPE = 3
-          AND s.SALESSTATUS < 4
-          AND EXISTS (
-            SELECT 1
-            FROM SALESLINE openregel
-            WHERE openregel.SALESID = s.SALESID
-              AND openregel.DATAAREAID = s.DATAAREAID
-              AND openregel.REMAINSALESPHYSICAL > 0
-          )
+        {filter_sql}
         ORDER BY s.SALESID, l.LINENUM
         """,
-        (bedrijf,),
+        params,
     )
     orders = {}
     for rij in rijen(cursor):
@@ -668,7 +697,6 @@ class Firestore:
         self._token = None
         self._token_tot = 0
         self.gelezen = 0  # aantal gelezen documenten (Firestore rekent per document)
-        self.leestijd = None
 
     def _toegang(self):
         import time
@@ -717,12 +745,14 @@ class Firestore:
     def documentnaam(self, collectie, doc_id):
         return f'projects/{self.project}/databases/(default)/documents/{collectie}/{doc_id}'
 
-    def alle(self, collectie):
+    def alle(self, collectie, velden=None):
         from urllib.parse import unquote
         docs = {}
         token = None
         while True:
             params = {'pageSize': 300}
+            if velden:
+                params['mask.fieldPaths'] = list(velden)
             if token:
                 params['pageToken'] = token
             data = self._vraag('GET', f'{self.basis}/{collectie}', params=params)
@@ -734,36 +764,28 @@ class Firestore:
             if not token:
                 return docs
 
-    def vraag_op(self, collectie, veld=None, op='EQUAL', waarde=None, sorteer=None, aflopend=False, aantal=None):
+    def waar(self, collectie, veld, waarde):
         from urllib.parse import unquote
-        query = {'from': [{'collectionId': collectie}]}
-        if veld:
-            query['where'] = {
-                'fieldFilter': {'field': {'fieldPath': veld}, 'op': op, 'value': naar_veld(waarde)}
+        body = {
+            'structuredQuery': {
+                'from': [{'collectionId': collectie}],
+                'where': {
+                    'fieldFilter': {
+                        'field': {'fieldPath': veld},
+                        'op': 'EQUAL',
+                        'value': naar_veld(waarde),
+                    }
+                },
             }
-        if sorteer:
-            query['orderBy'] = [{
-                'field': {'fieldPath': sorteer},
-                'direction': 'DESCENDING' if aflopend else 'ASCENDING',
-            }]
-        if aantal:
-            query['limit'] = aantal
+        }
         docs = {}
-        for item in self._vraag('POST', f'{self.basis}:runQuery', {'structuredQuery': query}):
-            if item.get('readTime'):
-                self.leestijd = item['readTime']  # tijd van de server
+        for item in self._vraag('POST', f'{self.basis}:runQuery', body):
             doc = item.get('document')
             if not doc:
                 continue
             docs[unquote(doc['name'].rsplit('/', 1)[-1])] = velden_van(doc.get('fields'))
         self.gelezen += max(1, len(docs))  # een lege query telt als 1
         return docs
-
-    def waar(self, collectie, veld, waarde):
-        return self.vraag_op(collectie, veld, 'EQUAL', waarde)
-
-    def bestaat(self, collectie, veld, waarde):
-        return bool(self.waar(collectie, veld, waarde))
 
     def commit(self, writes):
         for i in range(0, len(writes), 400):
@@ -789,17 +811,122 @@ class Firestore:
         }
 
 
-def index_op(db, collectie, veld):
+def laad_staat():
+    if not STAAT_PAD.exists():
+        return {}
+    try:
+        return json.loads(STAAT_PAD.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def bewaar_staat(staat):
+    tijdelijk = STAAT_PAD.with_suffix('.json.tmp')
+    tijdelijk.write_text(json.dumps(staat, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    os.replace(tijdelijk, STAAT_PAD)
+
+
+def nu_utc():
+    return datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+def canon(waarde):
+    if isinstance(waarde, bool) or waarde is None:
+        return waarde
+    if isinstance(waarde, float):
+        afgerond = round(waarde, 4)
+        if afgerond == int(afgerond):
+            return int(afgerond)
+        return afgerond
+    if isinstance(waarde, dict):
+        return {sleutel: canon(waarde[sleutel]) for sleutel in sorted(waarde)}
+    if isinstance(waarde, list):
+        return [canon(item) for item in waarde]
+    return waarde
+
+
+def vingerafdruk(data, velden):
+    ruw = json.dumps(canon({veld: data.get(veld) for veld in velden}), ensure_ascii=False, separators=(',', ':'))
+    return hashlib.sha1(ruw.encode('utf-8')).hexdigest()[:16]
+
+
+def alleen(data, velden):
+    return {veld: data[veld] for veld in velden if veld in data}
+
+
+ARTIKEL_KERN_VELDEN = (
+    'artikelnummer', 'naam', 'eenheid', 'btwGroep', 'barcodeDoos', 'barcodeZak',
+    'barcode', 'barcodeCodes', 'stuksPerDoos', 'stuksPerZak', 'zoek', 'tekeningen',
+)
+LOCATIE_KERN_VELDEN = ('code',)
+KLANT_KERN_VELDEN = (
+    'klantcode', 'naam', 'straat', 'postcode', 'plaats', 'land', 'contactpersoon',
+    'btwGroep', 'btwNummer', 'betalingstermijn', 'taal',
+)
+
+
+def artikel_kern(doc_id, data):
+    return {
+        'id': doc_id,
+        'artikelnummer': data.get('artikelnummer') or '',
+        'naam': data.get('naam') or '',
+        'eenheid': data.get('eenheid') or '',
+        'btwGroep': data.get('btwGroep') or '',
+        'barcodeDoos': data.get('barcodeDoos') or '',
+        'barcodeZak': data.get('barcodeZak') or '',
+        'barcode': data.get('barcode') or '',
+        'barcodeCodes': list(data.get('barcodeCodes') or []),
+        'stuksPerDoos': data.get('stuksPerDoos'),
+        'stuksPerZak': data.get('stuksPerZak'),
+        'zoek': list(data.get('zoek') or []),
+        'tekeningen': data.get('tekeningen') or [],
+    }
+
+
+def locatie_kern(doc_id, data):
+    return {'id': doc_id, 'code': data.get('code') or ''}
+
+
+def klant_kern(doc_id, data):
+    return {
+        'id': doc_id,
+        'naam': data.get('naam') or '',
+        'straat': data.get('straat') or '',
+        'postcode': data.get('postcode') or '',
+        'plaats': data.get('plaats') or '',
+        'land': data.get('land') or '',
+        'contactpersoon': data.get('contactpersoon') or '',
+        'btwGroep': data.get('btwGroep') or '',
+        'btwNummer': data.get('btwNummer') or '',
+        'betalingstermijn': data.get('betalingstermijn'),
+        'taal': data.get('taal') or '',
+    }
+
+
+def index_kern(db, collectie, veld, kern, velden):
     index = {}
-    for doc_id, data in db.alle(collectie).items():
+    for doc_id, data in db.alle(collectie, velden).items():
         sleutel = tekst(data.get(veld)).upper()
         if sleutel and sleutel not in index:
-            index[sleutel] = {'id': doc_id, **data}
+            index[sleutel] = kern(doc_id, data)
     return index
 
 
-def zelfde(nieuw, oud, velden):
-    return all(nieuw.get(veld) == oud.get(veld) for veld in velden)
+def zaai_voorraad(db):
+    spiegel = {}
+    for doc_id, data in db.alle('voorraadstanden').items():
+        if data.get('bron') != 'axapta':
+            continue
+        sleutel = f"{tekst(data.get('artikelnummer')).upper()}|{tekst(data.get('locatieCode')).upper()}"
+        spiegel[sleutel] = {
+            'docId': doc_id,
+            'aantal': getal(data.get('aantal')),
+            'artikelId': data.get('artikelId') or '',
+            'artikelnummer': data.get('artikelnummer') or '',
+            'locatieId': data.get('locatieId') or '',
+            'locatieCode': data.get('locatieCode') or '',
+        }
+    return spiegel
 
 
 class Batches:
@@ -830,21 +957,11 @@ class Batches:
             self.writes = []
 
 
-def schrijf_voorraad(db, standen, artikelen, locaties, bestaand=None):
-    """Zet de Axapta-voorraad in `voorraadstanden`.
-
-    `bestaand` is wat er nu in Firestore staat. Zonder `bestaand` wordt het
-    gelezen; anders komt het uit de lokale staat. Na afloop klopt `bestaand`
-    weer met Firestore en kan het bewaard worden.
-    """
+def schrijf_voorraad(db, standen, artikelen, locaties, spiegel, volledig=False):
     import uuid
 
-    if bestaand is None:
-        bestaand = db.alle('voorraadstanden')
-    nieuw = {}
-
     batches = Batches(db)
-    gezien = set()
+    nieuw = {}
     overgeslagen = []
     overgeslagen_aantal = 0
     bijgewerkt = 0
@@ -860,7 +977,7 @@ def schrijf_voorraad(db, standen, artikelen, locaties, bestaand=None):
                 overgeslagen.append(f'{artikelnummer} @ {locatiecode} ({ontbreekt} niet in FMID)')
             continue
         doc_id = f'{artikel["id"]}__{locatie["id"]}'
-        gezien.add(doc_id)
+        sleutel = f'{artikelnummer}|{locatiecode}'
         payload = {
             'artikelId': artikel['id'],
             'artikelnummer': artikel.get('artikelnummer') or artikelnummer,
@@ -869,11 +986,19 @@ def schrijf_voorraad(db, standen, artikelen, locaties, bestaand=None):
             'aantal': aantal,
             'bron': 'axapta',
         }
-        oud = bestaand.get(doc_id)
-        if oud and zelfde(payload, oud, ('artikelId', 'artikelnummer', 'locatieId', 'locatieCode', 'aantal', 'bron')):
+        vast = {
+            'docId': doc_id,
+            'aantal': aantal,
+            'artikelId': payload['artikelId'],
+            'artikelnummer': payload['artikelnummer'],
+            'locatieId': payload['locatieId'],
+            'locatieCode': payload['locatieCode'],
+        }
+        oud = spiegel.get(sleutel)
+        nieuw[sleutel] = vast
+        if not volledig and oud and oud.get('docId') == doc_id and getal(oud.get('aantal')) == aantal:
             continue
         batches.set('voorraadstanden', doc_id, payload)
-        nieuw[doc_id] = {**(oud or {}), **payload}
         voor = getal(oud.get('aantal')) if oud else 0.0
         if voor != aantal:
             batches.set('voorraadmutaties', uuid.uuid4().hex, {
@@ -893,8 +1018,8 @@ def schrijf_voorraad(db, standen, artikelen, locaties, bestaand=None):
             })
         bijgewerkt += 1
 
-    for doc_id, oud in bestaand.items():
-        if doc_id in gezien or oud.get('bron') != 'axapta':
+    for sleutel, oud in spiegel.items():
+        if sleutel in nieuw:
             continue
         voor = getal(oud.get('aantal'))
         if voor != 0 and oud.get('artikelId'):
@@ -913,18 +1038,14 @@ def schrijf_voorraad(db, standen, artikelen, locaties, bestaand=None):
                 'gebruiker': 'Axapta',
                 'datum': datetime.utcnow(),
             })
-        batches.delete('voorraadstanden', doc_id)
-        nieuw[doc_id] = None
+        if oud.get('docId'):
+            batches.delete('voorraadstanden', oud['docId'])
         verwijderd += 1
 
     batches.klaar()
-    for doc_id, stand in nieuw.items():
-        if stand is None:
-            bestaand.pop(doc_id, None)
-        else:
-            bestaand[doc_id] = stand
+    spiegel.clear()
+    spiegel.update(nieuw)
     return {
-        'standen': bestaand,
         'axapta': len(standen),
         'bijgewerkt': bijgewerkt,
         'verwijderd': verwijderd,
@@ -936,12 +1057,13 @@ def schrijf_voorraad(db, standen, artikelen, locaties, bestaand=None):
 def order_payload(kop, regels, klant):
     besteld_geleverd = any(getal(r['besteld']) - getal(r['teLeveren']) > 0 for r in regels)
     nog_open = any(getal(r['teLeveren']) > 0 for r in regels)
-    if int(kop['axaptaStatus'] or 0) == 4:
+    axapta_status = geheel(kop['axaptaStatus'], 0)
+    if axapta_status == 4:
         status = 'geannuleerd'
     elif besteld_geleverd and nog_open:
         status = 'deels geleverd'
     elif not nog_open:
-        status = 'geleverd'
+        status = 'gefactureerd' if axapta_status == 3 else 'geleverd'
     else:
         status = 'bevestigd'
 
@@ -977,7 +1099,7 @@ def order_payload(kop, regels, klant):
         'aangemaaktDoor': 'Axapta',
         'bron': 'axapta',
         'axaptaSalesId': tekst(kop['ordernummer']),
-        'axaptaGesloten': False,
+        'axaptaGesloten': axapta_status == 4 or not nog_open,
         'datum': kop['orderdatum'] if isinstance(kop['orderdatum'], datetime) and kop['orderdatum'].year >= 1950 else datetime.utcnow(),
     }
 
@@ -1003,238 +1125,133 @@ def regel_payload(order_id, rij, artikel):
     }
 
 
-def heeft_documenten(db, order_id):
-    for collectie in ('pakbonnen', 'facturen'):
-        if db.bestaat(collectie, 'verkooporderId', order_id):
-            return True
-    return False
+def order_doc_id(nummer):
+    return 'ax__' + nummer.replace('/', '_').replace('\\', '_')
 
 
-def schrijf_orders(db, orders, artikelen, klanten):
+def te_sluiten(spiegel, open_nummers):
+    """Orders die de vorige run nog open waren en nu niet meer in de open lijst staan."""
+    open_ids = {order_doc_id(n) for n in open_nummers}
+    gesloten = set(spiegel.get('gesloten') or [])
+    nummers = spiegel.get('nummers') or {}
+    uit = {}
+    for order_id in spiegel.get('afdruk') or {}:
+        if order_id in open_ids or order_id in gesloten:
+            continue
+        uit[order_id] = nummers.get(order_id) or order_id[len('ax__'):]
+    return uit
+
+
+def zaai_orders(db):
     bestaand = db.waar('verkooporders', 'bron', 'axapta')
-    regels_nu = {}
+    regels = {}
+    per_order = {}
     for doc_id, data in db.waar('verkooporderregels', 'bron', 'axapta').items():
-        regels_nu.setdefault(data.get('verkooporderId'), {})[doc_id] = data
+        order_id = data.get('verkooporderId') or ''
+        regels[doc_id] = vingerafdruk(data, REGEL_VELDEN)
+        per_order.setdefault(order_id, []).append(doc_id)
+    return {
+        'afdruk': {order_id: vingerafdruk(data, ORDER_VELDEN) for order_id, data in bestaand.items()},
+        'regels': regels,
+        'perOrder': per_order,
+        'gesloten': [order_id for order_id, data in bestaand.items() if data.get('axaptaGesloten')],
+    }
 
+
+def schrijf_een_order(batches, nummer, order, artikelen, klanten, spiegel, volledig):
+    """Schrijft kop en regels van één order. Geeft het aantal writes terug.
+
+    Een nieuw document krijgt alle velden; een bestaand alleen de
+    Axapta-velden, en alleen als de hash afwijkt (of bij een volledige run).
+    """
+    afdrukken = spiegel.setdefault('afdruk', {})
+    regel_afdruk = spiegel.setdefault('regels', {})
+    per_order = spiegel.setdefault('perOrder', {})
+    order_id = order_doc_id(nummer)
+    spiegel.setdefault('nummers', {})[order_id] = nummer
+    writes = 0
+
+    kop = order['kop']
+    klant = klanten.get(tekst(kop['klantcode']).upper())
+    payload = order_payload(kop, order['regels'], klant)
+    afdruk = vingerafdruk(payload, ORDER_VELDEN)
+    bekend = order_id in afdrukken
+    if not bekend:
+        batches.set('verkooporders', order_id, payload)
+        writes += 1
+    elif volledig or afdrukken[order_id] != afdruk:
+        batches.set('verkooporders', order_id, alleen(payload, ORDER_VELDEN))
+        writes += 1
+    afdrukken[order_id] = afdruk
+
+    gezien = set()
+    for rij in order['regels']:
+        artikel = artikelen.get(tekst(rij['artikelnummer']).upper())
+        regel_id = regel_doc_id(nummer, rij['regelnummer'])
+        gezien.add(regel_id)
+        regel = regel_payload(order_id, rij, artikel)
+        regel_af = vingerafdruk(regel, REGEL_VELDEN)
+        if regel_id not in regel_afdruk:
+            batches.set('verkooporderregels', regel_id, regel)
+            writes += 1
+        elif volledig or regel_afdruk[regel_id] != regel_af:
+            batches.set('verkooporderregels', regel_id, alleen(regel, REGEL_VELDEN))
+            writes += 1
+        regel_afdruk[regel_id] = regel_af
+    for regel_id in per_order.get(order_id, []):
+        if regel_id not in gezien:
+            batches.delete('verkooporderregels', regel_id)
+            regel_afdruk.pop(regel_id, None)
+            writes += 1
+    per_order[order_id] = sorted(gezien)
+    return writes
+
+
+def schrijf_orders(db, orders, eindstand, sluiten, artikelen, klanten, spiegel, volledig=False):
+    """`orders`: open orders uit Axapta. `sluiten`: order-id's die niet meer
+    open zijn, `eindstand` hun laatste stand uit Axapta. Leest niets uit Firestore."""
+    gesloten = set(spiegel.get('gesloten') or [])
     batches = Batches(db)
-    open_ids = set()
     bijgewerkt = 0
     zonder_klant = []
 
     for nummer, order in orders.items():
-        kop = order['kop']
-        klant = klanten.get(tekst(kop['klantcode']).upper())
+        klant = klanten.get(tekst(order['kop']['klantcode']).upper())
         if not klant and len(zonder_klant) < 20:
-            zonder_klant.append(f'{nummer} klant {tekst(kop["klantcode"])}')
-        order_id = 'ax__' + nummer.replace('/', '_').replace('\\', '_')
-        open_ids.add(order_id)
-        payload = order_payload(kop, order['regels'], klant)
-        oud = bestaand.get(order_id)
-        if not (oud and zelfde(payload, oud, ORDER_VELDEN)):
-            # datum alleen bij de eerste keer, zodat een update de sortering niet verplaatst
-            schrijven = dict(payload)
-            if oud:
-                schrijven.pop('datum', None)
-            batches.set('verkooporders', order_id, schrijven)
-            bijgewerkt += 1
+            zonder_klant.append(f'{nummer} klant {tekst(order["kop"]["klantcode"])}')
+        gesloten.discard(order_doc_id(nummer))
+        bijgewerkt += schrijf_een_order(batches, nummer, order, artikelen, klanten, spiegel, volledig)
 
-        gezien = set()
-        for rij in order['regels']:
-            artikel = artikelen.get(tekst(rij['artikelnummer']).upper())
-            regel_id = regel_doc_id(nummer, rij['regelnummer'])
-            gezien.add(regel_id)
-            regel = regel_payload(order_id, rij, artikel)
-            oud_regel = regels_nu.get(order_id, {}).get(regel_id)
-            if not (oud_regel and zelfde(regel, oud_regel, REGEL_VELDEN)):
-                batches.set('verkooporderregels', regel_id, regel)
-                bijgewerkt += 1
-        for regel_id in regels_nu.get(order_id, {}):
-            if regel_id not in gezien:
-                batches.delete('verkooporderregels', regel_id)
-
-    gesloten = 0
-    for order_id, oud in bestaand.items():
-        if order_id in open_ids or oud.get('axaptaGesloten'):
-            continue
-        if heeft_documenten(db, order_id):
+    # Afgesloten orders blijven in FMID staan (pakbonnen en facturen kunnen
+    # ernaar verwijzen) met de eindstand uit Axapta. Niet meer elke run vergelijken.
+    regel_afdruk = spiegel.setdefault('regels', {})
+    per_order = spiegel.setdefault('perOrder', {})
+    gesloten_nu = 0
+    for order_id, nummer in sluiten.items():
+        order = eindstand.get(nummer)
+        if order:
+            bijgewerkt += schrijf_een_order(batches, nummer, order, artikelen, klanten, spiegel, True)
+        else:
             batches.set('verkooporders', order_id, {
-                'status': 'geleverd',
+                'status': 'geannuleerd',
                 'axaptaGesloten': True,
                 'bron': 'axapta',
             })
-            gesloten += 1
-            continue
-        for regel_id in regels_nu.get(order_id, {}):
-            batches.delete('verkooporderregels', regel_id)
-        batches.delete('verkooporders', order_id)
-        gesloten += 1
+            bijgewerkt += 1
+        for regel_id in per_order.pop(order_id, []):
+            regel_afdruk.pop(regel_id, None)
+        gesloten.add(order_id)
+        gesloten_nu += 1
 
     batches.klaar()
+    spiegel['gesloten'] = sorted(gesloten)
     return {
         'orders': len(orders),
         'regels': sum(len(o['regels']) for o in orders.values()),
         'bijgewerkt': bijgewerkt,
-        'gesloten': gesloten,
+        'gesloten': gesloten_nu,
         'zonderKlant': zonder_klant,
     }
-
-
-# ---------------------------------------------------------------------------
-# Lokale staat
-#
-# Firestore rekent per gelezen document. Alles opnieuw lezen kost ±22.000
-# reads per run (vooral de 17.000 artikelen). Daarom onthoudt de sync in
-# sync_staat.json wat er in Firestore staat:
-#   - artikelen, locaties en klanten (alleen de velden die de sync gebruikt)
-#   - de voorraadstanden
-#   - een vingerafdruk van de open orders uit Axapta
-# Een gewone run leest dan alleen:
-#   - voorraadmutaties die de app sinds de vorige run boekte (ontvangst,
-#     pakbon, handmatig), zodat Axapta leidend blijft voor de voorraad
-#   - artikelen en klanten die sindsdien in FMID zijn aangemaakt
-#   - de Axapta-orders in FMID, alleen als de open orders in Axapta veranderd zijn
-# Eén keer per week (FMID_VOLLEDIG_DAGEN in .env, standaard 7) en met
-# --volledig leest de sync alles opnieuw, zoals vroeger. Dat ruimt ook op wat
-# de sync niet ziet, zoals een artikel dat in FMID van naam veranderde.
-# ---------------------------------------------------------------------------
-
-def utc_nu():
-    return datetime.utcnow().replace(microsecond=0)
-
-
-def tijdstip(waarde):
-    """Firestore-tijd ('2026-11-10T14:40:45.123456Z') als naive UTC-datetime."""
-    if isinstance(waarde, datetime):
-        return waarde.replace(tzinfo=None)
-    tekstwaarde = str(waarde or '').strip().rstrip('Z')
-    if len(tekstwaarde) < 19:
-        return None
-    try:
-        basis = datetime.strptime(tekstwaarde[:19], '%Y-%m-%dT%H:%M:%S')
-    except ValueError:
-        return None
-    if tekstwaarde[19:20] == '.':
-        cijfers = ''.join(c for c in tekstwaarde[20:26] if c.isdigit())
-        basis = basis.replace(microsecond=int(cijfers.ljust(6, '0')))
-    return basis
-
-
-def isotijd(moment):
-    return moment.strftime('%Y-%m-%dT%H:%M:%S.%f') if moment else ''
-
-
-def vingerafdruk(data):
-    tekstvorm = json.dumps(data, sort_keys=True, default=str)
-    return hashlib.sha256(tekstvorm.encode('utf-8')).hexdigest()
-
-
-def artikel_kern(artikel):
-    return {'id': artikel['id'], **{v: artikel[v] for v in ARTIKEL_VELDEN if v in artikel}}
-
-
-def lees_staat():
-    try:
-        staat = json.loads(STAAT_PAD.read_text(encoding='utf-8'))
-    except (OSError, ValueError):
-        return None
-    return staat if staat.get('versie') == STAAT_VERSIE else None
-
-
-def bewaar_staat(staat):
-    tijdelijk = STAAT_PAD.with_suffix('.tmp')
-    tijdelijk.write_text(json.dumps(staat, default=str), encoding='utf-8')
-    os.replace(tijdelijk, STAAT_PAD)
-
-
-def volledige_run_nodig(staat):
-    if not staat or not staat.get('volledigOp'):
-        return True
-    try:
-        # strptime i.p.v. fromisoformat: dat bestaat pas vanaf Python 3.7.
-        vorige = datetime.strptime(staat['volledigOp'][:19], '%Y-%m-%dT%H:%M:%S')
-    except ValueError:
-        return True
-    try:
-        dagen = float(os.environ.get('FMID_VOLLEDIG_DAGEN') or 7)
-    except ValueError:
-        dagen = 7
-    # 3 uur speling, zodat een dagelijkse cron niet net een dag te laat is.
-    return datetime.now() - vorige >= timedelta(days=dagen) - timedelta(hours=3)
-
-
-def begin_mutaties(db, staat):
-    """Startpunt voor verwerk_app_mutaties: alles tot nu geldt als verwerkt."""
-    laatste = db.vraag_op('voorraadmutaties', sorteer='datum', aflopend=True, aantal=1)
-    tijden = [tijdstip(m.get('datum')) for m in laatste.values()]
-    tot = max([t for t in tijden if t] + [tijdstip(db.leestijd) or utc_nu()])
-    recent = db.vraag_op('voorraadmutaties', 'datum', 'GREATER_THAN_OR_EQUAL', tot - MARGE)
-    staat['mutatiesTot'] = isotijd(tot)
-    staat['mutatieIds'] = sorted(recent)
-
-
-def verwerk_app_mutaties(db, staat, bestaand):
-    """Werk de lokale voorraadstanden bij met wat de app sinds de vorige run boekte.
-
-    Elke boeking in de app (ontvangst, pakbon, handmatig, omboeking) schrijft
-    een voorraadmutatie met `voorraadNa`. Zo weten we de stand zonder alle
-    voorraadstanden te lezen.
-    """
-    vanaf = tijdstip(staat.get('mutatiesTot')) or utc_nu()
-    al_gezien = set(staat.get('mutatieIds') or [])
-    mutaties = db.vraag_op('voorraadmutaties', 'datum', 'GREATER_THAN_OR_EQUAL', vanaf - MARGE)
-    nieuw = []
-    for mutatie_id, m in mutaties.items():
-        moment = tijdstip(m.get('datum'))
-        if not moment or mutatie_id in al_gezien:
-            continue
-        nieuw.append((moment, mutatie_id, m))
-    nieuw.sort(key=lambda x: (x[0], x[1]))
-
-    toegepast = 0
-    for _, _, m in nieuw:
-        if m.get('bron') == 'import':  # door de sync zelf geschreven
-            continue
-        if not m.get('artikelId') or not m.get('locatieId') or m.get('voorraadNa') is None:
-            continue
-        doc_id = f"{m['artikelId']}__{m['locatieId']}"
-        stand = dict(bestaand.get(doc_id) or {
-            'artikelId': m['artikelId'],
-            'artikelnummer': m.get('artikelnummer') or '',
-            'locatieId': m['locatieId'],
-            'locatieCode': m.get('locatieCode') or '',
-        })
-        stand['aantal'] = getal(m['voorraadNa'])
-        bestaand[doc_id] = stand
-        toegepast += 1
-
-    # Alles tot de leestijd van de server is gezien; boekingen van daarna komen
-    # de volgende run. Zo schuift het venster ook op als er niets geboekt wordt.
-    tot = max([moment for moment, _, _ in nieuw] + [vanaf, tijdstip(db.leestijd) or vanaf])
-    staat['mutatiesTot'] = isotijd(tot)
-    staat['mutatieIds'] = sorted(
-        mutatie_id for mutatie_id, m in mutaties.items()
-        if (tijdstip(m.get('datum')) or tot) >= tot - MARGE
-    )
-    return toegepast
-
-
-def nieuwe_in_fmid(db, staat, artikelen, klanten):
-    """Artikelen en klanten die sinds de vorige run in FMID zijn aangemaakt."""
-    vanaf = (tijdstip(staat.get('indexTot')) or utc_nu()) - MARGE
-    gevonden = 0
-    leestijd = None
-    for collectie, index, veld, kern in (
-        ('artikelen', artikelen, 'artikelnummer', artikel_kern),
-        ('klanten', klanten, 'klantcode', lambda k: k),
-    ):
-        for doc_id, data in db.vraag_op(collectie, 'createdAt', 'GREATER_THAN_OR_EQUAL', vanaf).items():
-            sleutel = tekst(data.get(veld)).upper()
-            if sleutel and sleutel not in index:
-                index[sleutel] = kern({'id': doc_id, **data})
-                gevonden += 1
-        leestijd = leestijd or tijdstip(db.leestijd)
-    staat['indexTot'] = isotijd(leestijd or utc_nu())
-    return gevonden
 
 
 def init_firestore():
@@ -1242,25 +1259,49 @@ def init_firestore():
 
 
 def main():
+    """Gewone run: alleen Axapta lezen en verschillen naar Firestore schrijven.
+
+    --volledig (één keer per nacht): artikelen, locaties en klanten opnieuw
+    ophalen uit Firestore, tekeningen en barcodes bijwerken, en alle
+    Axapta-velden opnieuw wegschrijven. Dat zet wijzigingen die in FMID op
+    Axapta-velden zijn gedaan terug, zonder documenten te lezen.
+    """
     proef = '--proef' in sys.argv
+    volledig = '--volledig' in sys.argv or '--ververs' in sys.argv
     laad_env()
     slot = None if proef else neem_slot()
     bedrijf = vereist('AX_DATAAREAID')
-    print('Proefrun (schrijft niets)…' if proef else 'Sync Axapta → FMID ERP…')
+    staat = laad_staat()
+    eerste_keer = not staat.get('artikelen')
+    stam_doen = volledig or eerste_keer
+    if proef:
+        print('Proefrun (schrijft niets)…')
+    else:
+        print('Volledige sync Axapta → FMID ERP…' if stam_doen else 'Sync Axapta → FMID ERP…')
 
     conn = verbind()
     try:
         standen = lees_voorraad(conn, bedrijf)
-        orders = lees_open_orders(conn, bedrijf)
-        tekeningen = lees_tekeningen(conn, bedrijf)
-        barcodes = lees_barcodes(conn, bedrijf)
+        kolommen = orderkolommen(conn)
+        orders = lees_open_orders(conn, bedrijf, kolommen)
+        sluiten = te_sluiten(staat.get('orders') or {}, orders)
+        eindstand = lees_orders_op_nummer(conn, bedrijf, kolommen, sluiten.values()) if sluiten else {}
+        if stam_doen:
+            tekeningen = lees_tekeningen(conn, bedrijf)
+            barcodes = lees_barcodes(conn, bedrijf)
+        else:
+            tekeningen = {}
+            barcodes = {}
     finally:
         conn.close()
+    if sluiten:
+        print(f'Niet meer open in Axapta: {len(sluiten)} order(s)')
 
     regels = sum(len(o['regels']) for o in orders.values())
     print(f'Axapta: {len(standen)} voorraadregels, {len(orders)} open orders, {regels} orderregels')
-    tekening_aantal = sum(len(v) for v in tekeningen.values())
-    print(f'Tekeningen: {tekening_aantal} bij {len(tekeningen)} artikelen')
+    if stam_doen:
+        tekening_aantal = sum(len(v) for v in tekeningen.values())
+        print(f'Tekeningen: {tekening_aantal} bij {len(tekeningen)} artikelen')
     if standen:
         (artikel, locatie), aantal = next(iter(standen.items()))
         print(f'Voorbeeld voorraad: {artikel} op {locatie} = {aantal}')
@@ -1270,7 +1311,8 @@ def main():
     voorbeeld_tekening = tekeningen.get('A106 1/2-15'.upper())
     if voorbeeld_tekening:
         print(f'Voorbeeld tekening: {voorbeeld_tekening[0]["pad"]}')
-    print(f'Barcodes: {len(barcodes)} artikelen')
+    if stam_doen:
+        print(f'Barcodes: {len(barcodes)} artikelen')
     voorbeeld_barcode = barcodes.get('A105 15-15'.upper())
     if voorbeeld_barcode:
         print(
@@ -1282,115 +1324,86 @@ def main():
         return
 
     db = init_firestore()
-    oude_staat = lees_staat()
-    # Pas na een geslaagde run komt de staat terug. Breekt de run af, dan
-    # leest de volgende run alles opnieuw in plaats van op een oude staat te bouwen.
-    if STAAT_PAD.exists():
-        STAAT_PAD.unlink()
-    volledig = '--volledig' in sys.argv or volledige_run_nodig(oude_staat)
-    orders_afdruk = vingerafdruk(orders)
+    if stam_doen:
+        # De enige reads van de sync: één keer per nacht, alleen de velden die nodig zijn.
+        print('Artikelen, locaties en klanten uit Firebase ophalen…')
+        staat['artikelen'] = index_kern(db, 'artikelen', 'artikelnummer', artikel_kern, ARTIKEL_KERN_VELDEN)
+        staat['locaties'] = index_kern(db, 'locaties', 'code', locatie_kern, LOCATIE_KERN_VELDEN)
+        staat['klanten'] = index_kern(db, 'klanten', 'klantcode', klant_kern, KLANT_KERN_VELDEN)
+        bewaar_staat(staat)
+    if not staat.get('voorraadGezaaid'):
+        print('Voorraadspiegel opbouwen…')
+        staat['voorraad'] = zaai_voorraad(db)
+        staat['voorraadGezaaid'] = True
+        bewaar_staat(staat)
+    if not staat.get('ordersGezaaid'):
+        print('Orderspiegel opbouwen…')
+        staat['orders'] = zaai_orders(db)
+        staat['ordersGezaaid'] = True
+        bewaar_staat(staat)
 
-    if volledig:
-        print('Volledige run: alles uit Firestore lezen.')
-        staat = {'versie': STAAT_VERSIE}
-        # Vóór het lezen van de standen, zodat geen boeking tussen wal en schip valt.
-        begin_mutaties(db, staat)
-        staat['indexTot'] = isotijd(tijdstip(db.leestijd) or utc_nu())
-        artikelen = {
-            sleutel: artikel_kern(a) for sleutel, a in index_op(db, 'artikelen', 'artikelnummer').items()
-        }
-        locaties = {
-            sleutel: {'id': l['id'], 'code': l.get('code') or ''}
-            for sleutel, l in index_op(db, 'locaties', 'code').items()
-        }
-        klanten = index_op(db, 'klanten', 'klantcode')
-        bestaand = None
-        app_mutaties = 0
-        nieuw_in_fmid = 0
-    else:
-        print('Gewone run: alleen wijzigingen sinds de vorige run.')
-        staat = oude_staat
-        artikelen = staat['artikelen']
-        locaties = staat['locaties']
-        klanten = staat['klanten']
-        bestaand = staat['standen']
-        app_mutaties = verwerk_app_mutaties(db, staat, bestaand)
-        nieuw_in_fmid = nieuwe_in_fmid(db, staat, artikelen, klanten)
-
-    voorraad = schrijf_voorraad(db, standen, artikelen, locaties, bestaand)
-    # Orders lezen kost ±450 reads; alleen als Axapta of de klant/artikellijst veranderde.
-    orders_nodig = volledig or nieuw_in_fmid or orders_afdruk != staat.get('ordersAfdruk')
-    if orders_nodig:
-        verkoop = schrijf_orders(db, orders, artikelen, klanten)
-    tekening_sync = schrijf_tekeningen(db, tekeningen, artikelen)
-    barcode_sync = schrijf_barcodes(db, barcodes, artikelen)
-
-    staat.update({
-        'artikelen': artikelen,
-        'locaties': locaties,
-        'klanten': klanten,
-        'standen': voorraad['standen'],
-        'ordersAfdruk': orders_afdruk,
-    })
-    if volledig:
-        staat['volledigOp'] = datetime.now().replace(microsecond=0).isoformat()
-    bewaar_staat(staat)
-
-    status = {
+    artikelen = staat['artikelen']
+    voorraad = schrijf_voorraad(
+        db, standen, artikelen, staat['locaties'], staat.setdefault('voorraad', {}), volledig,
+    )
+    verkoop = schrijf_orders(
+        db, orders, eindstand, sluiten, artikelen, staat['klanten'], staat.setdefault('orders', {}), volledig,
+    )
+    hartslag = {
         'laatsteSync': datetime.utcnow(),
-        'modus': 'volledig' if volledig else 'wijzigingen',
-        'gelezen': db.gelezen,
-        'appMutaties': app_mutaties,
-        'laatsteVolledig': staat.get('volledigOp') or '',
         'dataAreaId': bedrijf,
         'voorraadRegels': voorraad['axapta'],
         'voorraadBijgewerkt': voorraad['bijgewerkt'],
         'voorraadVerwijderd': voorraad['verwijderd'],
         'voorraadOvergeslagen': voorraad['overgeslagenAantal'],
         'voorraadOvergeslagenVoorbeelden': voorraad['overgeslagen'],
-        'tekeningArtikelen': tekening_sync['artikelen'],
-        'tekeningenBijgewerkt': tekening_sync['bijgewerkt'],
-        'tekeningenGewist': tekening_sync['gewist'],
-        'tekeningenOvergeslagen': tekening_sync['overgeslagen'],
-        'barcodeArtikelen': barcode_sync['artikelen'],
-        'barcodesBijgewerkt': barcode_sync['bijgewerkt'],
-        'barcodesGewist': barcode_sync['gewist'],
-        'barcodesOvergeslagen': barcode_sync['overgeslagen'],
+        'openOrders': verkoop['orders'],
+        'orderregels': verkoop['regels'],
+        'ordersBijgewerkt': verkoop['bijgewerkt'],
+        'ordersGesloten': verkoop['gesloten'],
+        'ordersZonderKlant': verkoop['zonderKlant'],
         'bron': 'axapta',
     }
-    if orders_nodig:
-        status.update({
-            'openOrders': verkoop['orders'],
-            'orderregels': verkoop['regels'],
-            'ordersBijgewerkt': verkoop['bijgewerkt'],
-            'ordersGesloten': verkoop['gesloten'],
-            'ordersZonderKlant': verkoop['zonderKlant'],
+    if stam_doen:
+        tekening_sync = schrijf_tekeningen(db, tekeningen, artikelen)
+        barcode_sync = schrijf_barcodes(db, barcodes, artikelen)
+        staat['stamOp'] = nu_utc()
+        hartslag.update({
+            'volledigeSync': datetime.utcnow(),
+            'tekeningArtikelen': tekening_sync['artikelen'],
+            'tekeningenBijgewerkt': tekening_sync['bijgewerkt'],
+            'tekeningenGewist': tekening_sync['gewist'],
+            'tekeningenOvergeslagen': tekening_sync['overgeslagen'],
+            'barcodeArtikelen': barcode_sync['artikelen'],
+            'barcodesBijgewerkt': barcode_sync['bijgewerkt'],
+            'barcodesGewist': barcode_sync['gewist'],
+            'barcodesOvergeslagen': barcode_sync['overgeslagen'],
         })
-    db.commit([db.schrijfopdracht('axaptaSync', 'fmid', status)])
+    hartslag.update({'modus': 'volledig' if stam_doen else 'wijzigingen', 'gelezen': db.gelezen})
+    bewaar_staat(staat)
+    db.commit([db.schrijfopdracht('axaptaSync', 'fmid', hartslag)])
 
-    print(f"Modus: {status['modus']}, gelezen uit Firestore: {db.gelezen}, boekingen uit de app: {app_mutaties}")
+    print(f"Modus: {hartslag['modus']}, gelezen uit Firestore: {db.gelezen}")
     print(
         f"Voorraad bijgewerkt: {voorraad['bijgewerkt']}, verwijderd: {voorraad['verwijderd']}, "
         f"overgeslagen: {voorraad['overgeslagenAantal']}"
     )
     if voorraad['overgeslagen']:
         print('Niet gekoppeld:', '; '.join(voorraad['overgeslagen']))
-    if not orders_nodig:
-        print('Orders: niets veranderd in Axapta, niet gelezen.')
-    else:
+    print(
+        f"Orders en regels geschreven: {verkoop['bijgewerkt']}, gesloten of verwijderd: {verkoop['gesloten']}"
+    )
+    if verkoop['zonderKlant']:
+        print('Order zonder klant in FMID:', '; '.join(verkoop['zonderKlant']))
+    if stam_doen:
         print(
-            f"Orders en regels geschreven: {verkoop['bijgewerkt']}, gesloten of verwijderd: {verkoop['gesloten']}"
+            f"Tekeningen bijgewerkt: {tekening_sync['bijgewerkt']}, "
+            f"gewist: {tekening_sync['gewist']}, zonder artikel in FMID: {tekening_sync['overgeslagen']}"
         )
-        if verkoop['zonderKlant']:
-            print('Order zonder klant in FMID:', '; '.join(verkoop['zonderKlant']))
-    print(
-        f"Tekeningen bijgewerkt: {tekening_sync['bijgewerkt']}, "
-        f"gewist: {tekening_sync['gewist']}, zonder artikel in FMID: {tekening_sync['overgeslagen']}"
-    )
-    print(
-        f"Barcodes bijgewerkt: {barcode_sync['bijgewerkt']}, "
-        f"gewist: {barcode_sync['gewist']}, zonder artikel in FMID: {barcode_sync['overgeslagen']}"
-    )
+        print(
+            f"Barcodes bijgewerkt: {barcode_sync['bijgewerkt']}, "
+            f"gewist: {barcode_sync['gewist']}, zonder artikel in FMID: {barcode_sync['overgeslagen']}"
+        )
     print('Sync klaar.')
     if slot:
         slot.close()
