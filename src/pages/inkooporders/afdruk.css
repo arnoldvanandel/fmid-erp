@@ -502,6 +502,17 @@
   line-height: 1.3;
 }
 
+.pickrapport-col-locatie { width: 18%; }
+.pickrapport-col-artikel { width: 34%; }
+.pickrapport-col-aantal { width: 16%; }
+.pickrapport-col-blijft { width: 14%; }
+.pickrapport-col-orders { width: 18%; }
+
+.pickrapport-locatie {
+  font-size: 13pt;
+  font-weight: 800;
+}
+
 .ontvangst-col-tijd { width: 14%; }
 .ontvangst-col-artikel { width: 34%; }
 .ontvangst-col-locatie { width: 16%; }

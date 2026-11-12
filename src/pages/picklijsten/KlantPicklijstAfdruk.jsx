@@ -178,7 +178,10 @@ export default function KlantPicklijstAfdruk() {
                     {p.artikelnaam}
                     {p.vervangt && <div className="pick-vervangt">omboeken naar {p.vervangt}</div>}
                   </td>
-                  <td className="num pick-aantal">{aantal(p.aantal)}</td>
+                  <td className="num pick-aantal">
+                    {aantal(p.aantal)}
+                    {p.totaalOpen != null && <div className="pick-voorraad-bij">open {aantal(p.totaalOpen)}</div>}
+                  </td>
                   <td className="doc-nowrap">{p.eenheid}</td>
                   <td className="doc-nowrap">{(p.ordernummers || [p.ordernummer]).filter(Boolean).join(', ')}</td>
                   <td className="num">

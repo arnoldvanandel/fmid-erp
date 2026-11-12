@@ -2,6 +2,7 @@ import { collection, documentId, getDoc, getDocs, doc, query, where } from 'fire
 import { db } from '../firebase'
 import { laadLooproute, sorteerPicksOpLooproute } from './looproute'
 import { laadPickrapport } from './pickrapport'
+import { groepeerPickstappen } from './pickVerpakking'
 import { laadVerkooporderVoorAfdruk } from './verkooporders'
 
 // Firestore staat max. 30 waarden per 'in'-query toe.
@@ -103,6 +104,7 @@ async function verdeelOverVoorraad(openRegels) {
         artikelnummer: r.artikelnummer,
         artikelnaam: r.artikelnaam,
         eenheid: r.eenheid,
+        artikelId: r.artikelId || '',
         nodig: r.nogTeLeveren,
         tekort: nodig,
         vervanger: v?.artikelnummer || '',
@@ -169,6 +171,36 @@ function voegVerdelingToe(lijst, stuk) {
   else lijst.push({ ...stuk })
 }
 
+async function voegVerpakkingToe(picks) {
+  const ids = [...new Set(picks.flatMap((p) => [p.artikelId, p.omboekenNaarId].filter(Boolean)))]
+  if (!ids.length) return picks
+  const docs = await haalOpIn('artikelen', documentId(), ids)
+  const perId = Object.fromEntries(docs.map((a) => [a.id, a]))
+  return picks.map((p) => {
+    const art = perId[p.artikelId] || {}
+    return {
+      ...p,
+      stuksPerDoos: Number(art.stuksPerDoos) > 0 ? Number(art.stuksPerDoos) : 0,
+      stuksPerZak: Number(art.stuksPerZak) > 0 ? Number(art.stuksPerZak) : 0,
+    }
+  })
+}
+
+// Verpakking (doos/zak) en het totaal dat er van het artikel openstaat,
+// ook als dat over meerdere orders of locaties verdeeld is.
+async function verrijkPicklijst(picks, tekorten) {
+  const metVerpakking = await voegVerpakkingToe(picks)
+  const stappen = groepeerPickstappen(metVerpakking, tekorten)
+  const openPerArtikel = new Map(stappen.map((s) => [s.sleutel, s.totaalOpen]))
+  return {
+    stappen,
+    picks: metVerpakking.map((p) => ({
+      ...p,
+      totaalOpen: openPerArtikel.get(String(p.omboekenNaarId || p.artikelId || p.artikelnummer || '')) ?? p.aantal,
+    })),
+  }
+}
+
 // Stelt de picklijst van een verkooporder samen: per orderregel wat nog
 // geleverd moet worden, verdeeld over de locaties waar het artikel ligt
 // (grootste voorraad eerst). Gesorteerd op looproute (afstandsmatrix of sorteercode).
@@ -183,8 +215,9 @@ export async function maakPicklijst(verkooporderId) {
     }))
     .filter((r) => r.nogTeLeveren > 0)
 
-  const { picks, tekorten } = await verdeelOverVoorraad(open)
-  return { ...gegevens, picks, tekorten, openRegels: open.length }
+  const { picks: ruwePicks, tekorten } = await verdeelOverVoorraad(open)
+  const { picks, stappen } = await verrijkPicklijst(ruwePicks, tekorten)
+  return { ...gegevens, picks, stappen, tekorten, openRegels: open.length }
 }
 
 // Alle open regels van één klant (over meerdere verkooporders) in één picklijst,
@@ -206,6 +239,7 @@ export async function maakPicklijstPerKlant(klantId) {
       klant,
       orders: [],
       picks: [],
+      stappen: [],
       tekorten: [],
       openRegels: 0,
       openOrders: 0,
@@ -244,13 +278,15 @@ export async function maakPicklijstPerKlant(klantId) {
     afstanden: looproute.afstanden,
     startZone: looproute.startZone,
   })
+  const verrijkt = await verrijkPicklijst(gesorteerd, tekorten)
 
   return {
     klant,
     orders: orders
       .filter((o) => open.some((r) => r.orderId === o.id))
       .sort((a, b) => String(a.ordernummer).localeCompare(String(b.ordernummer), 'nl', { numeric: true })),
-    picks: gesorteerd,
+    picks: verrijkt.picks,
+    stappen: verrijkt.stappen,
     tekorten,
     openRegels: open.length,
     openOrders: orders.filter((o) => open.some((r) => r.orderId === o.id)).length,

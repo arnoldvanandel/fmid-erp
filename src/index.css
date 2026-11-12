@@ -1055,10 +1055,25 @@ td .picklijst-acties {
   background: var(--fmid-groen);
 }
 
+.pick-mobiel-nav {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pick-mobiel-nav .btn {
+  flex: 1;
+  min-height: 44px;
+}
+
 .pick-mobiel-inhoud {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   padding: 16px 16px 8px;
@@ -1730,6 +1745,57 @@ td .picklijst-acties {
   font-size: 18px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.pick-sectie {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.pick-sectie-aantal {
+  font-size: clamp(32px, 10vw, 48px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pick-sectie-aantal span {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.pick-verpakking {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pick-verpakking-deel {
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 18px;
+}
+
+.pick-verpakking-invoer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pick-verpakking-invoer .field {
+  flex: 1 1 90px;
+  margin: 0;
+}
+
+.pick-tegel-meta {
+  color: var(--color-text-muted);
+  font-size: 14px;
 }
 
 .aantal-rij {

@@ -18,6 +18,7 @@ function regelVoorRapport(p) {
     gevraagd: Number.isFinite(Number(p.gevraagd)) ? Number(p.gevraagd) : Number(p.aantal) || 0,
     eenheid: p.eenheid || '',
     blijft: blijftLiggen(p),
+    totaalOpen: Number.isFinite(Number(p.totaalOpen)) ? Number(p.totaalOpen) : null,
     ordernummers: (p.ordernummers || [p.ordernummer]).filter(Boolean),
     vervangt: p.vervangt || '',
     verdeling: (p.verdeling || [])
@@ -40,6 +41,7 @@ function tekortVoorRapport(t) {
     artikelnaam: t.artikelnaam || '',
     tekort: Number(t.tekort) || 0,
     eenheid: t.eenheid || '',
+    nodig: Number.isFinite(Number(t.nodig)) ? Number(t.nodig) : null,
   }
 }
 
