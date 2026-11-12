@@ -100,22 +100,27 @@ def verbind():
     return pyodbc.connect(cs, timeout=20)
 
 
-def neem_slot():
+def neem_slot(wacht_seconden=0):
+    import time
     try:
         import fcntl
     except ImportError:
         fcntl = None
     slot = open(MAP / 'axapta_sync.lock', 'w', encoding='utf-8')
-    try:
-        if fcntl:
-            fcntl.flock(slot, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        else:
-            import msvcrt  # Windows
-            msvcrt.locking(slot.fileno(), msvcrt.LK_NBLCK, 1)
-    except OSError:
-        print('Vorige sync loopt nog. Deze run slaat over.')
-        raise SystemExit(0)
-    return slot
+    tot = time.time() + wacht_seconden
+    while True:
+        try:
+            if fcntl:
+                fcntl.flock(slot, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            else:
+                import msvcrt  # Windows
+                msvcrt.locking(slot.fileno(), msvcrt.LK_NBLCK, 1)
+            return slot
+        except OSError:
+            if time.time() >= tot:
+                print('Vorige sync loopt nog. Deze run slaat over.')
+                raise SystemExit(0)
+            time.sleep(2)
 
 
 def tekst(waarde):
@@ -727,15 +732,21 @@ class Firestore:
         return self._token
 
     def _vraag(self, methode, url, body=None, params=None):
+        import time
         import requests
-        antwoord = requests.request(
-            methode,
-            url,
-            headers={'Authorization': f'Bearer {self._toegang()}'},
-            json=body,
-            params=params,
-            timeout=120,
-        )
+        # Bij een piek weigert Firestore tijdelijk (429/503): even wachten en opnieuw.
+        for poging in range(6):
+            antwoord = requests.request(
+                methode,
+                url,
+                headers={'Authorization': f'Bearer {self._toegang()}'},
+                json=body,
+                params=params,
+                timeout=120,
+            )
+            if antwoord.status_code not in (429, 500, 503) or poging == 5:
+                break
+            time.sleep(2 ** (poging + 1))
         if antwoord.status_code >= 400:
             raise SystemExit(f'Firestore-fout: {antwoord.status_code} {antwoord.text[:500]}')
         if not antwoord.text:
@@ -1436,8 +1447,12 @@ def verwerk_verzoek():
     verzoek = db.document('axaptaSync', 'verzoek')
     if not verzoek or verzoek.get('status') != 'wachten':
         return
-    # Loopt de geplande sync nog, dan blijft het verzoek staan voor de volgende minuut.
-    slot = neem_slot()
+    # Loopt de geplande sync nog, dan daarop wachten (meestal enkele seconden).
+    slot = neem_slot(wacht_seconden=180)
+    verzoek = db.document('axaptaSync', 'verzoek')
+    if not verzoek or verzoek.get('status') != 'wachten':
+        slot.close()  # al afgehandeld door een run die eerder het slot had
+        return
     print(f"Verzoek uit de app van {verzoek.get('aangevraagdDoor') or 'onbekend'}.")
     db.commit([db.schrijfopdracht('axaptaSync', 'verzoek', {'status': 'bezig', 'gestartOp': datetime.utcnow()})])
     try:
