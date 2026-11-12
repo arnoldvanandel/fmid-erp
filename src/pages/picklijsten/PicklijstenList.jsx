@@ -179,9 +179,14 @@ export default function PicklijstenList() {
             Picken en daarna inpakken in dozen. Op telefoon via een QR-code, of als PDF.
           </div>
         </div>
-        <Link className="btn btn-secondary" to="/looproute">
-          Looproute / afstanden
-        </Link>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <Link className="btn btn-secondary" to="/picklijsten/rapporten">
+            Pickrapporten
+          </Link>
+          <Link className="btn btn-secondary" to="/looproute">
+            Looproute / afstanden
+          </Link>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

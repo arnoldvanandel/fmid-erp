@@ -638,7 +638,8 @@
     page-break-inside: avoid;
   }
 
-  .afdruk-toolbar {
+  .afdruk-toolbar,
+  .pickrapport-wijzig {
     display: none;
   }
 

@@ -205,7 +205,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Laatste pickrapport per klant: wat er op de telefoon is afgevinkt.
+    // Eén pickrapport per pickronde. Oudere rondes blijven staan.
     match /pickrapporten/{docId} {
       allow read: if isActive();
       allow create, update: if isActive();

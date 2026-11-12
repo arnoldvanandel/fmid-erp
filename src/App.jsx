@@ -25,6 +25,7 @@ import PicklijstenList from './pages/picklijsten/PicklijstenList'
 import KlantPicklijstAfdruk from './pages/picklijsten/KlantPicklijstAfdruk'
 import PicklijstMobiel from './pages/picklijsten/PicklijstMobiel'
 import PickrapportAfdruk from './pages/picklijsten/PickrapportAfdruk'
+import PickrapportenList from './pages/picklijsten/PickrapportenList'
 import InpakMobiel from './pages/picklijsten/InpakMobiel'
 import InpaklijstAfdruk from './pages/picklijsten/InpaklijstAfdruk'
 import InpakrapportAfdruk from './pages/picklijsten/InpakrapportAfdruk'
@@ -240,6 +241,24 @@ export default function App() {
                 <Layout>
                   <PicklijstenList />
                 </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/picklijsten/rapporten"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <PickrapportenList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/picklijsten/rapport/:rapportId"
+            element={
+              <ProtectedRoute>
+                <PickrapportAfdruk />
               </ProtectedRoute>
             }
           />

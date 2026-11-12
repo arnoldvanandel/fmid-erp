@@ -6,7 +6,13 @@ import { useAuth } from '../../contexts/AuthContext'
 import { haalArtikelOpBarcode } from '../../lib/artikelZoeken'
 import { formatNumber } from '../../lib/format'
 import { maakPicklijstPerKlant } from '../../lib/picklijst'
-import { bouwPickrapport, leesPickrapportLokaal, schrijfPickrapportLokaal, slaPickrapportOp } from '../../lib/pickrapport'
+import {
+  bouwPickrapport,
+  leesPickrapportLokaal,
+  nieuwPickrapportId,
+  schrijfPickrapportLokaal,
+  slaPickrapportOp,
+} from '../../lib/pickrapport'
 import {
   anboLocaties,
   bonfixLocaties,
@@ -32,14 +38,15 @@ function aantal(v) {
 function leesVoortgang(sleutel) {
   try {
     const raw = sessionStorage.getItem(sleutel)
-    if (!raw) return { index: 0, gepickt: {} }
+    if (!raw) return { index: 0, gepickt: {}, rapportId: '' }
     const data = JSON.parse(raw)
     return {
       index: Number.isInteger(data.index) && data.index >= 0 ? data.index : 0,
       gepickt: data.gepickt && typeof data.gepickt === 'object' ? data.gepickt : {},
+      rapportId: typeof data.rapportId === 'string' ? data.rapportId : '',
     }
   } catch {
-    return { index: 0, gepickt: {} }
+    return { index: 0, gepickt: {}, rapportId: '' }
   }
 }
 
@@ -72,6 +79,7 @@ export default function PicklijstMobiel() {
   const scanVraag = useRef(0)
   const inhoudRef = useRef(null)
   const laatstGeklikt = useRef(0)
+  const rapportIdRef = useRef('')
   const voortgangSleutel = `picklijst-mobiel-v2-${klantId}`
 
   useEffect(() => {
@@ -83,6 +91,7 @@ export default function PicklijstMobiel() {
         if (!actief) return
         const voortgang = leesVoortgang(voortgangSleutel)
         const stappen = l.stappen || []
+        rapportIdRef.current = voortgang.rapportId
         setLijst(l)
         setGepickt(voortgang.gepickt)
         setIndex(Math.min(voortgang.index, stappen.length))
@@ -94,7 +103,7 @@ export default function PicklijstMobiel() {
   }, [klantId, voortgangSleutel])
 
   useEffect(() => {
-    if (lijst) schrijfVoortgang(voortgangSleutel, { index, gepickt })
+    if (lijst) schrijfVoortgang(voortgangSleutel, { index, gepickt, rapportId: rapportIdRef.current })
   }, [index, gepickt, lijst, voortgangSleutel])
 
   useEffect(() => {
@@ -128,14 +137,20 @@ export default function PicklijstMobiel() {
 
   function bewaarRapport(bevestigd = gepickt) {
     if (!stappen.length) return
+    const id = rapportIdRef.current || nieuwPickrapportId()
+    rapportIdRef.current = id
     const { picks, tekorten } = picksUitStappen(stappen, bevestigd)
-    const rapport = bouwPickrapport({
-      klant: lijst.klant,
-      orders: lijst.orders,
-      picks,
-      tekorten,
-      gebruiker: profile?.naam || profile?.email || '',
-    })
+    const rapport = {
+      ...bouwPickrapport({
+        klant: lijst.klant,
+        orders: lijst.orders,
+        picks,
+        tekorten,
+        gebruiker: profile?.naam || profile?.email || '',
+      }),
+      id,
+    }
+    schrijfVoortgang(voortgangSleutel, { index, gepickt: bevestigd, rapportId: id })
     schrijfPickrapportLokaal(rapport)
     setRapportKlaar(true)
     setRapportFout(null)
@@ -297,6 +312,7 @@ export default function PicklijstMobiel() {
             onRapport={openRapport}
             onVorige={() => gaNaar(stappen.length - 1, false)}
             onOpnieuw={() => {
+              rapportIdRef.current = ''
               setIndex(0)
               setGepickt({})
               setFout(null)

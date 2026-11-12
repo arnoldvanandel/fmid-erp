@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore'
 import { db } from '../firebase'
 
 const SLEUTEL = (klantId) => `pickrapport-${klantId}`
@@ -43,6 +43,10 @@ function tekortVoorRapport(t) {
     eenheid: t.eenheid || '',
     nodig: Number.isFinite(Number(t.nodig)) ? Number(t.nodig) : null,
   }
+}
+
+function rond3(n) {
+  return Math.round(n * 1000) / 1000
 }
 
 function schaalVerdeling(verdeling, nieuwAantal) {
@@ -138,16 +142,72 @@ function nieuwer(a, b) {
   return String(a.gepicktOp || '') >= String(b.gepicktOp || '') ? a : b
 }
 
-export async function slaPickrapportOp(rapport) {
-  await setDoc(doc(db, 'pickrapporten', rapport.klantId), rapport)
+export function nieuwPickrapportId() {
+  return doc(collection(db, 'pickrapporten')).id
 }
 
-// Firestore zodat de pc het rapport kan afdrukken; anders de kopie op dit apparaat.
+// Eén document per pickronde. Een bestaande id (zelfde ronde op de telefoon,
+// of een correctie op de pc) werkt hetzelfde rapport bij.
+export async function slaPickrapportOp(rapport) {
+  const id = rapport.id || nieuwPickrapportId()
+  const op = { ...rapport, id }
+  await setDoc(doc(db, 'pickrapporten', id), op)
+  return op
+}
+
+// Alleen bijwerken als dit rapport nog de kopie van deze klant op dit apparaat is.
+export function werkPickrapportLokaalBij(rapport) {
+  const lokaal = leesPickrapportLokaal(rapport.klantId)
+  if (!lokaal || lokaal.id === rapport.id || String(rapport.gepicktOp || '') >= String(lokaal.gepicktOp || '')) {
+    schrijfPickrapportLokaal(rapport)
+  }
+}
+
+// Locatie en gepikt aantal op een opgeslagen regel. Minder dan de verdeling
+// gaat ook naar de inpaklijst; meer blijft op het rapport.
+export function pasRapportRegel(regel, { aantal, locatieCode } = {}) {
+  const oud = Number(regel.aantal) || 0
+  const nieuw = Math.max(0, Number(aantal ?? oud) || 0)
+  const locatie = locatieCode != null ? String(locatieCode).trim() : regel.locatieCode || ''
+  const verdelingSom = (regel.verdeling || []).reduce((som, v) => som + (Number(v.aantal) || 0), 0)
+  const verdeling =
+    nieuw + 1e-9 >= verdelingSom ? regel.verdeling || [] : schaalVerdeling(regel.verdeling, nieuw)
+  const voorraadBekend = Number.isFinite(Number(regel.blijft))
+  const voorraad = voorraadBekend ? Number(regel.blijft) + oud : null
+  const aantalGewijzigd = Math.abs(nieuw - oud) > 1e-9
+  return {
+    ...regel,
+    locatieCode: locatie,
+    aantal: nieuw,
+    verdeling,
+    blijft: !aantalGewijzigd || voorraad == null ? regel.blijft : Math.max(0, rond3(voorraad - nieuw)),
+  }
+}
+
+export function pasRapportTekort(tekort, aantal) {
+  return { ...tekort, tekort: Math.max(0, Number(aantal) || 0) }
+}
+
+async function rapportenVanKlant(klantId) {
+  const snap = await getDocs(query(collection(db, 'pickrapporten'), where('klantId', '==', klantId)))
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => String(b.gepicktOp || '').localeCompare(String(a.gepicktOp || '')))
+}
+
+export async function laadPickrapportOpId(id) {
+  const snap = await getDoc(doc(db, 'pickrapporten', id))
+  if (!snap.exists()) return null
+  return { id: snap.id, ...snap.data() }
+}
+
+// Het laatste rapport van deze klant: daar pakt de inpaklijst de regels van.
+// Oudere rondes blijven apart staan.
 export async function laadPickrapport(klantId) {
   let opgeslagen = null
   try {
-    const snap = await getDoc(doc(db, 'pickrapporten', klantId))
-    if (snap.exists()) opgeslagen = { id: snap.id, ...snap.data() }
+    const lijst = await rapportenVanKlant(klantId)
+    opgeslagen = lijst[0] || null
   } catch {
     opgeslagen = null
   }
