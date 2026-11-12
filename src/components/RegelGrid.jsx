@@ -55,7 +55,8 @@ export function GetalCel({ value, decimalen = 2, maxDecimalen = decimalen, onCom
       onFocus={(e) => {
         setBewerken(leeg ? '' : String(value).replace('.', ','))
         const el = e.currentTarget
-        setTimeout(() => el.select(), 0)
+        // select() zet de focus terug; niet doen als de cel al verlaten is (snel Enter).
+        setTimeout(() => document.activeElement === el && el.select(), 0)
       }}
       onChange={(e) => setBewerken(e.target.value)}
       onBlur={() => {

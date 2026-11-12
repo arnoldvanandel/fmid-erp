@@ -172,6 +172,11 @@ export default function InkooporderForm({ inkooporder, onDone }) {
   )
 
   const [regelSaving, setRegelSaving] = useState(false)
+  // Onderste (nieuwe) regel: na Enter gaat de cursor terug naar het artikelnummer.
+  const nieuweRijRef = useRef(null)
+  function focusNieuwArtikel() {
+    setTimeout(() => nieuweRijRef.current?.querySelector('[data-kolom="artikelnummer"]')?.focus(), 0)
+  }
   const [regelError, setRegelError] = useState(null)
   const [geselecteerdeRegel, setGeselecteerdeRegel] = useState(null)
 
@@ -373,6 +378,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
         })
       }
       setNieuweRegel(LEGE_REGEL)
+      focusNieuwArtikel()
     } catch (err) {
       setRegelError(err.message)
     } finally {
@@ -721,6 +727,7 @@ export default function InkooporderForm({ inkooporder, onDone }) {
             )}
 
             <tr
+              ref={nieuweRijRef}
               className={'regel-grid-nieuw' + (geselecteerdeRegel === 'nieuw' ? ' geselecteerd' : '')}
               onFocus={() => setGeselecteerdeRegel('nieuw')}
               onKeyDown={(e) => {
