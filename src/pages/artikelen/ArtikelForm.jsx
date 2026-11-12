@@ -834,23 +834,63 @@ function DocumentenTab({ artikel }) {
   )
   const tekeningen = Array.isArray(artikel.tekeningen) ? artikel.tekeningen : []
 
-  async function handleFileChange(e) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
+  // Een of meer PDF's uploaden, gekozen via de knop of hierheen gesleept.
+  async function uploadBestanden(bestanden) {
+    const lijst = [...bestanden]
+    if (lijst.length === 0 || uploading) return
     setError(null)
     setUploading(true)
-    try {
-      await uploadArtikelDocument({
-        artikel,
-        file,
-        gebruiker: profile?.naam || profile?.email,
-      })
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setUploading(false)
+    const fouten = []
+    for (const file of lijst) {
+      try {
+        await uploadArtikelDocument({
+          artikel,
+          file,
+          gebruiker: profile?.naam || profile?.email,
+        })
+      } catch (err) {
+        fouten.push(lijst.length > 1 ? `${file.name}: ${err.message}` : err.message)
+      }
     }
+    if (fouten.length) setError(fouten.join(' '))
+    setUploading(false)
+  }
+
+  function handleFileChange(e) {
+    const bestanden = [...(e.target.files || [])]
+    e.target.value = ''
+    uploadBestanden(bestanden)
+  }
+
+  // Slepen vanuit de Verkenner of Outlook. De teller voorkomt knipperen als
+  // de muis over onderdelen binnen het vak gaat.
+  const [slepen, setSlepen] = useState(false)
+  const sleepTeller = useRef(0)
+  const sleeptBestanden = (e) => [...(e.dataTransfer?.types || [])].includes('Files')
+  const sleepProps = {
+    onDragEnter: (e) => {
+      if (!sleeptBestanden(e)) return
+      e.preventDefault()
+      sleepTeller.current += 1
+      setSlepen(true)
+    },
+    onDragOver: (e) => {
+      if (!sleeptBestanden(e)) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    },
+    onDragLeave: (e) => {
+      if (!sleeptBestanden(e)) return
+      sleepTeller.current = Math.max(0, sleepTeller.current - 1)
+      if (sleepTeller.current === 0) setSlepen(false)
+    },
+    onDrop: (e) => {
+      if (!sleeptBestanden(e)) return
+      e.preventDefault()
+      sleepTeller.current = 0
+      setSlepen(false)
+      uploadBestanden(e.dataTransfer.files)
+    },
   }
 
   async function handleDelete(documentItem) {
@@ -864,7 +904,8 @@ function DocumentenTab({ artikel }) {
   }
 
   return (
-    <div>
+    <div className={'sleepvak' + (slepen ? ' sleepvak-actief' : '')} {...sleepProps}>
+      {slepen && <div className="sleepvak-melding">Laat los om de PDF toe te voegen</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <h3 style={{ margin: 0 }}>Documenten</h3>
         <button
@@ -879,6 +920,7 @@ function DocumentenTab({ artikel }) {
           ref={fileInputRef}
           type="file"
           accept="application/pdf"
+          multiple
           onChange={handleFileChange}
           style={{ display: 'none' }}
         />
@@ -889,7 +931,9 @@ function DocumentenTab({ artikel }) {
       {loading ? (
         <div className="empty-state"><div className="spinner" style={{ margin: '0 auto' }} /></div>
       ) : documentenVoorArtikel.length === 0 && tekeningen.length === 0 ? (
-        <div className="empty-state">Nog geen documenten gekoppeld aan dit artikel.</div>
+        <div className="empty-state">
+          Nog geen documenten gekoppeld aan dit artikel. Sleep een PDF hierheen of kies “+ PDF toevoegen”.
+        </div>
       ) : (
         <table className="data-table">
           <thead>
@@ -940,6 +984,9 @@ function DocumentenTab({ artikel }) {
             ))}
           </tbody>
         </table>
+      )}
+      {documentenVoorArtikel.length + tekeningen.length > 0 && (
+        <p className="hint" style={{ marginTop: 8 }}>Sleep een PDF hierheen om hem toe te voegen.</p>
       )}
     </div>
   )

@@ -726,6 +726,36 @@ table.data-table {
 
 /* ---------- Misc ---------- */
 
+/* Vak waar je bestanden in kunt slepen (documenten bij een artikel). */
+.sleepvak {
+  position: relative;
+  border: 2px dashed transparent;
+  border-radius: 8px;
+  margin: -10px;
+  padding: 8px;
+  /* margin + rand + padding heffen elkaar op: geen verschuiving van de inhoud */
+}
+
+.sleepvak-actief {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.sleepvak-melding {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+  border-radius: 6px;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
 .empty-state {
   padding: 48px 20px;
   text-align: center;
