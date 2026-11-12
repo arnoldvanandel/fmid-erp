@@ -80,6 +80,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Axapta-sync (Raspberry Pi, met de servicesleutel). In de app: de status
+    // lezen en met de knop 'Synchroniseren' een verzoek op 'wachten' zetten.
+    match /axaptaSync/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive() && docId == 'verzoek'
+        && request.resource.data.status == 'wachten';
+      allow delete: if isAdmin();
+    }
+
     match /verkooporders/{docId} {
       allow read: if isActive();
       allow create, update: if isActive();

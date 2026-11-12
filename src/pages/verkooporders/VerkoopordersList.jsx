@@ -4,6 +4,7 @@ import { useCollection } from '../../hooks/useCollection'
 import { formatDate, formatNumber } from '../../lib/format'
 import { STATUS_BADGE, STATUS_LABEL, maakVerkooporder } from '../../lib/verkooporders'
 import Modal from '../../components/Modal'
+import AxaptaSyncKnop from '../../components/AxaptaSyncKnop'
 import VerkooporderForm from './VerkooporderForm'
 
 // Zelfde opzet als InkoopordersList.
@@ -157,9 +158,12 @@ export default function VerkoopordersList() {
           <h1>Verkooporders</h1>
           <div className="page-header-sub">{orders.length} verkooporders</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowNieuw(true)}>
-          + Nieuwe verkooporder
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <AxaptaSyncKnop />
+          <button className="btn btn-primary" onClick={() => setShowNieuw(true)}>
+            + Nieuwe verkooporder
+          </button>
+        </div>
       </div>
 
       <div className="card">

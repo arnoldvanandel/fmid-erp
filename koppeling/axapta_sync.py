@@ -745,6 +745,21 @@ class Firestore:
     def documentnaam(self, collectie, doc_id):
         return f'projects/{self.project}/databases/(default)/documents/{collectie}/{doc_id}'
 
+    def document(self, collectie, doc_id):
+        """Eén document lezen; None als het niet bestaat."""
+        import requests
+        antwoord = requests.get(
+            f'{self.basis}/{collectie}/{doc_id}',
+            headers={'Authorization': f'Bearer {self._toegang()}'},
+            timeout=30,
+        )
+        self.gelezen += 1
+        if antwoord.status_code == 404:
+            return None
+        if antwoord.status_code >= 400:
+            raise SystemExit(f'Firestore-fout: {antwoord.status_code} {antwoord.text[:500]}')
+        return velden_van(antwoord.json().get('fields'))
+
     def alle(self, collectie, velden=None):
         from urllib.parse import unquote
         docs = {}
@@ -1258,7 +1273,7 @@ def init_firestore():
     return Firestore(vereist('GOOGLE_APPLICATION_CREDENTIALS'))
 
 
-def main():
+def main(met_slot=True):
     """Gewone run: alleen Axapta lezen en verschillen naar Firestore schrijven.
 
     --volledig (één keer per nacht): artikelen, locaties en klanten opnieuw
@@ -1269,7 +1284,7 @@ def main():
     proef = '--proef' in sys.argv
     volledig = '--volledig' in sys.argv or '--ververs' in sys.argv
     laad_env()
-    slot = None if proef else neem_slot()
+    slot = neem_slot() if met_slot and not proef else None
     bedrijf = vereist('AX_DATAAREAID')
     staat = laad_staat()
     eerste_keer = not staat.get('artikelen')
@@ -1407,11 +1422,51 @@ def main():
     print('Sync klaar.')
     if slot:
         slot.close()
+    return hartslag
+
+
+def verwerk_verzoek():
+    """Knop 'Synchroniseren' in de app: die zet axaptaSync/verzoek op 'wachten'.
+
+    Cron draait dit elke minuut: één read. Staat er een verzoek klaar, dan
+    volgt een gewone run en komt de uitkomst terug in het verzoek.
+    """
+    laad_env()
+    db = init_firestore()
+    verzoek = db.document('axaptaSync', 'verzoek')
+    if not verzoek or verzoek.get('status') != 'wachten':
+        return
+    # Loopt de geplande sync nog, dan blijft het verzoek staan voor de volgende minuut.
+    slot = neem_slot()
+    print(f"Verzoek uit de app van {verzoek.get('aangevraagdDoor') or 'onbekend'}.")
+    db.commit([db.schrijfopdracht('axaptaSync', 'verzoek', {'status': 'bezig', 'gestartOp': datetime.utcnow()})])
+    try:
+        hartslag = main(met_slot=False)
+    except BaseException as fout:
+        db.commit([db.schrijfopdracht('axaptaSync', 'verzoek', {
+            'status': 'fout',
+            'afgehandeldOp': datetime.utcnow(),
+            'melding': (str(fout) or fout.__class__.__name__)[:300],
+        })])
+        raise
+    db.commit([db.schrijfopdracht('axaptaSync', 'verzoek', {
+        'status': 'klaar',
+        'afgehandeldOp': datetime.utcnow(),
+        'melding': (
+            f"Voorraad: {hartslag['voorraadBijgewerkt']} bijgewerkt, {hartslag['voorraadVerwijderd']} verwijderd. "
+            f"Verkooporders: {hartslag['ordersBijgewerkt']} orders/regels bijgewerkt, "
+            f"{hartslag['ordersGesloten']} gesloten."
+        ),
+    })])
+    slot.close()
 
 
 if __name__ == '__main__':
     try:
-        main()
+        if '--verzoek' in sys.argv:
+            verwerk_verzoek()
+        else:
+            main()
     except pyodbc.Error as fout:
         print('SQL-fout:', fout)
         raise SystemExit(1)

@@ -5,6 +5,7 @@ import { useVoorraadArtikelen } from '../../hooks/useVoorraadArtikelen'
 import { telArtikelen, useArtikelZoeken } from '../../lib/artikelZoeken'
 import { formatDateTime, formatNumber } from '../../lib/format'
 import Modal from '../../components/Modal'
+import AxaptaSyncKnop from '../../components/AxaptaSyncKnop'
 import { TelefoonQr } from '../../components/PicklijstQrVenster'
 import MutatieForm from './MutatieForm'
 
@@ -72,7 +73,8 @@ export default function VoorraadOverzicht() {
           <h1>Voorraad</h1>
           <div className="page-header-sub">Actuele voorraadstand per locatie en mutaties</div>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <AxaptaSyncKnop />
           <Link className="btn btn-secondary" to="/voorraad/op-voorraad/rapport">
             Rapport
           </Link>

@@ -40,7 +40,14 @@ weekend elke 2 uur, en elke nacht om 02:30 een volledige run:
 0 0-1,3-5,19-23 * * 1-5 cd /home/pi/koppeling && /usr/bin/python3 axapta_sync.py >> /home/pi/koppeling/sync.log 2>&1
 0 0,4,6,8,10,12,14,16,18,20,22 * * 0,6 cd /home/pi/koppeling && /usr/bin/python3 axapta_sync.py >> /home/pi/koppeling/sync.log 2>&1
 30 2 * * * cd /home/pi/koppeling && /usr/bin/python3 axapta_sync.py --volledig >> /home/pi/koppeling/sync.log 2>&1
+* * * * * cd /home/pi/koppeling && /usr/bin/python3 axapta_sync.py --verzoek >> /home/pi/koppeling/sync.log 2>&1
 ```
+
+De laatste regel hoort bij de knop **Synchroniseren** op de pagina's
+Verkooporders en Voorraad. De knop zet `axaptaSync/verzoek` op `wachten`;
+`--verzoek` kijkt elke minuut of er een verzoek is (1 read, ±1.440 per dag)
+en draait dan een gewone run. De uitkomst komt terug in het verzoek en staat
+onder de knop.
 
 ### Zuinig met Firestore
 
