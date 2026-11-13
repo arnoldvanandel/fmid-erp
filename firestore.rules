@@ -80,6 +80,25 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Gereedschap uit Controlsys. De Pi schrijft met de servicesleutel;
+    // in de app alleen lezen.
+    match /gereedschappen/{docId} {
+      allow read: if isActive();
+      allow create, update, delete: if false;
+    }
+
+    match /gereedschapSync/{docId} {
+      allow read: if isActive();
+      allow create, update, delete: if false;
+    }
+
+    // Foto per plaatje of houder, door collega's toegevoegd in de app.
+    match /gereedschapFotos/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
     // Axapta-sync (Raspberry Pi, met de servicesleutel). In de app: de status
     // lezen en met de knop 'Synchroniseren' een verzoek op 'wachten' zetten.
     match /axaptaSync/{docId} {

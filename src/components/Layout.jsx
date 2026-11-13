@@ -5,6 +5,7 @@ import { useInstellingen } from '../hooks/useInstellingen'
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/artikelen', label: 'Artikelen' },
+  { to: '/gereedschappen', label: 'Gereedschappen' },
   { to: '/labels', label: 'Labels' },
   { to: '/klanten', label: 'Klanten' },
   { to: '/postnl', label: 'PostNL-labels' },

@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ArtikelenList from './pages/artikelen/ArtikelenList'
+import GereedschappenOverzicht from './pages/gereedschappen/GereedschappenOverzicht'
 import Labels from './pages/labels/Labels'
 import LeveranciersList from './pages/leveranciers/LeveranciersList'
 import KlantenList from './pages/klanten/KlantenList'
@@ -80,6 +81,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <ArtikelenList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/gereedschappen"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <GereedschappenOverzicht />
                 </Layout>
               </ProtectedRoute>
             }

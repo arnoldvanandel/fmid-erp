@@ -41,9 +41,17 @@ weekend elke 2 uur, en elke nacht om 02:30 een volledige run:
 0 0,4,6,8,10,12,14,16,18,20,22 * * 0,6 cd /home/pi/koppeling && /usr/bin/python3 axapta_sync.py >> /home/pi/koppeling/sync.log 2>&1
 30 2 * * * cd /home/pi/koppeling && /usr/bin/python3 axapta_sync.py --volledig >> /home/pi/koppeling/sync.log 2>&1
 * * * * * cd /home/pi/koppeling && /usr/bin/python3 axapta_sync.py --verzoek >> /home/pi/koppeling/sync.log 2>&1
+15 3 * * * cd /home/pi/koppeling && /usr/bin/python3 gereedschap_sync.py >> /home/pi/koppeling/gereedschap.log 2>&1
 ```
 
-De laatste regel hoort bij de knop **Synchroniseren** op de pagina's
+`gereedschap_sync.py` zet elke nacht om 03:15 de Controlsys-gereedschappen
+(houders, plaatjes en koppelingen) in Firestore. De ERP leest die kopie op
+Gereedschappen. Controlsys blijft leidend; de sync schrijft niets terug naar
+SQL. `python3 gereedschap_sync.py --proef` leest alleen en schrijft niets.
+De database staat in `CS_SQL_DATABASE` (standaard dezelfde server en login
+als Axapta).
+
+De regel met `--verzoek` hoort bij de knop **Synchroniseren** op de pagina's
 Verkooporders en Voorraad. De knop zet `axaptaSync/verzoek` op `wachten`;
 `--verzoek` kijkt elke minuut of er een verzoek is (1 read, ±1.440 per dag)
 en draait dan een gewone run. De uitkomst komt terug in het verzoek en staat
