@@ -756,6 +756,19 @@ table.data-table {
   pointer-events: none;
 }
 
+/* Tekening kiezen of erin slepen bij een nieuwe calculatie. */
+.tekening-kiezer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+}
+
 .empty-state {
   padding: 48px 20px;
   text-align: center;

@@ -108,6 +108,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Calculaties en aanbiedingen aan de klant (zie src/lib/calculaties.js).
+    match /calculaties/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
     match /verkooporders/{docId} {
       allow read: if isActive();
       allow create, update: if isActive();

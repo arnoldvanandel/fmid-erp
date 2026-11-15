@@ -9,6 +9,7 @@ const navItems = [
   { to: '/labels', label: 'Labels' },
   { to: '/klanten', label: 'Klanten' },
   { to: '/postnl', label: 'PostNL-labels' },
+  { to: '/calculaties', label: 'Calculaties' },
   { to: '/verkooporders', label: 'Verkooporders', end: true },
   { to: '/verkooporders/openstaand', label: 'Openstaande orders' },
   { to: '/picklijsten', label: 'Picklijsten', end: true },

@@ -18,6 +18,8 @@ import OntvangstrapportenList from './pages/inkooporders/OntvangstrapportenList'
 import OntvangstrapportAfdruk from './pages/inkooporders/OntvangstrapportAfdruk'
 import InkoopsjablonenList from './pages/inkooporders/InkoopsjablonenList'
 import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
+import CalculatiesList from './pages/calculaties/CalculatiesList'
+import AanbiedingAfdruk from './pages/calculaties/AanbiedingAfdruk'
 import OpenstaandeOrders from './pages/verkooporders/OpenstaandeOrders'
 import FacturenList from './pages/verkooporders/FacturenList'
 import VerkoopAfdruk from './pages/verkooporders/VerkoopAfdruk'
@@ -196,6 +198,24 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <InkooporderAfdruk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calculaties"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CalculatiesList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/calculaties/:id/afdruk"
+            element={
+              <ProtectedRoute>
+                <AanbiedingAfdruk />
               </ProtectedRoute>
             }
           />

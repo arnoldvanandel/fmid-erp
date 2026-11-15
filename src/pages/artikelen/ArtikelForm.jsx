@@ -818,7 +818,7 @@ function VoorraadTab({ artikel, openInkoop }) {
 // PDF-documenten gekoppeld aan dit artikel (bijv. datasheets, certificaten).
 // Bestand gaat naar Storage, de metadata (naam/grootte/link) naar Firestore —
 // zie lib/documenten.js.
-function DocumentenTab({ artikel }) {
+export function DocumentenTab({ artikel, titel = 'Documenten' }) {
   const { profile, isAdmin } = useAuth()
   const { data: documenten, loading } = useCollection('artikeldocumenten', {
     orderByField: 'datum',
@@ -907,7 +907,7 @@ function DocumentenTab({ artikel }) {
     <div className={'sleepvak' + (slepen ? ' sleepvak-actief' : '')} {...sleepProps}>
       {slepen && <div className="sleepvak-melding">Laat los om de PDF toe te voegen</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <h3 style={{ margin: 0 }}>Documenten</h3>
+        <h3 style={{ margin: 0 }}>{titel}</h3>
         <button
           type="button"
           className="btn btn-secondary btn-sm"

@@ -1,0 +1,1039 @@
+import { useEffect, useMemo, useState } from 'react'
+import { doc, onSnapshot } from 'firebase/firestore'
+import { db } from '../../firebase'
+import { useAuth } from '../../contexts/AuthContext'
+import { formatNumber, formatPrijs } from '../../lib/format'
+import { LEVERINGSVOORWAARDEN, VALUTA } from '../../lib/stamgegevens'
+import { klantEmailadressen } from '../../lib/verkooporders'
+import {
+  KOSTENSOORTEN,
+  bewerkingKosten,
+  stukSeconden,
+  STANDAARD_UURTARIEF,
+  STATUS_LABEL,
+  berekenPrijzen,
+  calculatieVelden,
+  geldigTot,
+  kostenOpbouw,
+  laadCalculatieVoorAfdruk,
+  leesAantallen,
+  prijsUitBedrag,
+  prijsUitMarge,
+  prijsUitOpslag,
+  verwijderCalculatie,
+  wijzigCalculatie,
+} from '../../lib/calculaties'
+import { aanbiedingMailTekst, aanbiedingTitel, mailAanbieding } from '../../lib/calculatieMail'
+import { GetalCel } from '../../components/RegelGrid'
+import MailVenster, { MailStatus } from '../../components/MailVenster'
+import { DocumentenTab } from '../artikelen/ArtikelForm'
+import MateriaalCalculator from './MateriaalCalculator'
+import { datumLang } from '../inkooporders/bedrijf'
+
+const TABS = [
+  { id: 'artikel', label: '1. Artikel en tekening' },
+  { id: 'calculatie', label: '2. Calculatie' },
+  { id: 'prijs', label: '3. Prijs en voorwaarden' },
+]
+
+function naarForm(c) {
+  return {
+    omschrijving: c.omschrijving || '',
+    klantArtikelnummer: c.klantArtikelnummer || '',
+    revisie: c.revisie || '',
+    contactpersoon: c.contactpersoon || '',
+    referentie: c.referentie || '',
+    aantallen: (c.aantallen || []).join(', '),
+    // Tijd per stuk in seconden (oude calculaties hadden minuten).
+    bewerkingen: (c.bewerkingen || []).map(({ stukMinuten, ...b }) => ({
+      ...b,
+      stukSeconden: stukSeconden({ ...b, stukMinuten }),
+    })),
+    kosten: (c.kosten || []).map((k) => ({ ...k })),
+    marge: c.marge ?? 0,
+    prijzen: { ...(c.prijzen || {}) },
+    valuta: c.valuta || 'EUR',
+    leveringsvoorwaarde: c.leveringsvoorwaarde || '',
+    levertijd: c.levertijd || '',
+    geldigDagen: c.geldigDagen ?? 30,
+    betalingstermijn: c.betalingstermijn ?? 30,
+    opmerkingen: c.opmerkingen || '',
+    notities: c.notities || '',
+    status: c.status || 'concept',
+  }
+}
+
+function euro(waarde, decimalen = 2) {
+  return `€ ${formatNumber(waarde, decimalen)}`
+}
+
+// Een calculatie in de volgorde van het werk: artikel en tekening, de
+// calculatie zelf, de prijs met de voorwaarden, en dan de aanbieding mailen.
+export default function CalculatieForm({ calculatie: start, startFout = null, onDone }) {
+  const { profile, isAdmin } = useAuth()
+  const gebruiker = profile?.naam || profile?.email
+
+  // Live volgen: status en mailgegevens veranderen na het mailen.
+  const [calculatie, setCalculatie] = useState(start)
+  useEffect(
+    () =>
+      onSnapshot(doc(db, 'calculaties', start.id), (snap) => {
+        if (snap.exists()) setCalculatie({ id: snap.id, ...snap.data() })
+      }),
+    [start.id]
+  )
+  const [artikel, setArtikel] = useState(null)
+  useEffect(() => {
+    if (!start.artikelId) return undefined
+    return onSnapshot(doc(db, 'artikelen', start.artikelId), (snap) => {
+      setArtikel(snap.exists() ? { id: snap.id, ...snap.data() } : null)
+    })
+  }, [start.artikelId])
+  const [klant, setKlant] = useState(null)
+  useEffect(() => {
+    if (!start.klantId) return undefined
+    return onSnapshot(doc(db, 'klanten', start.klantId), (snap) => {
+      setKlant(snap.exists() ? { id: snap.id, ...snap.data() } : null)
+    })
+  }, [start.klantId])
+
+  const [form, setForm] = useState(() => naarForm(start))
+  const [gewijzigd, setGewijzigd] = useState(false)
+  const [activeTab, setActiveTab] = useState('artikel')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(startFout)
+  const [melding, setMelding] = useState(null)
+  const [mail, setMail] = useState(null) // { gegevens, tekst }
+  const [mailen, setMailen] = useState(false)
+  const [calculatorRegel, setCalculatorRegel] = useState(null) // index in form.kosten
+
+  // Uitkomst van de materiaalcalculator in de kostenregel zetten.
+  function neemMateriaalOver(index, { materiaal, omschrijving, perStuk }) {
+    set(
+      'kosten',
+      form.kosten.map((k, i) => (i === index ? { ...k, soort: 'Materiaal', materiaal, omschrijving, perStuk } : k))
+    )
+    setCalculatorRegel(null)
+  }
+
+  // De status verandert na het mailen buiten het formulier om.
+  useEffect(() => {
+    if (!gewijzigd) setForm((f) => ({ ...f, status: calculatie.status || f.status }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calculatie.status])
+
+  function set(veld, waarde) {
+    setForm((f) => ({ ...f, [veld]: waarde }))
+    setGewijzigd(true)
+    setMelding(null)
+  }
+
+  function setRegel(lijst, index, veld, waarde) {
+    set(
+      lijst,
+      form[lijst].map((r, i) => (i === index ? { ...r, [veld]: waarde } : r))
+    )
+  }
+
+  function verwijderRegel(lijst, index) {
+    set(
+      lijst,
+      form[lijst].filter((_, i) => i !== index)
+    )
+  }
+
+  // ---------------------------------------------------------------- prijstabel
+  // Elke aanpassing in de prijstabel wordt een vaste prijs per stuk voor dat aantal.
+
+  function zetPrijs(aantal, prijs) {
+    set('prijzen', { ...form.prijzen, [String(aantal)]: prijs })
+  }
+
+  // Een getalcel meldt zich bij elk verlaten, ook zonder wijziging. Alleen een
+  // andere waarde telt; een leeggemaakte cel gaat terug naar de adviesprijs.
+  function prijsCel(aantal, getoond, nieuw, naarPrijs) {
+    if (nieuw === '') {
+      if (form.prijzen[String(aantal)] !== undefined) naarAdviesprijs(aantal)
+      return
+    }
+    if (Number(nieuw) === Number(getoond)) return
+    probeer(() => zetPrijs(aantal, naarPrijs(Number(nieuw))))
+  }
+
+  function naarAdviesprijs(aantal) {
+    const { [String(aantal)]: _weg, ...rest } = form.prijzen
+    set('prijzen', rest)
+  }
+
+  function zetAantallen(lijst, prijzen = form.prijzen) {
+    const uniek = [...new Set(lijst.filter((n) => n > 0))].sort((a, b) => a - b)
+    setForm((f) => ({ ...f, aantallen: uniek.join(', '), prijzen }))
+    setGewijzigd(true)
+    setMelding(null)
+  }
+
+  // Ander aantal: een eigen prijs verhuist mee naar het nieuwe aantal.
+  function wijzigAantal(oud, nieuw) {
+    if (!(nieuw > 0) || nieuw === oud) return
+    const { [String(oud)]: prijs, ...rest } = form.prijzen
+    const prijzen =
+      prijs === undefined || rest[String(nieuw)] !== undefined ? rest : { ...rest, [String(nieuw)]: prijs }
+    zetAantallen(
+      leesAantallen(form.aantallen).map((a) => (a === oud ? nieuw : a)),
+      prijzen
+    )
+  }
+
+  function verwijderAantal(aantal) {
+    const { [String(aantal)]: _weg, ...rest } = form.prijzen
+    zetAantallen(
+      leesAantallen(form.aantallen).filter((a) => a !== aantal),
+      rest
+    )
+  }
+
+  const [nieuwAantal, setNieuwAantal] = useState('')
+  function voegAantalToe() {
+    const n = Number(String(nieuwAantal).replace(',', '.'))
+    if (!(n > 0)) return
+    zetAantallen([...leesAantallen(form.aantallen), n])
+    setNieuwAantal('')
+  }
+
+  function probeer(fn) {
+    try {
+      setError(null)
+      fn()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // Wat er nu in het formulier staat, doorgerekend.
+  const velden = useMemo(() => calculatieVelden(form), [form])
+  const aantallenLijst = velden.aantallen
+  // Alle bewerkingen samen: instellen (per serie) en bewerken per stuk.
+  const bewerkingTotaal = useMemo(
+    () =>
+      form.bewerkingen.reduce(
+        (som, b) => {
+          const k = bewerkingKosten(b)
+          return { instel: som.instel + k.instel, perStuk: som.perStuk + k.perStuk }
+        },
+        { instel: 0, perStuk: 0 }
+      ),
+    [form.bewerkingen]
+  )
+  // Alle materiaal- en overige kosten samen.
+  const kostenTotaal = useMemo(
+    () =>
+      form.kosten.reduce(
+        (som, k) => ({
+          perStuk: som.perStuk + (Number(k.perStuk) || 0),
+          eenmalig: som.eenmalig + (Number(k.eenmalig) || 0),
+        }),
+        { perStuk: 0, eenmalig: 0 }
+      ),
+    [form.kosten]
+  )
+  const opbouw = useMemo(() => kostenOpbouw(velden), [velden])
+  const regels = useMemo(() => berekenPrijzen(velden), [velden])
+
+  async function slaOp() {
+    setError(null)
+    setSaving(true)
+    try {
+      await wijzigCalculatie(calculatie, form)
+      setGewijzigd(false)
+      setMelding('Opgeslagen.')
+      return true
+    } catch (err) {
+      setError(err.message)
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    await slaOp()
+  }
+
+  function controleerAanbieding() {
+    if (regels.length === 0) throw new Error('Vul minimaal één aantal in.')
+    if (regels.some((r) => !(r.prijs > 0))) {
+      throw new Error('Nog niet elk aantal heeft een prijs. Vul de calculatie of de prijs in.')
+    }
+  }
+
+  async function bekijkAanbieding() {
+    setError(null)
+    try {
+      controleerAanbieding()
+      if (gewijzigd && !(await slaOp())) return
+      window.open(`/calculaties/${calculatie.id}/afdruk`, '_blank', 'noopener')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function openMail() {
+    setError(null)
+    try {
+      controleerAanbieding()
+      if (gewijzigd && !(await slaOp())) return
+      const gegevens = await laadCalculatieVoorAfdruk(calculatie.id)
+      setMail({
+        gegevens,
+        tekst: aanbiedingMailTekst({
+          gegevens,
+          gebruiker,
+          handtekening: profile?.handtekening,
+        }),
+      })
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function verstuurMail(ontvangers) {
+    setMailen(true)
+    try {
+      await mailAanbieding({
+        gegevens: mail.gegevens,
+        ontvangers,
+        tekst: mail.tekst,
+        gebruiker,
+        gebruikerEmail: profile?.email,
+        handtekening: profile?.handtekening,
+      })
+      setMail(null)
+      setMelding('De aanbieding is klaargezet om te mailen en opgeslagen bij de calculatie.')
+    } finally {
+      setMailen(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Calculatie ${calculatie.calculatienummer} verwijderen? Het artikel en de tekening blijven staan.`))
+      return
+    setError(null)
+    try {
+      await verwijderCalculatie(calculatie)
+      onDone?.()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {error && <div className="banner banner-danger">{error}</div>}
+      {melding && <div className="banner banner-info">{melding}</div>}
+
+      <div className="field-row">
+        <div className="field">
+          <label>Klant</label>
+          <input type="text" value={`${calculatie.klantcode} — ${calculatie.klantNaam}`} disabled />
+        </div>
+        <div className="field">
+          <label>Artikel</label>
+          <input type="text" value={calculatie.artikelnummer || ''} disabled />
+        </div>
+        <div className="field">
+          <label>Status</label>
+          <select value={form.status} onChange={(e) => set('status', e.target.value)}>
+            {Object.entries(STATUS_LABEL).map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <MailStatus document={calculatie} titel="Aanbieding gemaild" />
+
+      <div className="tab-row">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={'tab-btn' + (activeTab === t.id ? ' active' : '')}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="tab-paneel">
+        {activeTab === 'artikel' && (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Ons artikelnummer</label>
+                <input type="text" value={calculatie.artikelnummer || ''} disabled />
+                <span className="hint">Eerste 3 letters van de klant + het artikelnummer van de klant.</span>
+              </div>
+              <div className="field">
+                <label>Artikelnummer van de klant</label>
+                <input
+                  type="text"
+                  value={form.klantArtikelnummer}
+                  onChange={(e) => set('klantArtikelnummer', e.target.value)}
+                />
+              </div>
+              <div className="field" style={{ maxWidth: 140 }}>
+                <label>Revisie tekening</label>
+                <input type="text" value={form.revisie} onChange={(e) => set('revisie', e.target.value)} />
+              </div>
+            </div>
+            <div className="field">
+              <label>Omschrijving</label>
+              <input type="text" value={form.omschrijving} onChange={(e) => set('omschrijving', e.target.value)} />
+              <span className="hint">Staat op de aanbieding en is de naam van het artikel.</span>
+            </div>
+
+            {artikel ? (
+              <DocumentenTab artikel={artikel} titel="Tekening" />
+            ) : (
+              <div className="banner banner-warning">
+                Het artikel {calculatie.artikelnummer} bestaat niet meer; een tekening toevoegen kan daardoor niet.
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'calculatie' && (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Aantallen</label>
+                <input
+                  type="text"
+                  value={form.aantallen}
+                  onChange={(e) => set('aantallen', e.target.value)}
+                  placeholder="bijv. 10, 50, 100"
+                />
+                <span className="hint">
+                  Voor elk aantal komt er een prijs op de aanbieding
+                  {leesAantallen(form.aantallen).length ? `: ${leesAantallen(form.aantallen).join(', ')} stuks.` : '.'}
+                </span>
+              </div>
+            </div>
+
+            <div className="regel-grid-kop">
+              <h3>Bewerkingen</h3>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() =>
+                  set('bewerkingen', [
+                    ...form.bewerkingen,
+                    {
+                      omschrijving: '',
+                      instelMinuten: '',
+                      stukSeconden: '',
+                      uurtarief: form.bewerkingen.at(-1)?.uurtarief ?? STANDAARD_UURTARIEF,
+                    },
+                  ])
+                }
+              >
+                + Bewerking
+              </button>
+            </div>
+            <div className="regel-grid-wrap">
+              <table className="regel-grid">
+                <thead>
+                  <tr>
+                    <th>Bewerking</th>
+                    <th className="num">Insteltijd (min)</th>
+                    <th className="num">Tijd per stuk (sec)</th>
+                    <th className="num">Uurtarief (€)</th>
+                    <th className="num">Instelkosten</th>
+                    <th className="num" title="Alleen de bewerkingstijd, zonder instellen">
+                      Bewerken per stuk
+                    </th>
+                    {aantallenLijst.map((a) => (
+                      <th key={a} className="num" title={`Instelkosten verdeeld over ${a} stuks + bewerken per stuk`}>
+                        Per stuk bij {formatNumber(a, 0)}
+                      </th>
+                    ))}
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.bewerkingen.length === 0 ? (
+                    <tr>
+                      <td colSpan={7 + aantallenLijst.length} className="regel-grid-leeg">
+                        Nog geen bewerkingen. Voeg bijvoorbeeld zagen, draaien of frezen toe.
+                      </td>
+                    </tr>
+                  ) : (
+                    form.bewerkingen.map((b, i) => (
+                      <tr key={i}>
+                        <td>
+                          <input
+                            type="text"
+                            value={b.omschrijving}
+                            placeholder="bijv. Draaien"
+                            onChange={(e) => setRegel('bewerkingen', i, 'omschrijving', e.target.value)}
+                          />
+                        </td>
+                        <td className="num">
+                          <GetalCel
+                            value={b.instelMinuten}
+                            decimalen={0}
+                            maxDecimalen={1}
+                            onCommit={(v) => setRegel('bewerkingen', i, 'instelMinuten', v)}
+                          />
+                        </td>
+                        <td className="num">
+                          <GetalCel
+                            value={b.stukSeconden}
+                            decimalen={0}
+                            maxDecimalen={1}
+                            onCommit={(v) => setRegel('bewerkingen', i, 'stukSeconden', v)}
+                          />
+                        </td>
+                        <td className="num">
+                          <GetalCel
+                            value={b.uurtarief}
+                            decimalen={2}
+                            onCommit={(v) => setRegel('bewerkingen', i, 'uurtarief', v)}
+                          />
+                        </td>
+                        <td className="num alleen-lezen">{formatNumber(bewerkingKosten(b).instel, 2)}</td>
+                        <td className="num alleen-lezen">{formatNumber(bewerkingKosten(b).perStuk, 4)}</td>
+                        {aantallenLijst.map((a) => (
+                          <td key={a} className="num alleen-lezen">
+                            {formatNumber(bewerkingKosten(b).instel / a + bewerkingKosten(b).perStuk, 4)}
+                          </td>
+                        ))}
+                        <td className="alleen-lezen" style={{ textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => verwijderRegel('bewerkingen', i)}
+                            aria-label="Bewerking verwijderen"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {form.bewerkingen.length > 1 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={4}>Totaal bewerkingen</td>
+                      <td className="num">{formatNumber(bewerkingTotaal.instel, 2)}</td>
+                      <td className="num">{formatNumber(bewerkingTotaal.perStuk, 4)}</td>
+                      {aantallenLijst.map((a) => (
+                        <td key={a} className="num">
+                          {formatNumber(bewerkingTotaal.instel / a + bewerkingTotaal.perStuk, 4)}
+                        </td>
+                      ))}
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+
+            <div className="regel-grid-kop" style={{ marginTop: 18 }}>
+              <h3>Materiaal en overige kosten</h3>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    set('kosten', [
+                      ...form.kosten,
+                      {
+                        soort: 'Materiaal',
+                        omschrijving: '',
+                        perStuk: '',
+                        eenmalig: '',
+                      },
+                    ])
+                    setCalculatorRegel(form.kosten.length)
+                  }}
+                >
+                  + Materiaal
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() =>
+                    set('kosten', [
+                      ...form.kosten,
+                      {
+                        soort: 'Uitbesteed',
+                        omschrijving: '',
+                        perStuk: '',
+                        eenmalig: '',
+                      },
+                    ])
+                  }
+                >
+                  + Overige kosten
+                </button>
+              </div>
+            </div>
+            <div className="regel-grid-wrap">
+              <table className="regel-grid">
+                <thead>
+                  <tr>
+                    <th>Soort</th>
+                    <th>Omschrijving</th>
+                    <th className="num">Per stuk (€)</th>
+                    <th className="num">Eenmalig (€)</th>
+                    {aantallenLijst.map((a) => (
+                      <th key={a} className="num" title={`Per stuk + eenmalige kosten verdeeld over ${a} stuks`}>
+                        Per stuk bij {formatNumber(a, 0)}
+                      </th>
+                    ))}
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.kosten.length === 0 ? (
+                    <tr>
+                      <td colSpan={5 + aantallenLijst.length} className="regel-grid-leeg">
+                        Nog geen kosten. Voeg materiaal, uitbesteed werk of gereedschap toe.
+                      </td>
+                    </tr>
+                  ) : (
+                    form.kosten.map((k, i) => (
+                      <tr key={i}>
+                        <td>
+                          <select
+                            value={k.soort}
+                            onChange={(e) => {
+                              setRegel('kosten', i, 'soort', e.target.value)
+                              if (e.target.value === 'Materiaal') setCalculatorRegel(i)
+                            }}
+                          >
+                            {KOSTENSOORTEN.map((s) => (
+                              <option key={s}>{s}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={k.omschrijving}
+                            placeholder="bijv. Messing staf Ø30"
+                            onChange={(e) => setRegel('kosten', i, 'omschrijving', e.target.value)}
+                          />
+                        </td>
+                        <td className="num">
+                          <GetalCel
+                            value={k.perStuk}
+                            decimalen={2}
+                            maxDecimalen={4}
+                            onCommit={(v) => setRegel('kosten', i, 'perStuk', v)}
+                          />
+                        </td>
+                        <td className="num">
+                          <GetalCel
+                            value={k.eenmalig}
+                            decimalen={2}
+                            onCommit={(v) => setRegel('kosten', i, 'eenmalig', v)}
+                          />
+                        </td>
+                        {aantallenLijst.map((a) => (
+                          <td key={a} className="num alleen-lezen">
+                            {formatNumber((Number(k.perStuk) || 0) + (Number(k.eenmalig) || 0) / a, 4)}
+                          </td>
+                        ))}
+                        <td className="alleen-lezen" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {k.soort === 'Materiaal' && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => setCalculatorRegel(i)}
+                              title="Materiaalprijs per stuk berekenen"
+                            >
+                              Calculator
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => verwijderRegel('kosten', i)}
+                            aria-label="Kostenregel verwijderen"
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {form.kosten.length > 1 && (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={2}>Totaal materiaal en overige kosten</td>
+                      <td className="num">{formatNumber(kostenTotaal.perStuk, 4)}</td>
+                      <td className="num">{formatNumber(kostenTotaal.eenmalig, 2)}</td>
+                      {aantallenLijst.map((a) => (
+                        <td key={a} className="num">
+                          {formatNumber(kostenTotaal.perStuk + kostenTotaal.eenmalig / a, 4)}
+                        </td>
+                      ))}
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+
+            {regels.length > 0 && (
+              <div className="regel-grid-wrap" style={{ marginTop: 14 }}>
+                <table className="regel-grid">
+                  <tbody>
+                    <tr>
+                      <td style={{ fontWeight: 600 }}>Kostprijs per stuk (bewerkingen + materiaal en kosten)</td>
+                      {regels.map((r) => (
+                        <td key={r.aantal} className="num" style={{ fontWeight: 600 }}>
+                          bij {formatNumber(r.aantal, 0)}: {euro(r.kostprijs, 4)}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <p className="hint" style={{ marginTop: 8 }}>
+              Eenmalig per serie (instellen, gereedschap): <strong>{euro(opbouw.vast)}</strong> · per stuk:{' '}
+              <strong>{euro(opbouw.perStuk, 4)}</strong>. De prijs voor de klant stel je in op het tabblad Prijs en
+              voorwaarden.
+            </p>
+
+            <div className="field" style={{ marginTop: 14 }}>
+              <label>Notities bij de calculatie (intern)</label>
+              <textarea rows={3} value={form.notities} onChange={(e) => set('notities', e.target.value)} />
+              <span className="hint">Komt niet op de aanbieding.</span>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'prijs' && (
+          <>
+            <div className="field-row">
+              <div className="field">
+                <label>Standaard opslag op de kostprijs (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={form.marge}
+                  onChange={(e) => set('marge', e.target.value)}
+                />
+                <span className="hint">Geldt voor elk aantal zonder eigen prijs (de adviesprijs).</span>
+              </div>
+              <div className="field">
+                <label>Valuta</label>
+                <select value={form.valuta} onChange={(e) => set('valuta', e.target.value)}>
+                  {VALUTA.map((v) => (
+                    <option key={v}>{v}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="regel-grid-kop">
+              <h3>Prijs per aantal</h3>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={nieuwAantal}
+                  onChange={(e) => setNieuwAantal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    voegAantalToe()
+                  }}
+                  placeholder="Aantal"
+                  aria-label="Aantal toevoegen"
+                  style={{ width: 100 }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={voegAantalToe}
+                  disabled={!(Number(String(nieuwAantal).replace(',', '.')) > 0)}
+                >
+                  + Aantal
+                </button>
+              </div>
+            </div>
+            <div className="regel-grid-wrap">
+              <table className="regel-grid">
+                <thead>
+                  <tr>
+                    <th className="num">Aantal</th>
+                    <th className="num">Eenmalig per stuk</th>
+                    <th className="num">Kosten per stuk</th>
+                    <th className="num">Kostprijs</th>
+                    <th className="num">Opslag (%)</th>
+                    <th className="num">Prijs per stuk ({form.valuta})</th>
+                    <th className="num">Marge (%)</th>
+                    <th className="num">Bedrag ({form.valuta})</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regels.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="regel-grid-leeg">
+                        Nog geen aantallen. Vul hierboven een aantal in en kies + Aantal.
+                      </td>
+                    </tr>
+                  ) : (
+                    regels.map((r) => (
+                      <tr key={r.aantal}>
+                        <td className="num">
+                          <GetalCel
+                            value={r.aantal}
+                            decimalen={0}
+                            maxDecimalen={2}
+                            onCommit={(v) => wijzigAantal(r.aantal, v)}
+                          />
+                        </td>
+                        <td className="num alleen-lezen">{formatNumber(r.vastPerStuk, 2)}</td>
+                        <td className="num alleen-lezen">{formatNumber(r.perStuk, 2)}</td>
+                        <td className="num alleen-lezen">{formatNumber(r.kostprijs, 2)}</td>
+                        <td className="num">
+                          <GetalCel
+                            value={Math.round(r.opslagPct * 10) / 10}
+                            decimalen={1}
+                            maxDecimalen={2}
+                            onCommit={(v) =>
+                              prijsCel(r.aantal, Math.round(r.opslagPct * 10) / 10, v, (o) =>
+                                prijsUitOpslag(r.kostprijs, o)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="num">
+                          <GetalCel
+                            value={r.prijs}
+                            decimalen={2}
+                            maxDecimalen={4}
+                            onCommit={(v) => prijsCel(r.aantal, r.prijs, v, (p) => p)}
+                          />
+                        </td>
+                        <td className="num">
+                          <GetalCel
+                            value={Math.round(r.margePct * 10) / 10}
+                            decimalen={1}
+                            maxDecimalen={2}
+                            onCommit={(v) =>
+                              prijsCel(r.aantal, Math.round(r.margePct * 10) / 10, v, (m) =>
+                                prijsUitMarge(r.kostprijs, m)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="num">
+                          <GetalCel
+                            value={Math.round(r.bedrag * 100) / 100}
+                            decimalen={2}
+                            onCommit={(v) =>
+                              prijsCel(r.aantal, Math.round(r.bedrag * 100) / 100, v, (b) =>
+                                prijsUitBedrag(b, r.aantal)
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="alleen-lezen" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {r.handmatig && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => naarAdviesprijs(r.aantal)}
+                              title={`Terug naar de adviesprijs (${formatNumber(r.advies, 2)})`}
+                            >
+                              Advies
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => verwijderAantal(r.aantal)}
+                            aria-label={`Aantal ${r.aantal} verwijderen`}
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="hint" style={{ marginTop: 8 }}>
+              Pas het aantal, de opslag, de prijs per stuk, de marge of het bedrag aan; de rest rekent mee. Opslag is
+              over de kostprijs, marge over de verkoopprijs. Een aangepaste regel houdt zijn eigen prijs; met Advies
+              gaat hij terug naar de standaard opslag.
+              {Object.keys(velden.prijzen).length > 1 && (
+                <>
+                  {' '}
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => set('prijzen', {})}>
+                    Alles terug naar adviesprijzen
+                  </button>
+                </>
+              )}
+            </p>
+
+            <div className="field-row" style={{ marginTop: 14 }}>
+              <div className="field">
+                <label>Leveringsvoorwaarde</label>
+                <select value={form.leveringsvoorwaarde} onChange={(e) => set('leveringsvoorwaarde', e.target.value)}>
+                  <option value="">— kies —</option>
+                  {Object.entries(LEVERINGSVOORWAARDEN).map(([code, naam]) => (
+                    <option key={code} value={code}>
+                      {code} — {naam}
+                    </option>
+                  ))}
+                  {form.leveringsvoorwaarde && !LEVERINGSVOORWAARDEN[form.leveringsvoorwaarde] && (
+                    <option value={form.leveringsvoorwaarde}>{form.leveringsvoorwaarde}</option>
+                  )}
+                </select>
+              </div>
+              <div className="field">
+                <label>Levertijd</label>
+                <input
+                  type="text"
+                  value={form.levertijd}
+                  onChange={(e) => set('levertijd', e.target.value)}
+                  placeholder="bijv. 4 weken na opdracht"
+                />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Betalingstermijn (dagen)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.betalingstermijn}
+                  onChange={(e) => set('betalingstermijn', e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Aanbieding geldig (dagen)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.geldigDagen}
+                  onChange={(e) => set('geldigDagen', e.target.value)}
+                />
+                <span className="hint">
+                  {geldigTot({ ...calculatie, geldigDagen: form.geldigDagen })
+                    ? `Geldig tot ${datumLang(geldigTot({ ...calculatie, geldigDagen: form.geldigDagen }))}.`
+                    : 'Zonder einddatum.'}
+                </span>
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Contactpersoon bij de klant</label>
+                <input
+                  type="text"
+                  value={form.contactpersoon}
+                  onChange={(e) => set('contactpersoon', e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>Uw referentie</label>
+                <input
+                  type="text"
+                  value={form.referentie}
+                  onChange={(e) => set('referentie', e.target.value)}
+                  placeholder="Aanvraagnummer van de klant"
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label>Opmerkingen (komen op de aanbieding)</label>
+              <textarea rows={3} value={form.opmerkingen} onChange={(e) => set('opmerkingen', e.target.value)} />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+        <div>
+          {isAdmin && (
+            <button type="button" className="btn btn-danger" onClick={handleDelete} disabled={saving}>
+              Verwijderen
+            </button>
+          )}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <button type="button" className="btn btn-secondary" onClick={() => onDone?.()} disabled={saving}>
+            Sluiten
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={bekijkAanbieding} disabled={saving}>
+            Aanbieding bekijken
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={openMail} disabled={saving}>
+            Aanbieding mailen
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={saving || !gewijzigd}>
+            {saving ? 'Opslaan…' : 'Opslaan'}
+          </button>
+        </div>
+      </div>
+
+      {calculatorRegel !== null && form.kosten[calculatorRegel] && (
+        <MateriaalCalculator
+          waarde={form.kosten[calculatorRegel].materiaal}
+          onOvernemen={(uitkomst) => neemMateriaalOver(calculatorRegel, uitkomst)}
+          onAnnuleren={() => setCalculatorRegel(null)}
+        />
+      )}
+
+      {mail && (
+        <MailVenster
+          titel={`${aanbiedingTitel(mail.gegevens)} mailen`}
+          standaardAdressen={klantEmailadressen(klant || mail.gegevens.klant, 'bevestiging')}
+          eerderGemaildOp={calculatie.gemaildOp}
+          gebruikerEmail={profile?.email}
+          bezig={mailen}
+          width={640}
+          onVersturen={verstuurMail}
+          onAnnuleren={() => setMail(null)}
+        >
+          <div className="field">
+            <label>Bericht</label>
+            <textarea rows={11} value={mail.tekst} onChange={(e) => setMail({ ...mail, tekst: e.target.value })} />
+            <span className="hint">
+              De aanbieding gaat als PDF mee: {formatNumber(mail.gegevens.regels.length, 0)}{' '}
+              {mail.gegevens.regels.length === 1 ? 'prijs' : 'prijzen'}, vanaf{' '}
+              {mail.gegevens.calculatie.valuta || 'EUR'}{' '}
+              {formatPrijs(Math.min(...mail.gegevens.regels.map((r) => r.prijs)))} per stuk.
+            </span>
+          </div>
+        </MailVenster>
+      )}
+    </form>
+  )
+}
