@@ -4,7 +4,9 @@ import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatNumber, formatPrijs } from '../../lib/format'
 import { LEVERINGSVOORWAARDEN, VALUTA } from '../../lib/stamgegevens'
-import { klantEmailadressen } from '../../lib/verkooporders'
+import { hoofdadres, klantEmailadressen } from '../../lib/verkooporders'
+import { MAIL_TALEN } from '../../lib/inkooporderMail'
+import KlantKiezerVenster from './KlantKiezerVenster'
 import {
   KOSTENSOORTEN,
   bewerkingKosten,
@@ -38,6 +40,11 @@ const TABS = [
 
 function naarForm(c) {
   return {
+    klantId: c.klantId || '',
+    klantcode: c.klantcode || '',
+    klantNaam: c.klantNaam || '',
+    adres: { naam: c.klantNaam || '', straat: '', postcode: '', plaats: '', land: '', ...(c.adres || {}) },
+    taal: c.taal || 'nl',
     omschrijving: c.omschrijving || '',
     klantArtikelnummer: c.klantArtikelnummer || '',
     revisie: c.revisie || '',
@@ -91,11 +98,12 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
   }, [start.artikelId])
   const [klant, setKlant] = useState(null)
   useEffect(() => {
-    if (!start.klantId) return undefined
-    return onSnapshot(doc(db, 'klanten', start.klantId), (snap) => {
+    // Volgt de opgeslagen klant, ook nadat die gewijzigd is.
+    if (!calculatie.klantId) return undefined
+    return onSnapshot(doc(db, 'klanten', calculatie.klantId), (snap) => {
       setKlant(snap.exists() ? { id: snap.id, ...snap.data() } : null)
     })
-  }, [start.klantId])
+  }, [calculatie.klantId])
 
   const [form, setForm] = useState(() => naarForm(start))
   const [gewijzigd, setGewijzigd] = useState(false)
@@ -106,6 +114,27 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
   const [mail, setMail] = useState(null) // { gegevens, tekst }
   const [mailen, setMailen] = useState(false)
   const [calculatorRegel, setCalculatorRegel] = useState(null) // index in form.kosten
+  const [klantKiezen, setKlantKiezen] = useState(false)
+
+  // Andere klant: naam, adres, contactpersoon en taal van de aanbieding gaan mee.
+  function kiesKlant(k) {
+    setForm((f) => ({
+      ...f,
+      klantId: k.id,
+      klantcode: k.klantcode || '',
+      klantNaam: k.naam || '',
+      adres: hoofdadres(k),
+      contactpersoon: k.contactpersoon || '',
+      taal: k.taal || f.taal,
+    }))
+    setGewijzigd(true)
+    setMelding(`Klant gewijzigd in ${k.klantcode} — ${k.naam}. Vergeet niet op te slaan.`)
+    setKlantKiezen(false)
+  }
+
+  function setAdres(veld, waarde) {
+    set('adres', { ...form.adres, [veld]: waarde })
+  }
 
   // Uitkomst van de materiaalcalculator in de kostenregel zetten.
   function neemMateriaalOver(index, { materiaal, omschrijving, perStuk }) {
@@ -335,7 +364,17 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
       <div className="field-row">
         <div className="field">
           <label>Klant</label>
-          <input type="text" value={`${calculatie.klantcode} — ${calculatie.klantNaam}`} disabled />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input type="text" value={`${form.klantcode} — ${form.klantNaam}`} disabled />
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setKlantKiezen(true)}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              Wijzigen
+            </button>
+          </div>
         </div>
         <div className="field">
           <label>Artikel</label>
@@ -945,6 +984,46 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
                 </span>
               </div>
             </div>
+            <div className="regel-grid-kop" style={{ marginTop: 6 }}>
+              <h3>Aanbieding aan</h3>
+            </div>
+            <div className="field-row">
+              <div className="field">
+                <label>Naam</label>
+                <input type="text" value={form.adres.naam} onChange={(e) => setAdres('naam', e.target.value)} />
+                <span className="hint">
+                  Zoals hij op de aanbieding staat. Een andere klant kies je bovenaan met Wijzigen.
+                </span>
+              </div>
+              <div className="field">
+                <label>Straat</label>
+                <input type="text" value={form.adres.straat} onChange={(e) => setAdres('straat', e.target.value)} />
+              </div>
+            </div>
+            <div className="field-row">
+              <div className="field" style={{ maxWidth: 140 }}>
+                <label>Postcode</label>
+                <input type="text" value={form.adres.postcode} onChange={(e) => setAdres('postcode', e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Plaats</label>
+                <input type="text" value={form.adres.plaats} onChange={(e) => setAdres('plaats', e.target.value)} />
+              </div>
+              <div className="field">
+                <label>Land</label>
+                <input type="text" value={form.adres.land} onChange={(e) => setAdres('land', e.target.value)} />
+              </div>
+              <div className="field" style={{ maxWidth: 160 }}>
+                <label>Taal</label>
+                <select value={form.taal} onChange={(e) => set('taal', e.target.value)}>
+                  {Object.entries(MAIL_TALEN).map(([code, naam]) => (
+                    <option key={code} value={code}>
+                      {naam}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="field-row">
               <div className="field">
                 <label>Contactpersoon bij de klant</label>
@@ -1003,6 +1082,14 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
         </div>
       </div>
 
+      {klantKiezen && (
+        <KlantKiezerVenster
+          huidigeKlantId={form.klantId}
+          onKies={kiesKlant}
+          onAnnuleren={() => setKlantKiezen(false)}
+        />
+      )}
+
       {calculatorRegel !== null && form.kosten[calculatorRegel] && (
         <MateriaalCalculator
           waarde={form.kosten[calculatorRegel].materiaal}
@@ -1014,7 +1101,7 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
       {mail && (
         <MailVenster
           titel={`${aanbiedingTitel(mail.gegevens)} mailen`}
-          standaardAdressen={klantEmailadressen(klant || mail.gegevens.klant, 'bevestiging')}
+          standaardAdressen={klantEmailadressen(mail.gegevens.klant || klant, 'bevestiging')}
           eerderGemaildOp={calculatie.gemaildOp}
           gebruikerEmail={profile?.email}
           bezig={mailen}

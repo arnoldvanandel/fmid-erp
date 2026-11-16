@@ -278,7 +278,21 @@ export function calculatieVelden(form) {
     const p = form.prijzen?.[String(aantal)]
     if (p !== '' && p != null && Number.isFinite(Number(p))) prijzen[String(aantal)] = rond(p, 4)
   }
+  const tekst = (v) => String(v || '').trim()
   const velden = {
+    // De klant kan na het aanmaken nog veranderen, ook als de aanbieding al verstuurd is.
+    klantId: tekst(form.klantId),
+    klantcode: tekst(form.klantcode),
+    klantNaam: tekst(form.klantNaam),
+    // Naam en adres zoals ze op de aanbieding staan.
+    adres: {
+      naam: tekst(form.adres?.naam),
+      straat: tekst(form.adres?.straat),
+      postcode: tekst(form.adres?.postcode),
+      plaats: tekst(form.adres?.plaats),
+      land: tekst(form.adres?.land),
+    },
+    taal: ['nl', 'de', 'en'].includes(form.taal) ? form.taal : 'nl',
     omschrijving: String(form.omschrijving || '').trim(),
     klantArtikelnummer: String(form.klantArtikelnummer || '').trim(),
     revisie: String(form.revisie || '').trim(),
@@ -324,18 +338,29 @@ export function calculatieVelden(form) {
 
 export async function wijzigCalculatie(calculatie, form) {
   const velden = calculatieVelden(form)
+  if (!velden.klantId) throw new Error('Kies een klant.')
+  if (!velden.adres.naam) throw new Error('Vul de naam in waaraan de aanbieding gericht is.')
   if (!velden.omschrijving) throw new Error('Vul een omschrijving in.')
   if (velden.aantallen.length === 0) throw new Error('Vul minimaal één aantal in.')
   await updateDoc(doc(db, 'calculaties', calculatie.id), { ...velden, gewijzigdOp: serverTimestamp() })
-  // De omschrijving en het klantnummer horen ook bij het artikel.
+  // Omschrijving, klantnummer en klant horen ook bij het artikel. Het
+  // artikelnummer zelf blijft hetzelfde.
+  const klantAnders = velden.klantId !== calculatie.klantId
   if (
     calculatie.artikelId &&
-    (velden.omschrijving !== calculatie.omschrijving || velden.klantArtikelnummer !== calculatie.klantArtikelnummer)
+    (klantAnders ||
+      velden.omschrijving !== calculatie.omschrijving ||
+      velden.klantArtikelnummer !== calculatie.klantArtikelnummer)
   ) {
     const snap = await getDoc(doc(db, 'artikelen', calculatie.artikelId))
     if (snap.exists()) {
       const artikel = snap.data()
       const nieuw = { naam: velden.omschrijving, klantArtikelnummer: velden.klantArtikelnummer }
+      // Alleen een artikel dat bij de oude klant hoorde, verhuist mee.
+      if (klantAnders && (!artikel.klantId || artikel.klantId === calculatie.klantId)) {
+        nieuw.klantId = velden.klantId
+        nieuw.klantcode = velden.klantcode
+      }
       await updateDoc(snap.ref, {
         ...nieuw,
         zoek: zoekTermen({ ...artikel, ...nieuw, zoeknaam: artikel.zoeknaam || velden.klantArtikelnummer }),
