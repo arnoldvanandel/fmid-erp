@@ -17,6 +17,8 @@ const ZXING_FORMATEN = [
   BarcodeFormat.UPC_E,
   BarcodeFormat.CODE_128,
   BarcodeFormat.CODE_39,
+  BarcodeFormat.CODE_93,
+  BarcodeFormat.CODABAR,
   BarcodeFormat.ITF,
   BarcodeFormat.QR_CODE,
 ]
@@ -97,24 +99,45 @@ function maakZxing() {
   return lezer
 }
 
-function leesMetZxing(zxing, video, canvas) {
-  const bronW = video.videoWidth
-  const bronH = video.videoHeight
+// Leest een beeld (video of foto) met de reservelezer. Met `draai` wordt het
+// beeld ook een kwartslag gedraaid geprobeerd, voor een etiket dat rechtop staat.
+function leesMetZxing(zxing, bron, bronW, bronH, canvas, { max = 1400, draai = false } = {}) {
   if (!bronW || !bronH) return ''
-  const schaal = Math.min(1, 1400 / bronW)
+  const schaal = Math.min(1, max / Math.max(bronW, bronH))
   const w = Math.max(1, Math.floor(bronW * schaal))
   const h = Math.max(1, Math.floor(bronH * schaal))
-  if (canvas.width !== w) canvas.width = w
-  if (canvas.height !== h) canvas.height = h
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  ctx.drawImage(video, 0, 0, w, h)
+  for (const gedraaid of draai ? [false, true] : [false]) {
+    const cw = gedraaid ? h : w
+    const ch = gedraaid ? w : h
+    if (canvas.width !== cw) canvas.width = cw
+    if (canvas.height !== ch) canvas.height = ch
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    ctx.save()
+    if (gedraaid) {
+      ctx.translate(cw, 0)
+      ctx.rotate(Math.PI / 2)
+    }
+    ctx.drawImage(bron, 0, 0, w, h)
+    ctx.restore()
+    const waarde = decodeerCanvas(zxing, ctx, cw, ch)
+    if (waarde) return waarde
+  }
+  return ''
+}
+
+function decodeerCanvas(zxing, ctx, w, h) {
   const pixels = ctx.getImageData(0, 0, w, h).data
   const grijs = new Uint8ClampedArray(w * h)
   for (let i = 0, j = 0; i < pixels.length; i += 4, j += 1) {
     grijs[j] = (pixels[i] + pixels[i + 1] * 2 + pixels[i + 2]) >> 2
   }
   try {
-    return zxing.decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(grijs, w, h)))).getText()?.trim() || ''
+    return (
+      zxing
+        .decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(grijs, w, h))))
+        .getText()
+        ?.trim() || ''
+    )
   } catch {
     return ''
   } finally {
@@ -160,6 +183,9 @@ export default function BarcodeCamera({ onCode, onSluiten }) {
   const [zoomAan, setZoomAan] = useState(false)
   const [afstand, setAfstand] = useState(null)
   const [melding, setMelding] = useState('')
+  const [herstart, setHerstart] = useState(0)
+  const [fotoBezig, setFotoBezig] = useState(false)
+  const fotoRef = useRef(null)
   onCodeRef.current = onCode
 
   useEffect(() => {
@@ -200,7 +226,9 @@ export default function BarcodeCamera({ onCode, onSluiten }) {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: cameraId ? { ...formaat, deviceId: { exact: cameraId } } : { ...formaat, facingMode: { ideal: 'environment' } },
+          video: cameraId
+            ? { ...formaat, deviceId: { exact: cameraId } }
+            : { ...formaat, facingMode: { ideal: 'environment' } },
         })
       } catch (err) {
         if (cameraId && (err?.name === 'OverconstrainedError' || err?.name === 'NotFoundError')) {
@@ -246,34 +274,47 @@ export default function BarcodeCamera({ onCode, onSluiten }) {
         zoom: caps.zoom && caps.zoom.max > caps.zoom.min ? caps.zoom : null,
       })
 
-      const detector = await maakDetector()
-      const zxing = detector ? null : maakZxing()
-      setLezer(detector ? 'Barcodelezer van Android' : 'Reservelezer (deze browser heeft geen barcodelezer)')
+      // Op sommige Android-toestellen bestaat de BarcodeDetector wel, maar vindt
+      // hij nooit iets. Daarom leest de reservelezer elk derde beeld mee.
+      let detector = await maakDetector()
+      const zxing = maakZxing()
+      setLezer(
+        detector ? 'Barcodelezer van Android + reservelezer' : 'Reservelezer (deze browser heeft geen barcodelezer)'
+      )
       setBezig(false)
 
+      let beeld = 0
+      let detectorFouten = 0
       const tick = async () => {
         if (gestopt) return
         if (video.readyState >= 2) {
-          try {
-            if (detector) {
+          beeld += 1
+          if (detector) {
+            try {
               const codes = await detector.detect(video)
+              detectorFouten = 0
               const code = codes.find((c) => String(c.rawValue || '').trim())
               if (code) {
                 gevonden(code.rawValue)
                 return
               }
-            } else {
-              const waarde = leesMetZxing(zxing, video, canvas)
-              if (waarde) {
-                gevonden(waarde)
-                return
+            } catch {
+              detectorFouten += 1
+              if (detectorFouten >= 5) {
+                detector = null
+                setLezer('Reservelezer (barcodelezer van Android werkt niet)')
               }
             }
-          } catch {
-            // Volgende beeld.
+          }
+          if (!gestopt && (!detector || beeld % 3 === 0)) {
+            const waarde = leesMetZxing(zxing, video, video.videoWidth, video.videoHeight, canvas)
+            if (waarde) {
+              gevonden(waarde)
+              return
+            }
           }
         }
-        if (!gestopt) tickTimer = window.setTimeout(tick, detector ? 100 : 300)
+        if (!gestopt) tickTimer = window.setTimeout(tick, detector ? 100 : 250)
       }
       tick()
     }
@@ -303,7 +344,68 @@ export default function BarcodeCamera({ onCode, onSluiten }) {
       spoorRef.current = null
       video.srcObject = null
     }
-  }, [cameraId])
+  }, [cameraId, herstart])
+
+  // Foto met de camera-app: scherper en op volle resolutie. Beide lezers
+  // proberen het, ook een kwartslag gedraaid.
+  // Camera-app gesloten zonder foto: het live beeld weer starten.
+  useEffect(() => {
+    const invoer = fotoRef.current
+    if (!invoer) return undefined
+    const geannuleerd = () => setHerstart((n) => n + 1)
+    invoer.addEventListener('cancel', geannuleerd)
+    return () => invoer.removeEventListener('cancel', geannuleerd)
+  }, [])
+
+  function fotoKnop() {
+    spoorRef.current?.stop()
+    fotoRef.current?.click()
+  }
+
+  async function leesFoto(e) {
+    const bestand = e.target.files?.[0]
+    e.target.value = ''
+    if (!bestand) {
+      setHerstart((n) => n + 1)
+      return
+    }
+    setFotoBezig(true)
+    setMelding('Foto lezen…')
+    try {
+      const plaatje = await createImageBitmap(bestand)
+      let waarde = ''
+      const detector = await maakDetector()
+      if (detector) {
+        try {
+          const codes = await detector.detect(plaatje)
+          waarde = String(codes.find((c) => String(c.rawValue || '').trim())?.rawValue || '').trim()
+        } catch {
+          // Dan de reservelezer.
+        }
+      }
+      if (!waarde) {
+        const canvas = document.createElement('canvas')
+        const zxing = maakZxing()
+        waarde =
+          leesMetZxing(zxing, plaatje, plaatje.width, plaatje.height, canvas, { max: 1600, draai: true }) ||
+          leesMetZxing(zxing, plaatje, plaatje.width, plaatje.height, canvas, { max: 2600, draai: true })
+      }
+      plaatje.close?.()
+      if (waarde) {
+        onCodeRef.current(waarde)
+        return
+      }
+      setMelding('')
+      setFout('Geen streepjescode gevonden op de foto. Kom dichterbij, houd de code recht en probeer opnieuw.')
+      setHerstart((n) => n + 1)
+    } catch {
+      setMelding('')
+      setFout('De foto kon niet gelezen worden. Probeer opnieuw of typ het artikelnummer.')
+      setHerstart((n) => n + 1)
+    } finally {
+      setFotoBezig(false)
+    }
+  }
 
   function toonMelding(tekst) {
     setMelding(tekst)
@@ -370,7 +472,11 @@ export default function BarcodeCamera({ onCode, onSluiten }) {
   return (
     <div className="opv-camera">
       <video ref={videoRef} muted autoPlay playsInline onPointerDown={tikOpBeeld} />
-      <p>{bezig && !fout ? 'Camera starten…' : melding || 'Houd de streepjescode in beeld. Tik op het beeld als het vaag is.'}</p>
+      <p>
+        {bezig && !fout
+          ? 'Camera starten…'
+          : melding || 'Houd de streepjescode in beeld. Tik op het beeld als het vaag is.'}
+      </p>
       {info && (
         <p className="hint">
           {lezer} · {info.naam} · scherpstellen: {info.focus.length ? info.focus.join(', ') : 'niet instelbaar'}
@@ -400,12 +506,23 @@ export default function BarcodeCamera({ onCode, onSluiten }) {
             {zoomAan ? 'Zoom uit' : 'Zoom 2×'}
           </button>
         )}
+        <button type="button" className="btn btn-secondary" onClick={fotoKnop} disabled={fotoBezig}>
+          Foto maken
+        </button>
         {cameras.length > 1 && (
           <button type="button" className="btn btn-secondary" onClick={andereCamera} disabled={bezig}>
             Andere camera
           </button>
         )}
       </div>
+      <input
+        ref={fotoRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={leesFoto}
+        style={{ display: 'none' }}
+      />
       <button type="button" className="btn btn-secondary" onClick={onSluiten}>
         Sluiten
       </button>
