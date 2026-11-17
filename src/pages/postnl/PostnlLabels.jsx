@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  updateDoc,
-} from 'firebase/firestore'
+import { addDoc, collection, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
@@ -25,6 +18,18 @@ import {
   zaaiStandaardAdressen,
 } from '../../lib/postnl'
 import './postnl.css'
+
+// Klant of leverancier in één vorm, zodat het kiezen en de tegel hetzelfde werken.
+const SOORTEN = {
+  klant: { label: 'Klant', meervoud: 'klanten', code: (k) => k.klantcode, codeVeld: 'klantcode', idVeld: 'klantId' },
+  leverancier: {
+    label: 'Leverancier',
+    meervoud: 'leveranciers',
+    code: (l) => l.leverancierscode,
+    codeVeld: 'leverancierscode',
+    idVeld: 'leverancierId',
+  },
+}
 
 function adressenVanKlant(klant) {
   const lijst = []
@@ -91,10 +96,7 @@ function AdresVelden({ form, onChange }) {
         </div>
         <div className="field">
           <label>Toevoeging</label>
-          <input
-            value={form.huisnummerToevoeging}
-            onChange={(e) => set('huisnummerToevoeging', e.target.value)}
-          />
+          <input value={form.huisnummerToevoeging} onChange={(e) => set('huisnummerToevoeging', e.target.value)} />
         </div>
       </div>
       <div className="field-row">
@@ -139,7 +141,6 @@ function payloadVanForm(form, extra = {}) {
 export default function PostnlLabels() {
   const { isAdmin } = useAuth()
   const { data, loading, error } = useCollection('postnlSnelkoppelingen')
-  const { data: klanten } = useCollection('klanten')
   const [zaaiFout, setZaaiFout] = useState(null)
   const [tegel, setTegel] = useState(null)
   const [nieuw, setNieuw] = useState(false)
@@ -168,11 +169,12 @@ export default function PostnlLabels() {
         <div>
           <h1>PostNL-labels</h1>
           <div className="page-header-sub">
-            Kies een tegel om een verzendlabel af te drukken. Een klant uit het bestand kun je als nieuwe tegel vastzetten.
+            Kies een tegel om een verzendlabel af te drukken. Een klant of leverancier uit het bestand kun je als nieuwe
+            tegel vastzetten.
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => setNieuw(true)}>
-          Klant als snelkoppeling
+          Nieuwe tegel
         </button>
       </div>
 
@@ -188,7 +190,7 @@ export default function PostnlLabels() {
         </div>
       ) : tegels.length === 0 ? (
         <div className="card card-pad">
-          <p>Nog geen snelkoppelingen. Zet een klant vast als tegel.</p>
+          <p>Nog geen snelkoppelingen. Zet een klant of leverancier vast als tegel.</p>
         </div>
       ) : (
         <div className="postnl-tegels">
@@ -206,7 +208,7 @@ export default function PostnlLabels() {
       )}
 
       {tegel && <LabelVenster tegel={tegel} isAdmin={isAdmin} onClose={() => setTegel(null)} />}
-      {nieuw && <NieuweTegel klanten={klanten} onClose={() => setNieuw(false)} />}
+      {nieuw && <NieuweTegel onClose={() => setNieuw(false)} />}
     </div>
   )
 }
@@ -229,9 +231,12 @@ function LabelVenster({ tegel, isAdmin, onClose }) {
     land: 'NL',
   }))
 
-  useEffect(() => () => {
-    if (pdfUrl) URL.revokeObjectURL(pdfUrl)
-  }, [pdfUrl])
+  useEffect(
+    () => () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl)
+    },
+    [pdfUrl]
+  )
 
   async function afdrukken() {
     const melding = controleerAdres({ ...form, titel: form.titel || tegel.titel })
@@ -318,13 +323,7 @@ function LabelVenster({ tegel, isAdmin, onClose }) {
       {!pdfUrl && (
         <div className="field" style={{ maxWidth: 160 }}>
           <label>Aantal labels</label>
-            <input
-            type="number"
-            min={1}
-            max={20}
-            value={aantal}
-            onChange={(e) => setAantal(e.target.value)}
-          />
+          <input type="number" min={1} max={20} value={aantal} onChange={(e) => setAantal(e.target.value)} />
           <div className="hint">Elk label is een pakket van 2 kg.</div>
         </div>
       )}
@@ -383,7 +382,11 @@ function LabelVenster({ tegel, isAdmin, onClose }) {
   )
 }
 
-function NieuweTegel({ klanten, onClose }) {
+function NieuweTegel({ onClose }) {
+  // Pas laden als het venster opengaat: scheelt reads bij elk bezoek aan de pagina.
+  const { data: klanten } = useCollection('klanten')
+  const { data: leveranciers } = useCollection('leveranciers')
+  const [soort, setSoort] = useState('klant')
   const [zoek, setZoek] = useState('')
   const [klant, setKlant] = useState(null)
   const [adressen, setAdressen] = useState([])
@@ -395,23 +398,31 @@ function NieuweTegel({ klanten, onClose }) {
   const treffers = useMemo(() => {
     const q = zoek.trim().toLowerCase()
     if (!q) return []
-    return klanten
+    const code = SOORTEN[soort].code
+    return (soort === 'klant' ? klanten : leveranciers)
       .filter(
         (k) =>
           k.naam?.toLowerCase().includes(q) ||
           k.zoeknaam?.toLowerCase().includes(q) ||
-          k.klantcode?.toLowerCase().includes(q) ||
+          String(code(k) || '')
+            .toLowerCase()
+            .includes(q) ||
           k.plaats?.toLowerCase().includes(q)
       )
       .sort((a, b) => String(a.naam || '').localeCompare(String(b.naam || ''), 'nl'))
       .slice(0, 20)
-  }, [klanten, zoek])
+  }, [klanten, leveranciers, soort, zoek])
+
+  function kiesSoort(volgende) {
+    setSoort(volgende)
+    setFout(null)
+  }
 
   function kiesKlant(volgende) {
     const lijst = adressenVanKlant(volgende)
     setKlant(volgende)
     setAdressen(lijst)
-    setFout(lijst.length ? null : 'Deze klant heeft geen adres.')
+    setFout(lijst.length ? null : `Deze ${SOORTEN[soort].label.toLowerCase()} heeft geen adres.`)
     if (!lijst.length) {
       setForm(null)
       return
@@ -439,8 +450,8 @@ function NieuweTegel({ klanten, onClose }) {
     try {
       await addDoc(collection(db, 'postnlSnelkoppelingen'), {
         ...payloadVanForm(form),
-        klantId: klant.id,
-        klantcode: klant.klantcode || '',
+        [SOORTEN[soort].idVeld]: klant.id,
+        [SOORTEN[soort].codeVeld]: SOORTEN[soort].code(klant) || '',
         volgorde: Date.now(),
         standaard: false,
         aangemaaktOp: serverTimestamp(),
@@ -453,7 +464,7 @@ function NieuweTegel({ klanten, onClose }) {
   }
 
   return (
-    <Modal title="Klant als snelkoppeling" onClose={onClose} width={720}>
+    <Modal title={`${SOORTEN[soort].label} als snelkoppeling`} onClose={onClose} width={720}>
       {fout && (
         <div className="banner banner-danger" style={{ marginBottom: 12 }}>
           {fout}
@@ -462,24 +473,38 @@ function NieuweTegel({ klanten, onClose }) {
 
       {!klant ? (
         <>
+          <div className="tab-row">
+            {Object.entries(SOORTEN).map(([id, s]) => (
+              <button
+                key={id}
+                type="button"
+                className={'tab-btn' + (soort === id ? ' active' : '')}
+                onClick={() => kiesSoort(id)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
           <div className="field">
-            <label>Zoek een klant</label>
+            <label>Zoek een {SOORTEN[soort].label.toLowerCase()}</label>
             <input
               autoFocus
-              placeholder="Naam, klantnummer of plaats…"
+              placeholder={soort === 'klant' ? 'Naam, klantnummer of plaats…' : 'Naam, leveranciersnummer of plaats…'}
               value={zoek}
               onChange={(e) => setZoek(e.target.value)}
             />
           </div>
           <div className="postnl-keuze">
             {treffers.length === 0 ? (
-              <p className="page-header-sub">{zoek.trim() ? 'Geen klanten gevonden.' : 'Typ een naam of klantnummer.'}</p>
+              <p className="page-header-sub">
+                {zoek.trim() ? `Geen ${SOORTEN[soort].meervoud} gevonden.` : 'Typ een naam of nummer.'}
+              </p>
             ) : (
               treffers.map((k) => (
                 <button key={k.id} type="button" onClick={() => kiesKlant(k)}>
                   <strong>
                     {k.naam}
-                    {k.klantcode ? ` · ${k.klantcode}` : ''}
+                    {SOORTEN[soort].code(k) ? ` · ${SOORTEN[soort].code(k)}` : ''}
                   </strong>
                   <div className="page-header-sub">
                     {[k.straat, postcodeWeergave(k.postcode), k.plaats].filter(Boolean).join(', ') || 'Geen hoofdadres'}
@@ -493,22 +518,22 @@ function NieuweTegel({ klanten, onClose }) {
         <form onSubmit={opslaan}>
           <p className="page-header-sub" style={{ marginBottom: 8 }}>
             {klant.naam}
-            {klant.klantcode ? ` · ${klant.klantcode}` : ''}
+            {SOORTEN[soort].code(klant) ? ` · ${SOORTEN[soort].code(klant)}` : ''}
           </p>
           {adressen.length > 1 && (
             <div className="postnl-keuze">
               {adressen.map((adres, index) => (
-                  <button
-                    key={`${adres.soort}-${adres.straat}-${adres.postcode}`}
-                    type="button"
-                    className={index === adresIndex ? 'actief' : ''}
-                    onClick={() => kiesAdres(index)}
-                  >
-                    <strong>{adres.soort}</strong>
-                    <div className="page-header-sub">
-                      {adres.naam} · {adres.straat}, {postcodeWeergave(adres.postcode)} {adres.plaats}
-                    </div>
-                  </button>
+                <button
+                  key={`${adres.soort}-${adres.straat}-${adres.postcode}`}
+                  type="button"
+                  className={index === adresIndex ? 'actief' : ''}
+                  onClick={() => kiesAdres(index)}
+                >
+                  <strong>{adres.soort}</strong>
+                  <div className="page-header-sub">
+                    {adres.naam} · {adres.straat}, {postcodeWeergave(adres.postcode)} {adres.plaats}
+                  </div>
+                </button>
               ))}
             </div>
           )}
@@ -526,7 +551,7 @@ function NieuweTegel({ klanten, onClose }) {
                 setFout(null)
               }}
             >
-              Andere klant
+              {soort === 'klant' ? 'Andere klant' : 'Andere leverancier'}
             </button>
             <button className="btn btn-ghost" type="button" onClick={onClose}>
               Annuleren

@@ -239,3 +239,27 @@ Regels die niet meer open zijn, worden bij de volgende sync verwijderd.
 - Geen terugschrijven naar Axapta  
 - `.env` en `firebase-sleutel.json` staan niet in git  
 - SQL-poort blijft binnen het bedrijfsnetwerk  
+
+## Leverancier overzetten (op een Windows-pc)
+
+`leverancier_overzetten.py` zet één leverancier uit Axapta over naar FMID ERP:
+aanmaken als hij er nog niet is, anders bijwerken. Wat alleen in FMID wordt
+ingevuld (mailadressen voor inkooporders, orderformaat, KvK-nummer,
+sticker-afleveradres) blijft bij bijwerken staan.
+
+Eenmalig:
+
+```
+pip install pyodbc
+npx firebase login
+```
+
+Maak `koppeling/.env` (zie `.env.example`) met `AX_SQL_DRIVER=SQL Server` en het
+SQL-wachtwoord. Niet in git.
+
+Gebruik (vanuit de hoofdmap van de repo):
+
+```
+python koppeling/leverancier_overzetten.py 70123 --proef   # alleen tonen
+python koppeling/leverancier_overzetten.py 70123           # overzetten
+```
