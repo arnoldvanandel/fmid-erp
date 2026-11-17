@@ -29,6 +29,7 @@ const T = {
     eenheid: 'Eenh.',
     prijs: 'Prijs per stuk',
     bedrag: 'Bedrag',
+    totaal: 'Totaal excl. BTW',
     inleiding: 'Hartelijk dank voor uw aanvraag. Wij bieden u graag het volgende aan:',
     prijzenExcl: 'Prijzen zijn exclusief BTW.',
     opmerkingen: 'Opmerkingen',
@@ -59,6 +60,7 @@ const T = {
     eenheid: 'Einh.',
     prijs: 'Preis pro Stück',
     bedrag: 'Betrag',
+    totaal: 'Gesamtbetrag netto',
     inleiding: 'Vielen Dank für Ihre Anfrage. Gerne bieten wir Ihnen wie folgt an:',
     prijzenExcl: 'Alle Preise verstehen sich zuzüglich MwSt.',
     opmerkingen: 'Bemerkungen',
@@ -88,6 +90,7 @@ const T = {
     eenheid: 'Unit',
     prijs: 'Price per piece',
     bedrag: 'Amount',
+    totaal: 'Total excl. VAT',
     inleiding: 'Thank you for your enquiry. We are pleased to quote as follows:',
     prijzenExcl: 'All prices are exclusive of VAT.',
     opmerkingen: 'Remarks',
@@ -98,6 +101,13 @@ const T = {
 }
 
 export const AANBIEDING_TITEL = { nl: T.nl.titel, de: T.de.titel, en: T.en.titel }
+
+// Komt een artikel vaker voor (een staffel, of een calculatie met meerdere
+// aantallen), dan zijn de regels alternatieven en is een totaal zinloos.
+function heeftTotaal(regels) {
+  const nummers = regels.map((r) => r.artikelnummer || '')
+  return regels.length > 0 && new Set(nummers).size === nummers.length
+}
 
 function aantal(value) {
   return formatNumber(value, Number.isInteger(Number(value)) ? 0 : 2)
@@ -185,6 +195,17 @@ export default function AanbiedingDocument({ calculatie: c, klant, regels }) {
           ))}
         </tbody>
       </table>
+
+      {heeftTotaal(regels) && (
+        <div className="doc-totalen">
+          <div className="doc-totalen-eind">
+            <span>{t.totaal}</span>
+            <span>
+              {valuta} {formatNumber(regels.reduce((som, r) => som + (Number(r.bedrag) || 0), 0), 2)}
+            </span>
+          </div>
+        </div>
+      )}
 
       <p className="doc-vermelding">{t.prijzenExcl}</p>
 
