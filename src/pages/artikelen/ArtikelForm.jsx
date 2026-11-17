@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
 import { useVoorraadTotals } from '../../hooks/useVoorraadTotals'
 import { useOpenInkoopVoorArtikel } from '../../hooks/useOpenInkoopVoorArtikel'
+import { useOpenVerkoopVoorArtikel } from '../../hooks/useOpenVerkoopVoorArtikel'
 import { BRON_LABEL, bronVan, useMutaties } from '../../hooks/useMutaties'
 import { formatBytes, formatCurrency, formatDate, formatDateTime, formatNumber } from '../../lib/format'
 import { uploadArtikelDocument, verwijderArtikelDocument } from '../../lib/documenten'
@@ -20,11 +21,13 @@ import { verpakkingVan } from '../../lib/labels'
 import { STAFFEL_SOORTEN, staffelRegels } from '../../lib/staffel'
 import { bonfixCode, isBonArtikel } from '../../lib/stickers'
 import { STATUS_LABEL as INKOOP_STATUS_LABEL } from '../../lib/inkooporders'
+import { STATUS_BADGE as VERKOOP_STATUS_BADGE, STATUS_LABEL as VERKOOP_STATUS_LABEL } from '../../lib/verkooporders'
 import { tekeningHref } from '../../lib/tekeningen'
 import Modal from '../../components/Modal'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
 import MutatieForm from '../voorraad/MutatieForm'
 import InkooporderForm from '../inkooporders/InkooporderForm'
+import VerkooporderForm from '../verkooporders/VerkooporderForm'
 
 const INKOOP_STATUS_BADGE = {
   'deels ontvangen': 'badge-warning',
@@ -55,6 +58,8 @@ export default function ArtikelForm({ artikel, onDone }) {
   const { isAdmin } = useAuth()
   const isNew = !artikel?.id
   const openInkoop = useOpenInkoopVoorArtikel(artikel?.id)
+  const openVerkoop = useOpenVerkoopVoorArtikel(artikel?.id)
+  const aantalOpen = openInkoop.regels.length + openVerkoop.regels.length
   const [form, setForm] = useState({
     artikelnummer: artikel?.artikelnummer || '',
     naam: artikel?.naam || '',
@@ -99,6 +104,7 @@ export default function ArtikelForm({ artikel, onDone }) {
         ? []
         : [
             { id: 'voorraad', label: 'Voorraad' },
+            { id: 'orders', label: 'Openstaande orders' },
             { id: 'documenten', label: 'Documenten' },
             ...(form.artikeltype === 'Stuklijst'
               ? [
@@ -219,15 +225,21 @@ export default function ArtikelForm({ artikel, onDone }) {
       </div>
 
       {!isNew && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13.5 }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, fontSize: 13.5, flexWrap: 'wrap' }}
+        >
           <span>
+            Nog te leveren op verkooporders:{' '}
+            <strong>{openVerkoop.loading ? '…' : formatNumber(openVerkoop.totaal)}</strong>
+            {artikel.eenheid ? ` ${artikel.eenheid}` : ''}
+            {' · '}
             Nog te ontvangen op inkooporders:{' '}
             <strong>{openInkoop.loading ? '…' : formatNumber(openInkoop.totaal)}</strong>
             {artikel.eenheid ? ` ${artikel.eenheid}` : ''}
           </span>
-          {openInkoop.regels.length > 0 && activeTab !== 'voorraad' && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setActiveTab('voorraad')}>
-              Details
+          {aantalOpen > 0 && activeTab !== 'orders' && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setActiveTab('orders')}>
+              Openstaande orders ({aantalOpen})
             </button>
           )}
         </div>
@@ -611,7 +623,11 @@ export default function ArtikelForm({ artikel, onDone }) {
         </div>
       )}
 
-      {activeTab === 'voorraad' && !isNew && <VoorraadTab artikel={artikel} openInkoop={openInkoop} />}
+      {activeTab === 'voorraad' && !isNew && <VoorraadTab artikel={artikel} />}
+
+      {activeTab === 'orders' && !isNew && (
+        <OpenOrdersTab artikel={artikel} openVerkoop={openVerkoop} openInkoop={openInkoop} />
+      )}
 
       {activeTab === 'documenten' && !isNew && <DocumentenTab artikel={artikel} />}
 
@@ -653,11 +669,10 @@ export default function ArtikelForm({ artikel, onDone }) {
 // Alleen-lezen overzicht van de actuele voorraad per locatie + recente
 // mutaties van dit ene artikel, met een snelkoppeling om direct een mutatie
 // te boeken zonder terug te hoeven naar de Voorraad-pagina.
-function VoorraadTab({ artikel, openInkoop }) {
+function VoorraadTab({ artikel }) {
   const { standenPerArtikel, totalenPerArtikel, loading: loadingStanden } = useVoorraadTotals()
   const { mutaties: mutatiesVoorArtikel, loading: loadingMutaties } = useMutaties({ artikelId: artikel.id, max: 10 })
   const [mutatieBoeken, setMutatieBoeken] = useState(false)
-  const [openOrder, setOpenOrder] = useState(null)
 
   const standen = standenPerArtikel[artikel.id] || []
   const totaal = totalenPerArtikel[artikel.id] || 0
@@ -702,52 +717,6 @@ function VoorraadTab({ artikel, openInkoop }) {
             ))}
           </tbody>
         </table>
-      )}
-
-      <h3>Openstaande inkooporders</h3>
-      {openInkoop.error && <div className="banner banner-danger">{openInkoop.error}</div>}
-      {openInkoop.loading ? (
-        <p className="page-header-sub" style={{ margin: '0 0 18px' }}>
-          Laden…
-        </p>
-      ) : openInkoop.regels.length === 0 ? (
-        <p className="page-header-sub" style={{ margin: '0 0 18px' }}>
-          Niets open op een inkooporder.
-        </p>
-      ) : (
-        <div style={{ overflowX: 'auto', marginBottom: 18 }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Leverancier</th>
-                <th className="num">Open</th>
-                <th>Leverdatum</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {openInkoop.regels.map((r) => (
-                <tr key={r.id} onClick={() => setOpenOrder(r.order)}>
-                  <td>{r.ordernummer}</td>
-                  <td>
-                    {r.leverancierscode}
-                    {r.leverancierNaam ? ` — ${r.leverancierNaam}` : ''}
-                  </td>
-                  <td className="num">
-                    {formatNumber(r.open)} {artikel.eenheid}
-                  </td>
-                  <td>{r.leverdatum ? formatDate(r.leverdatum) : '-'}</td>
-                  <td>
-                    <span className={'badge ' + (INKOOP_STATUS_BADGE[r.status] || 'badge-neutral')}>
-                      {INKOOP_STATUS_LABEL[r.status] || r.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -806,9 +775,119 @@ function VoorraadTab({ artikel, openInkoop }) {
         </Modal>
       )}
 
-      {openOrder && (
-        <Modal title={`Inkooporder ${openOrder.ordernummer}`} onClose={() => setOpenOrder(null)} width={1120}>
-          <InkooporderForm inkooporder={openOrder} onDone={() => setOpenOrder(null)} />
+    </div>
+  )
+}
+
+// Wat er van dit artikel openstaat: nog te leveren aan klanten en nog te
+// ontvangen van leveranciers. Klik op een regel om de order te openen.
+function OpenOrdersTab({ artikel, openVerkoop, openInkoop }) {
+  const [verkooporder, setVerkooporder] = useState(null)
+  const [inkooporder, setInkooporder] = useState(null)
+  const eenheid = artikel.eenheid ? ` ${artikel.eenheid}` : ''
+
+  function blok(titel, data, kolomNaam, rij, leeg) {
+    return (
+      <>
+        <h3>
+          {titel}: {data.loading ? '…' : formatNumber(data.totaal)}
+          {eenheid}
+        </h3>
+        {data.error && <div className="banner banner-danger">{data.error}</div>}
+        {data.loading ? (
+          <p className="page-header-sub" style={{ margin: '0 0 18px' }}>
+            Laden…
+          </p>
+        ) : data.regels.length === 0 ? (
+          <p className="page-header-sub" style={{ margin: '0 0 18px' }}>
+            {leeg}
+          </p>
+        ) : (
+          <div style={{ overflowX: 'auto', marginBottom: 18 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>{kolomNaam}</th>
+                  <th className="num">Besteld</th>
+                  <th className="num">Open</th>
+                  <th>Leverdatum</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>{data.regels.map(rij)}</tbody>
+            </table>
+          </div>
+        )}
+      </>
+    )
+  }
+
+  return (
+    <div>
+      {blok(
+        'Te leveren aan klanten',
+        openVerkoop,
+        'Klant',
+        (r) => (
+          <tr key={r.id} onClick={() => setVerkooporder(r.order)} title="Verkooporder openen">
+            <td>{r.ordernummer}</td>
+            <td>
+              {r.klantcode}
+              {r.klantNaam ? ` — ${r.klantNaam}` : ''}
+            </td>
+            <td className="num">{formatNumber(r.besteld)}</td>
+            <td className="num">
+              {formatNumber(r.open)}
+              {eenheid}
+            </td>
+            <td>{r.leverdatum ? formatDate(r.leverdatum) : '-'}</td>
+            <td>
+              <span className={'badge ' + (VERKOOP_STATUS_BADGE[r.status] || 'badge-neutral')}>
+                {VERKOOP_STATUS_LABEL[r.status] || r.status}
+              </span>
+            </td>
+          </tr>
+        ),
+        'Niets open op een verkooporder.'
+      )}
+
+      {blok(
+        'Nog te ontvangen van leveranciers',
+        openInkoop,
+        'Leverancier',
+        (r) => (
+          <tr key={r.id} onClick={() => setInkooporder(r.order)} title="Inkooporder openen">
+            <td>{r.ordernummer}</td>
+            <td>
+              {r.leverancierscode}
+              {r.leverancierNaam ? ` — ${r.leverancierNaam}` : ''}
+            </td>
+            <td className="num">{formatNumber(r.besteld)}</td>
+            <td className="num">
+              {formatNumber(r.open)}
+              {eenheid}
+            </td>
+            <td>{r.leverdatum ? formatDate(r.leverdatum) : '-'}</td>
+            <td>
+              <span className={'badge ' + (INKOOP_STATUS_BADGE[r.status] || 'badge-neutral')}>
+                {INKOOP_STATUS_LABEL[r.status] || r.status}
+              </span>
+            </td>
+          </tr>
+        ),
+        'Niets open op een inkooporder.'
+      )}
+
+      {verkooporder && (
+        <Modal title={`Verkooporder ${verkooporder.ordernummer}`} onClose={() => setVerkooporder(null)} width={1120}>
+          <VerkooporderForm verkooporder={verkooporder} onDone={() => setVerkooporder(null)} />
+        </Modal>
+      )}
+
+      {inkooporder && (
+        <Modal title={`Inkooporder ${inkooporder.ordernummer}`} onClose={() => setInkooporder(null)} width={1120}>
+          <InkooporderForm inkooporder={inkooporder} onDone={() => setInkooporder(null)} />
         </Modal>
       )}
     </div>
