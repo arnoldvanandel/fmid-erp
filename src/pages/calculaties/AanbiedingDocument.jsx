@@ -105,8 +105,9 @@ function aantal(value) {
 
 // De A4-pagina van een aanbieding, in dezelfde opmaak als de andere documenten.
 // Wordt gebruikt voor de afdrukpagina en voor de PDF-bijlage bij de mail
-// (lib/calculatieMail.js). Elk aantal uit de calculatie is een regel met zijn
-// eigen stuksprijs.
+// (lib/calculatieMail.js). De regels komen uit documentRegels: bij een
+// calculatie elk aantal met zijn eigen stuksprijs, bij een aanbieding met
+// artikelen de artikelen zoals ingevuld.
 export default function AanbiedingDocument({ calculatie: c, klant, regels }) {
   const taal = T[c?.taal || klant?.taal] ? c?.taal || klant?.taal : 'nl'
   const t = T[taal]
@@ -164,16 +165,16 @@ export default function AanbiedingDocument({ calculatie: c, klant, regels }) {
         </thead>
         <tbody>
           {regels.map((r, i) => (
-            <tr key={r.aantal}>
+            <tr key={i}>
               <td className="doc-pos">{(i + 1) * 10}</td>
-              <td className="doc-artikelnummer doc-nowrap">{c.artikelnummer}</td>
-              <td>{c.omschrijving}</td>
+              <td className="doc-artikelnummer doc-nowrap">{r.artikelnummer}</td>
+              <td>{r.omschrijving}</td>
               <td className="doc-nowrap">
-                {c.klantArtikelnummer}
-                {c.revisie ? ` ${t.rev} ${c.revisie}` : ''}
+                {r.klantArtikelnummer}
+                {r.revisie ? ` ${t.rev} ${r.revisie}` : ''}
               </td>
               <td className="num">{aantal(r.aantal)}</td>
-              <td className="doc-nowrap">{eenheid(c.eenheid, taal)}</td>
+              <td className="doc-nowrap">{eenheid(r.eenheid, taal)}</td>
               <td className="num">
                 {valuta} {formatPrijs(r.prijs)}
               </td>

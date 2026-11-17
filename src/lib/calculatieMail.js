@@ -42,9 +42,12 @@ export function aanbiedingTitel(gegevens) {
 export function aanbiedingMailTekst({ gegevens, gebruiker, handtekening }) {
   const c = gegevens.calculatie
   const t = MAIL_TEKSTEN[taalVan(gegevens)]
+  // Bij een aanbieding met meerdere artikelen noemen we geen artikel.
+  const artikelen = [...new Set((gegevens.regels || []).map((r) => r.klantArtikelnummer || r.omschrijving))]
+  const artikel = artikelen.length === 1 ? artikelen[0] : ''
   return (
     `${t.aanhef(c.contactpersoon?.trim())}\n\n` +
-    `${t.tekst(c.calculatienummer, c.referentie?.trim(), c.klantArtikelnummer || c.omschrijving)}\n\n` +
+    `${t.tekst(c.calculatienummer, c.referentie?.trim(), artikel)}\n\n` +
     (handtekening?.trim() || standaardHandtekening(c.behandeldDoor || gebruiker))
   )
 }

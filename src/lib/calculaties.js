@@ -269,17 +269,10 @@ export async function maakCalculatie({ klant, artikelnummer, klantArtikelnummer,
   return { calculatie: { ...calculatie, id: ref.id, datum: new Date() }, artikelNieuw: nieuw }
 }
 
-// Velden van het formulier -> wat we opslaan. De berekende regels gaan mee
-// (`regels`), zodat lijst en aanbieding niet opnieuw hoeven te rekenen.
-export function calculatieVelden(form) {
-  const aantallen = leesAantallen(Array.isArray(form.aantallen) ? form.aantallen.join(' ') : form.aantallen)
-  const prijzen = {}
-  for (const aantal of aantallen) {
-    const p = form.prijzen?.[String(aantal)]
-    if (p !== '' && p != null && Number.isFinite(Number(p))) prijzen[String(aantal)] = rond(p, 4)
-  }
+// Velden die elke aanbieding heeft: klant, adres en de voorwaarden.
+function aanbiedingVelden(form) {
   const tekst = (v) => String(v || '').trim()
-  const velden = {
+  return {
     // De klant kan na het aanmaken nog veranderen, ook als de aanbieding al verstuurd is.
     klantId: tekst(form.klantId),
     klantcode: tekst(form.klantcode),
@@ -293,11 +286,38 @@ export function calculatieVelden(form) {
       land: tekst(form.adres?.land),
     },
     taal: ['nl', 'de', 'en'].includes(form.taal) ? form.taal : 'nl',
+    contactpersoon: tekst(form.contactpersoon),
+    referentie: tekst(form.referentie),
+    valuta: VALUTA.includes(form.valuta) ? form.valuta : 'EUR',
+    leveringsvoorwaarde: tekst(form.leveringsvoorwaarde),
+    levertijd: tekst(form.levertijd),
+    geldigDagen: getal(form.geldigDagen),
+    betalingstermijn: getal(form.betalingstermijn),
+    opmerkingen: tekst(form.opmerkingen),
+    notities: tekst(form.notities),
+    status: STATUS_LABEL[form.status] ? form.status : 'concept',
+  }
+}
+
+function controleerAanbiedingVelden(velden) {
+  if (!velden.klantId) throw new Error('Kies een klant.')
+  if (!velden.adres.naam) throw new Error('Vul de naam in waaraan de aanbieding gericht is.')
+}
+
+// Velden van het formulier -> wat we opslaan. De berekende regels gaan mee
+// (`regels`), zodat lijst en aanbieding niet opnieuw hoeven te rekenen.
+export function calculatieVelden(form) {
+  const aantallen = leesAantallen(Array.isArray(form.aantallen) ? form.aantallen.join(' ') : form.aantallen)
+  const prijzen = {}
+  for (const aantal of aantallen) {
+    const p = form.prijzen?.[String(aantal)]
+    if (p !== '' && p != null && Number.isFinite(Number(p))) prijzen[String(aantal)] = rond(p, 4)
+  }
+  const velden = {
+    ...aanbiedingVelden(form),
     omschrijving: String(form.omschrijving || '').trim(),
     klantArtikelnummer: String(form.klantArtikelnummer || '').trim(),
     revisie: String(form.revisie || '').trim(),
-    contactpersoon: String(form.contactpersoon || '').trim(),
-    referentie: String(form.referentie || '').trim(),
     aantallen,
     bewerkingen: (form.bewerkingen || [])
       .filter((b) => String(b.omschrijving || '').trim() || getal(b.instelMinuten) || stukSeconden(b))
@@ -319,14 +339,6 @@ export function calculatieVelden(form) {
       })),
     marge: getal(form.marge),
     prijzen,
-    valuta: VALUTA.includes(form.valuta) ? form.valuta : 'EUR',
-    leveringsvoorwaarde: String(form.leveringsvoorwaarde || '').trim(),
-    levertijd: String(form.levertijd || '').trim(),
-    geldigDagen: getal(form.geldigDagen),
-    betalingstermijn: getal(form.betalingstermijn),
-    opmerkingen: String(form.opmerkingen || '').trim(),
-    notities: String(form.notities || '').trim(),
-    status: STATUS_LABEL[form.status] ? form.status : 'concept',
   }
   velden.regels = berekenPrijzen(velden).map((r) => ({
     aantal: r.aantal,
@@ -338,8 +350,7 @@ export function calculatieVelden(form) {
 
 export async function wijzigCalculatie(calculatie, form) {
   const velden = calculatieVelden(form)
-  if (!velden.klantId) throw new Error('Kies een klant.')
-  if (!velden.adres.naam) throw new Error('Vul de naam in waaraan de aanbieding gericht is.')
+  controleerAanbiedingVelden(velden)
   if (!velden.omschrijving) throw new Error('Vul een omschrijving in.')
   if (velden.aantallen.length === 0) throw new Error('Vul minimaal één aantal in.')
   await updateDoc(doc(db, 'calculaties', calculatie.id), { ...velden, gewijzigdOp: serverTimestamp() })
@@ -370,6 +381,84 @@ export async function wijzigCalculatie(calculatie, form) {
   return velden
 }
 
+// ---------------------------------------------------------------------------
+// Aanbieding met bestaande artikelen
+// ---------------------------------------------------------------------------
+// Geen calculatie, maar een lijst artikelen met een zelf ingevulde prijs per
+// stuk. Zelfde collectie, nummering, voorwaarden, afdruk en mail; herkenbaar
+// aan `soort: 'artikelen'` en de regels in `artikelRegels`.
+
+export function isArtikelAanbieding(calculatie) {
+  return calculatie?.soort === 'artikelen'
+}
+
+export async function maakArtikelAanbieding({ klant, gebruiker }) {
+  if (!klant?.id) throw new Error('Kies een klant.')
+  if (klant.geblokkeerd) throw new Error(`Klant ${klant.klantcode} is geblokkeerd.`)
+  const calculatienummer = await volgendNummer()
+  const aanbieding = {
+    calculatienummer,
+    soort: 'artikelen',
+    status: 'concept',
+    calculatiedatum: vandaag(),
+    klantId: klant.id,
+    klantcode: klant.klantcode || '',
+    klantNaam: klant.naam || '',
+    adres: hoofdadres(klant),
+    contactpersoon: klant.contactpersoon || '',
+    taal: klant.taal || 'nl',
+    valuta: klant.valuta || 'EUR',
+    artikelnummer: '',
+    omschrijving: '',
+    artikelRegels: [],
+    aantallen: [],
+    regels: [],
+    referentie: '',
+    leveringsvoorwaarde: klant.leveringsvoorwaarde || '',
+    levertijd: '',
+    geldigDagen: STANDAARD_GELDIG_DAGEN,
+    betalingstermijn: Number(klant.betalingstermijn ?? 30),
+    opmerkingen: '',
+    notities: '',
+    behandeldDoor: gebruiker || '',
+    aangemaaktDoor: gebruiker || '',
+    datum: serverTimestamp(),
+  }
+  const ref = await addDoc(collection(db, 'calculaties'), aanbieding)
+  return { ...aanbieding, id: ref.id, datum: new Date() }
+}
+
+export function artikelAanbiedingVelden(form) {
+  const tekst = (v) => String(v || '').trim()
+  const artikelRegels = (form.artikelRegels || [])
+    .filter((r) => r.artikelId || tekst(r.artikelnummer))
+    .map((r) => ({
+      artikelId: r.artikelId || '',
+      artikelnummer: tekst(r.artikelnummer),
+      omschrijving: tekst(r.omschrijving),
+      klantArtikelnummer: tekst(r.klantArtikelnummer),
+      eenheid: tekst(r.eenheid) || 'Stuks',
+      aantal: getal(r.aantal),
+      prijs: rond(r.prijs, 4),
+    }))
+  return {
+    ...aanbiedingVelden(form),
+    artikelRegels,
+    // Voor de lijst: artikelen, aantallen en prijzen in het kort.
+    artikelnummer: [...new Set(artikelRegels.map((r) => r.artikelnummer))].join(', '),
+    omschrijving: artikelRegels.length === 1 ? artikelRegels[0].omschrijving : `${artikelRegels.length} artikelregels`,
+    aantallen: artikelRegels.map((r) => r.aantal),
+    regels: artikelRegels.map((r) => ({ aantal: r.aantal, prijs: r.prijs })),
+  }
+}
+
+export async function wijzigArtikelAanbieding(aanbieding, form) {
+  const velden = artikelAanbiedingVelden(form)
+  controleerAanbiedingVelden(velden)
+  await updateDoc(doc(db, 'calculaties', aanbieding.id), { ...velden, gewijzigdOp: serverTimestamp() })
+  return velden
+}
+
 // Het artikel en de tekeningen blijven staan; alleen de calculatie gaat weg.
 export async function verwijderCalculatie(calculatie) {
   await deleteDoc(doc(db, 'calculaties', calculatie.id))
@@ -391,5 +480,27 @@ export async function laadCalculatieVoorAfdruk(calculatieId) {
   const calculatie = { id: snap.id, ...snap.data() }
   const klantSnap = calculatie.klantId ? await getDoc(doc(db, 'klanten', calculatie.klantId)) : null
   const klant = klantSnap?.exists() ? { id: klantSnap.id, ...klantSnap.data() } : null
-  return { calculatie, klant, regels: berekenPrijzen(calculatie) }
+  return { calculatie, klant, regels: documentRegels(calculatie) }
+}
+
+// De regels op de aanbieding. Bij een calculatie is elk aantal een regel van
+// hetzelfde artikel; bij een aanbieding met artikelen staan ze zoals ingevuld.
+export function documentRegels(calculatie) {
+  if (isArtikelAanbieding(calculatie)) {
+    return (calculatie.artikelRegels || []).map((r) => ({
+      ...r,
+      revisie: '',
+      bedrag: getal(r.prijs) * getal(r.aantal),
+    }))
+  }
+  return berekenPrijzen(calculatie).map((r) => ({
+    artikelnummer: calculatie.artikelnummer,
+    omschrijving: calculatie.omschrijving,
+    klantArtikelnummer: calculatie.klantArtikelnummer,
+    revisie: calculatie.revisie,
+    eenheid: calculatie.eenheid,
+    aantal: r.aantal,
+    prijs: r.prijs,
+    bedrag: r.bedrag,
+  }))
 }

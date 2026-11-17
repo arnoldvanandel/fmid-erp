@@ -5,7 +5,9 @@ import { formatDate, formatPrijs } from '../../lib/format'
 import {
   STATUS_BADGE,
   STATUS_LABEL,
+  isArtikelAanbieding,
   klantVoorvoegsel,
+  maakArtikelAanbieding,
   maakCalculatie,
   stelArtikelnummerVoor,
 } from '../../lib/calculaties'
@@ -14,6 +16,8 @@ import { uploadArtikelDocument } from '../../lib/documenten'
 import { leesTekening } from '../../lib/tekeningLezen'
 import Modal from '../../components/Modal'
 import CalculatieForm from './CalculatieForm'
+import ArtikelAanbiedingForm from './ArtikelAanbiedingForm'
+import KlantKiezerVenster from './KlantKiezerVenster'
 
 // Klant waarvan de naam op de tekening staat (bijv. in de copyrightregel).
 // Alleen bij precies één treffer, anders kiest de gebruiker zelf.
@@ -354,12 +358,33 @@ function prijsTekst(c) {
 }
 
 export default function CalculatiesList() {
+  const { profile } = useAuth()
   const { data: calculaties, loading } = useCollection('calculaties', { orderByField: 'datum', orderDirection: 'desc' })
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [showNieuw, setShowNieuw] = useState(false)
   const [editing, setEditing] = useState(null)
   const [startFout, setStartFout] = useState(null)
+  const [showArtikelAanbieding, setShowArtikelAanbieding] = useState(false)
+  const [aanmaken, setAanmaken] = useState(false)
+  const [lijstFout, setLijstFout] = useState(null)
+
+  // Aanbieding met bestaande artikelen: alleen de klant kiezen, de rest in het formulier.
+  async function maakAanbiedingVoor(klant) {
+    setLijstFout(null)
+    setAanmaken(true)
+    try {
+      const aanbieding = await maakArtikelAanbieding({ klant, gebruiker: profile?.naam || profile?.email })
+      setShowArtikelAanbieding(false)
+      setStartFout(null)
+      setEditing(aanbieding)
+    } catch (err) {
+      setShowArtikelAanbieding(false)
+      setLijstFout(err.message)
+    } finally {
+      setAanmaken(false)
+    }
+  }
 
   const gefilterd = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -384,10 +409,17 @@ export default function CalculatiesList() {
           <h1>Calculaties</h1>
           <div className="page-header-sub">{calculaties.length} calculaties en aanbiedingen</div>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowNieuw(true)}>
-          + Nieuwe calculatie
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={() => setShowArtikelAanbieding(true)}>
+            + Aanbieding met artikelen
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowNieuw(true)}>
+            + Nieuwe calculatie
+          </button>
+        </div>
       </div>
+
+      {lijstFout && <div className="banner banner-danger">{lijstFout}</div>}
 
       <div className="card">
         <div className="card-pad" style={{ paddingBottom: 0 }}>
@@ -452,7 +484,10 @@ export default function CalculatiesList() {
                     <td>
                       {c.klantcode} — {c.klantNaam}
                     </td>
-                    <td>{c.artikelnummer}</td>
+                    <td>
+                      {isArtikelAanbieding(c) && <span className="badge badge-neutral">Artikelen</span>}{' '}
+                      {c.artikelnummer}
+                    </td>
                     <td>{c.omschrijving}</td>
                     <td>{(c.aantallen || []).join(', ') || '-'}</td>
                     <td className="num">{prijsTekst(c)}</td>
@@ -483,11 +518,27 @@ export default function CalculatiesList() {
         </Modal>
       )}
 
-      {editing && (
-        <Modal title={`Calculatie ${editing.calculatienummer}`} onClose={() => setEditing(null)} width={1100}>
-          <CalculatieForm calculatie={editing} startFout={startFout} onDone={() => setEditing(null)} />
-        </Modal>
+      {showArtikelAanbieding && (
+        <KlantKiezerVenster
+          titel="Aanbieding met artikelen"
+          knop={aanmaken ? 'Aanmaken…' : 'Aanmaken'}
+          bezig={aanmaken}
+          uitleg="Daarna kies je de artikelen en vul je de prijzen en voorwaarden zelf in."
+          onKies={maakAanbiedingVoor}
+          onAnnuleren={() => setShowArtikelAanbieding(false)}
+        />
       )}
+
+      {editing &&
+        (isArtikelAanbieding(editing) ? (
+          <Modal title={`Aanbieding ${editing.calculatienummer}`} onClose={() => setEditing(null)} width={1100}>
+            <ArtikelAanbiedingForm aanbieding={editing} onDone={() => setEditing(null)} />
+          </Modal>
+        ) : (
+          <Modal title={`Calculatie ${editing.calculatienummer}`} onClose={() => setEditing(null)} width={1100}>
+            <CalculatieForm calculatie={editing} startFout={startFout} onDone={() => setEditing(null)} />
+          </Modal>
+        ))}
     </div>
   )
 }

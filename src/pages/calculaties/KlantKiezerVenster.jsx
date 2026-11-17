@@ -2,9 +2,18 @@ import { useMemo, useState } from 'react'
 import Modal from '../../components/Modal'
 import { useCollection } from '../../hooks/useCollection'
 
-// Een andere klant kiezen voor een bestaande calculatie. Zelfde lijst als bij
+// Een klant kiezen: een andere klant voor een bestaande calculatie, of de
+// klant van een nieuwe aanbieding met artikelen. Zelfde lijst als bij
 // "Nieuwe calculatie"; geblokkeerde klanten staan er niet in.
-export default function KlantKiezerVenster({ huidigeKlantId, onKies, onAnnuleren }) {
+export default function KlantKiezerVenster({
+  huidigeKlantId,
+  onKies,
+  onAnnuleren,
+  titel = 'Andere klant kiezen',
+  knop = 'Kiezen',
+  bezig = false,
+  uitleg = 'Naam, adres, contactpersoon en taal van de aanbieding worden die van de gekozen klant. Het artikelnummer blijft hetzelfde.',
+}) {
   const { data: klanten, loading } = useCollection('klanten', { orderByField: 'klantcode' })
   const [zoek, setZoek] = useState('')
   const [klantId, setKlantId] = useState(huidigeKlantId || '')
@@ -31,7 +40,7 @@ export default function KlantKiezerVenster({ huidigeKlantId, onKies, onAnnuleren
   }
 
   return (
-    <Modal title="Andere klant kiezen" onClose={onAnnuleren} width={600}>
+    <Modal title={titel} onClose={onAnnuleren} width={600}>
       <form onSubmit={kies}>
         <div className="field">
           <label>Zoek klant</label>
@@ -68,7 +77,7 @@ export default function KlantKiezerVenster({ huidigeKlantId, onKies, onAnnuleren
                   aria-selected={klantId === k.id}
                   className={klantId === k.id ? 'geselecteerd' : ''}
                   onClick={() => setKlantId(k.id)}
-                  onDoubleClick={() => onKies(k)}
+                  onDoubleClick={() => !bezig && onKies(k)}
                 >
                   {k.klantcode} — {k.naam}
                   {k.plaats ? ` (${k.plaats})` : ''}
@@ -76,17 +85,14 @@ export default function KlantKiezerVenster({ huidigeKlantId, onKies, onAnnuleren
               ))
             )}
           </div>
-          <span className="hint">
-            Naam, adres, contactpersoon en taal van de aanbieding worden die van de gekozen klant. Het artikelnummer
-            blijft hetzelfde.
-          </span>
+          <span className="hint">{uitleg}</span>
         </div>
         <div className="modal-actions">
           <button type="button" className="btn btn-secondary" onClick={onAnnuleren}>
             Annuleren
           </button>
-          <button type="submit" className="btn btn-primary" disabled={!klant || klant.id === huidigeKlantId}>
-            Kiezen
+          <button type="submit" className="btn btn-primary" disabled={bezig || !klant || klant.id === huidigeKlantId}>
+            {knop}
           </button>
         </div>
       </form>
