@@ -11,6 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "labelprinter": "node scripts/labelprinter.mjs",
+    "backup": "node scripts/backup.mjs",
+    "herstel": "node scripts/herstel.mjs",
     "deploy": "npm run build && firebase deploy"
   },
   "dependencies": {
