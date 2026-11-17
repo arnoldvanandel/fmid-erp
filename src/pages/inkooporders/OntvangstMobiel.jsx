@@ -32,6 +32,12 @@ function sleutelVan(artikel) {
   return artikel.artikelId || artikel.artikelnummer || artikel.sleutel
 }
 
+// Artikelen die met 91 of 91VZ beginnen en op v eindigen horen niet in de keuzelijst.
+function verbergBijOntvangst(artikelnummer) {
+  const nr = String(artikelnummer || '').replace(/\s+/g, '').toLowerCase()
+  return nr.startsWith('91') && nr.endsWith('v')
+}
+
 // Telefoon: kies een artikel, eventueel meerdere open inkooporders, zie de
 // locatie en boek het aantal. Zonder open order alleen na een bevestiging.
 export default function OntvangstMobiel() {
@@ -149,7 +155,7 @@ export default function OntvangstMobiel() {
     let actief = true
     setZoeken(true)
     const timer = setTimeout(() => {
-      zoekArtikelen(zoekterm, { max: 30 })
+      zoekArtikelen(zoekterm, { max: 30, filter: (a) => !verbergBijOntvangst(a.artikelnummer) })
         .then((lijst) => {
           if (actief) setGezocht(lijst)
         })
@@ -200,6 +206,7 @@ export default function OntvangstMobiel() {
           ]
         : [...openLijst, ...extra]
     return basis
+      .filter((a) => !verbergBijOntvangst(a.artikelnummer))
       .filter((a, i, lijst) => lijst.findIndex((b) => b.artikelnummer === a.artikelnummer) === i)
       .sort(
         (a, b) =>
@@ -274,7 +281,7 @@ export default function OntvangstMobiel() {
       const sleutel = sleutelVan(artikel)
       if (!bron.has(sleutel)) bron.set(sleutel, artikel.regels ? artikel : metOpenRegels(artikel))
     }
-    const lijst = [...bron.values()]
+    const lijst = [...bron.values()].filter((a) => !verbergBijOntvangst(a.artikelnummer))
     const exact = lijst.filter((a) => a.artikelnummer.trim().toLowerCase() === q)
     if (exact.length === 1) return exact[0]
     if (exact.length > 1) return null
@@ -454,7 +461,7 @@ export default function OntvangstMobiel() {
     }
     try {
       const exact = await haalArtikelOpNummer(nr)
-      if (exact) {
+      if (exact && !verbergBijOntvangst(exact.artikelnummer)) {
         kiesArtikel(metOpenRegels(exact))
         return true
       }
