@@ -20,6 +20,7 @@ import {
   bonfixTePakken,
   controlePickInvoer,
   invoerVan,
+  leegPickInvoer,
   leesAantal,
   pasInkoopInvoer,
   pasLocatieInvoer,
@@ -165,29 +166,37 @@ export default function PicklijstMobiel() {
     slaPickrapportOp(rapport).catch((err) => setRapportFout(err.message))
   }
 
-  function gaNaar(volgendeIndex, controleer) {
+  function gaNaar(volgendeIndex, controleer, bevestigd = gepickt) {
     const nu = Date.now()
     if (nu - laatstGeklikt.current < 400) return
     laatstGeklikt.current = nu
     if (controleer && stap) {
-      const meldingFout = controlePickInvoer(stap, invoerVanStap(stap))
+      const meldingFout = controlePickInvoer(stap, invoerVanStap(stap, bevestigd))
       if (meldingFout) {
         setFout(meldingFout)
         return
       }
     }
     if (volgendeIndex >= stappen.length) {
-      const probleemIndex = stappen.findIndex((s) => controlePickInvoer(s, invoerVanStap(s)))
+      const probleemIndex = stappen.findIndex((s) => controlePickInvoer(s, invoerVanStap(s, bevestigd)))
       if (probleemIndex >= 0) {
         setIndex(probleemIndex)
-        setFout(controlePickInvoer(stappen[probleemIndex], invoerVanStap(stappen[probleemIndex])))
+        setFout(controlePickInvoer(stappen[probleemIndex], invoerVanStap(stappen[probleemIndex], bevestigd)))
         return
       }
-      bewaarRapport()
+      bewaarRapport(bevestigd)
     }
     setFout(null)
     setMelding(null)
     setIndex(Math.max(0, Math.min(volgendeIndex, stappen.length)))
+  }
+
+  function overslaan() {
+    if (!stap) return
+    const bevestigd = { ...gepickt, [stap.sleutel]: leegPickInvoer(stap) }
+    setGepickt(bevestigd)
+    gaNaar(index + 1, false, bevestigd)
+    setMelding('Regel overgeslagen.')
   }
 
   async function controleerScan(code) {
@@ -347,9 +356,14 @@ export default function PicklijstMobiel() {
       {stap && (
         <footer className="pick-mobiel-voet">
           {fout && <div className="banner banner-danger">{fout}</div>}
-          <button type="button" className="btn btn-primary pick-mobiel-gepikt" onClick={() => gaNaar(index + 1, true)}>
-            {gepaktNu === 0 ? 'Niets gepickt' : `Bevestig ${aantal(gepaktNu)}`}
-          </button>
+          <div className="pick-mobiel-voet-acties">
+            <button type="button" className="btn btn-secondary pick-mobiel-overslaan" onClick={overslaan}>
+              Overslaan
+            </button>
+            <button type="button" className="btn btn-primary pick-mobiel-gepikt" onClick={() => gaNaar(index + 1, true)}>
+              {gepaktNu === 0 ? 'Niets gepickt' : `Bevestig ${aantal(gepaktNu)}`}
+            </button>
+          </div>
         </footer>
       )}
 

@@ -1224,8 +1224,25 @@ td .picklijst-acties {
   font-size: 15px;
 }
 
+.pick-mobiel-voet-acties {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.pick-mobiel-overslaan {
+  flex: 0 0 auto;
+  min-width: 7.5rem;
+  min-height: 72px;
+  border-radius: 12px;
+  font-size: 16px;
+  touch-action: manipulation;
+  user-select: none;
+}
+
 .pick-mobiel-gepikt {
-  width: 100%;
+  flex: 1 1 auto;
+  width: auto;
   min-height: 72px;
   border-radius: 12px;
   font-size: 22px;

@@ -265,6 +265,21 @@ export function standaardPickInvoer(stap) {
     locaties,
     inkoop: {},
     zonder: '',
+    overgeslagen: false,
+  }
+}
+
+// Alles op 0: de regel wordt overgeslagen, ook als er voorraad ligt.
+export function leegPickInvoer(stap) {
+  const locaties = {}
+  for (const l of stap?.locaties || []) locaties[l.sleutel] = ''
+  return {
+    anboTotaal: '',
+    bonfixTotaal: '',
+    locaties,
+    inkoop: {},
+    zonder: '',
+    overgeslagen: true,
   }
 }
 
@@ -464,7 +479,7 @@ export function picksUitStappen(stappen, bevestigd) {
       const gelezen = leesAantal(invoer.locaties?.[loc.sleutel])
       const aantal = rond3(Math.max(0, gelezen || 0))
       const verdeling = pakVerdeling(rest, aantal)
-      if (aantal > 1e-9 || Number(loc.voorgesteld) > 1e-9) {
+      if (aantal > 1e-9) {
         picks.push({
           bron: 'locatie',
           locatieCode: loc.locatieCode || '',
