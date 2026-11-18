@@ -13,21 +13,29 @@ import {
   schrijfPickrapportLokaal,
   slaPickrapportOp,
 } from '../../lib/pickrapport'
+import { useOpenInkoopVoorArtikel } from '../../hooks/useOpenInkoopVoorArtikel'
 import {
   anboLocaties,
   bonfixLocaties,
   bonfixTePakken,
   controlePickInvoer,
+  invoerVan,
   leesAantal,
+  pasInkoopInvoer,
   pasLocatieInvoer,
   pasTotaalInvoer,
+  pasZonderInvoer,
   picksUitStappen,
   rond3,
+  somExtraBronnen,
+  somGepakt,
   somInvoer,
   standaardPickInvoer,
   verpakkingTekst,
   verpakkingVanAantal,
+  vulInkoopInvoer,
   vulLocatieInvoer,
+  vulZonderInvoer,
 } from '../../lib/pickVerpakking'
 import { boekVoorraadMutatie } from '../../lib/voorraad'
 
@@ -273,7 +281,7 @@ export default function PicklijstMobiel() {
   const { klant, tekorten } = lijst
   const klaar = index >= stappen.length
   const invoer = stap ? invoerVanStap(stap) : null
-  const gepaktNu = stap ? somInvoer(stap.locaties, invoer?.locaties) : 0
+  const gepaktNu = stap ? somGepakt(stap, invoer) : 0
   const minder = stappen.filter((s) => {
     const ingevuld = somInvoer(s.locaties, invoerVanStap(s).locaties)
     return s.locaties.length > 0 && ingevuld + 1e-9 < (Number(s.totaalOpen) || 0)
@@ -340,11 +348,7 @@ export default function PicklijstMobiel() {
         <footer className="pick-mobiel-voet">
           {fout && <div className="banner banner-danger">{fout}</div>}
           <button type="button" className="btn btn-primary pick-mobiel-gepikt" onClick={() => gaNaar(index + 1, true)}>
-            {stap.locaties.length === 0
-              ? 'Verder'
-              : gepaktNu === 0
-                ? 'Niets gepickt'
-                : `Bevestig ${aantal(gepaktNu)}`}
+            {gepaktNu === 0 ? 'Niets gepickt' : `Bevestig ${aantal(gepaktNu)}`}
           </button>
         </footer>
       )}
@@ -532,6 +536,100 @@ function LocatieTegels({ locs, invoer, onLocatie, onVul, onNul, nulBezig }) {
   )
 }
 
+function ExtraBronnen({ stap, invoer, onInvoer }) {
+  const eenheid = stap.eenheid || 'stuks'
+  const { regels: openInkoop, loading, error } = useOpenInkoopVoorArtikel(stap.artikelId)
+  const zonder = leesAantal(invoer.zonder) || 0
+  const inkoopSom = somExtraBronnen({ ...invoer, zonder: '' })
+
+  return (
+    <>
+      <div className="pick-sectie">
+        <div className="pick-mobiel-label">Uit inkooporder</div>
+        <p className="hint">
+          Voor artikelen die rechtstreeks uit productie of een inkooporder komen, zonder eerst op voorraad te zetten.
+        </p>
+        {loading ? (
+          <p className="hint">Open inkooporders laden…</p>
+        ) : error ? (
+          <div className="banner banner-danger">{error}</div>
+        ) : openInkoop.length === 0 ? (
+          <p className="hint">Geen open inkooporder voor dit artikel.</p>
+        ) : (
+          <div className="locatie-tegels">
+            {openInkoop.map((order) => {
+              const waarde = invoer.inkoop?.[order.id]
+              const tekst = waarde && typeof waarde === 'object' ? waarde.tekst ?? '' : waarde ?? ''
+              const gepakt = leesAantal(tekst) || 0
+              return (
+                <div
+                  key={order.id}
+                  className={'locatie-tegel' + (String(tekst).trim() ? ' actief' : '')}
+                  onClick={(e) => {
+                    if (e.target.closest('input, button')) return
+                    onInvoer(vulInkoopInvoer(stap, invoer, order))
+                  }}
+                >
+                  <strong>{order.ordernummer || 'Inkooporder'}</strong>
+                  <div className="pick-tegel-meta">
+                    {[order.leverancierscode, order.leverancierNaam].filter(Boolean).join(' — ') || 'Leverancier onbekend'}
+                  </div>
+                  <div className="pick-tegel-meta">nog open {aantal(order.open)}</div>
+                  <AantalInput
+                    value={tekst}
+                    onValue={(v) => onInvoer(pasInkoopInvoer(stap, invoer, order, v))}
+                    aria-label={`Aantal uit ${order.ordernummer}`}
+                    placeholder="Aantal"
+                  />
+                  {gepakt > order.open + 1e-9 ? (
+                    <div className="pick-tegel-meta">Meer dan er op deze inkooporder openstaat.</div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {inkoopSom > 0 && (
+          <div className="pick-sectie-aantal" style={{ marginTop: 8 }}>
+            {aantal(inkoopSom)} <span>{eenheid} uit inkoop</span>
+          </div>
+        )}
+      </div>
+
+      <div className="pick-sectie">
+        <div className="pick-mobiel-label">Zonder locatie of inkooporder</div>
+        <div className="banner banner-warning">
+          Let op: je pakt dit artikel zonder voorraadlocatie en zonder inkooporder. Het systeem boekt hier geen voorraad
+          af. Gebruik dit alleen als je weet waar de goederen vandaan komen.
+        </div>
+        <VerpakkingVelden
+          doos={stap.stuksPerDoos}
+          zak={stap.stuksPerZak}
+          onTotaal={(waarde) => onInvoer(pasZonderInvoer(stap, invoer, invoerVan(waarde)))}
+        />
+        <div
+          className={'locatie-tegel' + (String(invoer.zonder || '').trim() ? ' actief' : '')}
+          style={{ marginTop: 8 }}
+          onClick={(e) => {
+            if (e.target.closest('input, button')) return
+            onInvoer(vulZonderInvoer(stap, invoer))
+          }}
+        >
+          <strong>Zonder bron</strong>
+          <div className="pick-tegel-meta">geen locatie · geen inkooporder</div>
+          <AantalInput
+            value={invoer.zonder ?? ''}
+            onValue={(waarde) => onInvoer(pasZonderInvoer(stap, invoer, waarde))}
+            aria-label="Aantal zonder locatie of inkooporder"
+            placeholder="Aantal"
+          />
+          {zonder > 0 ? <div className="pick-tegel-meta">Gepakt {aantal(zonder)}</div> : null}
+        </div>
+      </div>
+    </>
+  )
+}
+
 function StapKaart({ stap, invoer, scan, melding, nulBezig, onScan, onInvoer, onNul }) {
   const eenheid = stap.eenheid || 'stuks'
   const anbo = anboLocaties(stap)
@@ -584,13 +682,14 @@ function StapKaart({ stap, invoer, scan, melding, nulBezig, onScan, onInvoer, on
 
       {stap.tekort > 0 && (
         <div className="banner banner-warning">
-          Niet genoeg op voorraad: {aantal(stap.tekort)} {eenheid} van de {aantal(stap.totaalOpen)} die openstaan.
+          Niet genoeg op voorraad: {aantal(stap.tekort)} {eenheid} van de {aantal(stap.totaalOpen)} die openstaan. Kies
+          hieronder een inkooporder of pak zonder locatie.
         </div>
       )}
       {melding && <div className="banner banner-info">{melding}</div>}
 
       {stap.locaties.length === 0 ? (
-        <p>Dit artikel ligt nergens op voorraad. Er staan er {aantal(stap.totaalOpen)} {eenheid} open.</p>
+        <p>Dit artikel ligt nergens op voorraad. Kies een open inkooporder of pak zonder locatie.</p>
       ) : (
         <>
           {anbo.length > 0 && (
@@ -675,6 +774,8 @@ function StapKaart({ stap, invoer, scan, melding, nulBezig, onScan, onInvoer, on
           )}
         </>
       )}
+
+      <ExtraBronnen stap={stap} invoer={invoer} onInvoer={onInvoer} />
     </div>
   )
 }

@@ -263,7 +263,69 @@ export function standaardPickInvoer(stap) {
     anboTotaal: invoerVan(anboAantal),
     bonfixTotaal: invoerVan(bonfixAantal),
     locaties,
+    inkoop: {},
+    zonder: '',
   }
+}
+
+function inkoopTekst(waarde) {
+  if (waarde && typeof waarde === 'object') return waarde.tekst
+  return waarde
+}
+
+export function somInkoopInvoer(inkoop) {
+  return rond3(Object.values(inkoop || {}).reduce((s, waarde) => s + (leesAantal(inkoopTekst(waarde)) || 0), 0))
+}
+
+export function somExtraBronnen(invoer) {
+  return rond3(somInkoopInvoer(invoer?.inkoop) + (leesAantal(invoer?.zonder) || 0))
+}
+
+export function somGepakt(stap, invoer) {
+  const basis = invoer || standaardPickInvoer(stap)
+  return rond3(somInvoer(stap?.locaties || [], basis.locaties) + somExtraBronnen(basis))
+}
+
+export function pasInkoopInvoer(stap, invoer, order, waarde) {
+  const basis = invoer || standaardPickInvoer(stap)
+  const id = order?.id
+  if (!id) return basis
+  return {
+    ...basis,
+    inkoop: {
+      ...basis.inkoop,
+      [id]: {
+        tekst: waarde,
+        ordernummer: order.ordernummer || '',
+        inkooporderId: order.order?.id || order.inkooporderId || '',
+        leverancier: [order.leverancierscode, order.leverancierNaam].filter(Boolean).join(' — '),
+        open: Number(order.open) || 0,
+      },
+    },
+  }
+}
+
+export function pasZonderInvoer(stap, invoer, waarde) {
+  const basis = invoer || standaardPickInvoer(stap)
+  return { ...basis, zonder: waarde }
+}
+
+export function vulInkoopInvoer(stap, invoer, order) {
+  const basis = invoer || standaardPickInvoer(stap)
+  const zonderDeze = { ...basis.inkoop }
+  if (order?.id) delete zonderDeze[order.id]
+  const rest = rond3(
+    Math.max(0, (Number(stap.totaalOpen) || 0) - somGepakt(stap, { ...basis, inkoop: zonderDeze, zonder: '' }))
+  )
+  const open = Number(order?.open) || 0
+  const voorgesteld = open > 0 ? Math.min(rest, open) : rest
+  return pasInkoopInvoer(stap, basis, order, invoerVan(voorgesteld))
+}
+
+export function vulZonderInvoer(stap, invoer) {
+  const basis = invoer || standaardPickInvoer(stap)
+  const rest = rond3(Math.max(0, (Number(stap.totaalOpen) || 0) - somGepakt(stap, { ...basis, zonder: '' })))
+  return pasZonderInvoer(stap, basis, invoerVan(rest))
 }
 
 // Bonfix volgt het ANBO-aantal, behalve als dat aantal niet veranderd is
@@ -351,7 +413,30 @@ export function controlePickInvoer(stap, invoer) {
     if (n == null) return `Vul een geldig aantal in bij locatie ${l.locatieCode}.`
     if (n < 0) return `Het aantal op ${l.locatieCode} kan niet negatief zijn. Er staat te veel op de andere locaties.`
   }
+  for (const waarde of Object.values(basis.inkoop || {})) {
+    const n = leesAantal(inkoopTekst(waarde))
+    if (n == null) return `Vul een geldig aantal in bij de gekozen inkooporder.`
+    if (n < 0) return `Het aantal uit een inkooporder kan niet negatief zijn.`
+  }
+  const zonder = leesAantal(basis.zonder)
+  if (zonder == null) return 'Vul een geldig aantal in bij “zonder locatie of inkooporder”.'
+  if (zonder < 0) return 'Het aantal zonder locatie of inkooporder kan niet negatief zijn.'
   return null
+}
+
+function pakVerdeling(rest, aantal) {
+  let ruimte = rond3(Math.max(0, aantal))
+  const verdeling = []
+  for (const regel of rest) {
+    if (ruimte <= 1e-9) break
+    if (regel.rest <= 1e-9) continue
+    const pak = rond3(Math.min(regel.rest, ruimte))
+    if (pak <= 0) continue
+    verdeling.push(verdelingStuk(regel, pak))
+    regel.rest = rond3(regel.rest - pak)
+    ruimte = rond3(ruimte - pak)
+  }
+  return verdeling
 }
 
 function verdelingStuk(regel, aantal) {
@@ -364,49 +449,26 @@ function verdelingStuk(regel, aantal) {
   }
 }
 
-// Gepickte aantallen per locatie, met de verdeling over orderregels (nooit meer dan open).
-// Tekorten zijn wat er na het picken nog open blijft.
+// Gepickte aantallen per locatie, inkooporder of zonder bron, met de verdeling
+// over orderregels (nooit meer dan open). Tekorten zijn wat er na het picken
+// nog open blijft.
 export function picksUitStappen(stappen, bevestigd) {
   const picks = []
   const tekorten = []
 
   for (const stap of stappen || []) {
-    if (!stap.locaties?.length) {
-      for (const regel of stap.vraag || []) {
-        const tekort = rond3(regel.tekort || regel.aantal)
-        if (tekort <= 1e-9) continue
-        tekorten.push({
-          ordernummer: regel.ordernummer || '',
-          regelnummer: regel.regelnummer ?? '',
-          artikelnummer: stap.artikelnummer || '',
-          artikelnaam: stap.artikelnaam || '',
-          tekort,
-          nodig: rond3(regel.aantal),
-          eenheid: stap.eenheid || '',
-        })
-      }
-      continue
-    }
-
     const invoer = bevestigd?.[stap.sleutel] || standaardPickInvoer(stap)
     const rest = (stap.vraag || []).map((v) => ({ ...v, rest: rond3(v.aantal) }))
+
     for (const loc of [...anboLocaties(stap), ...bonfixLocaties(stap)]) {
       const gelezen = leesAantal(invoer.locaties?.[loc.sleutel])
       const aantal = rond3(Math.max(0, gelezen || 0))
-      let ruimte = aantal
-      const verdeling = []
-      for (const regel of rest) {
-        if (ruimte <= 1e-9) break
-        if (regel.rest <= 1e-9) continue
-        const pak = rond3(Math.min(regel.rest, ruimte))
-        if (pak <= 0) continue
-        verdeling.push(verdelingStuk(regel, pak))
-        regel.rest = rond3(regel.rest - pak)
-        ruimte = rond3(ruimte - pak)
-      }
+      const verdeling = pakVerdeling(rest, aantal)
       if (aantal > 1e-9 || Number(loc.voorgesteld) > 1e-9) {
         picks.push({
+          bron: 'locatie',
           locatieCode: loc.locatieCode || '',
+          locatieId: loc.locatieId || '',
           artikelnummer: loc.artikelnummer || stap.artikelnummer || '',
           artikelnaam: loc.artikelnaam || stap.artikelnaam || '',
           aantal,
@@ -421,6 +483,54 @@ export function picksUitStappen(stappen, bevestigd) {
         })
       }
     }
+
+    for (const [regelId, waarde] of Object.entries(invoer.inkoop || {})) {
+      const aantal = rond3(Math.max(0, leesAantal(inkoopTekst(waarde)) || 0))
+      if (aantal <= 1e-9) continue
+      const info = waarde && typeof waarde === 'object' ? waarde : {}
+      const verdeling = pakVerdeling(rest, aantal)
+      picks.push({
+        bron: 'inkoop',
+        locatieCode: info.ordernummer ? `IO ${info.ordernummer}` : 'Inkooporder',
+        locatieId: '',
+        inkooporderId: info.inkooporderId || '',
+        inkoopregelId: regelId,
+        inkoopordernummer: info.ordernummer || '',
+        leverancier: info.leverancier || '',
+        artikelnummer: stap.artikelnummer || '',
+        artikelnaam: stap.artikelnaam || '',
+        aantal,
+        gevraagd: 0,
+        eenheid: stap.eenheid || '',
+        voorraadOpLocatie: null,
+        opLocatie: null,
+        ordernummers: stap.ordernummers || [],
+        vervangt: '',
+        verdeling,
+        totaalOpen: Number(stap.totaalOpen) || 0,
+      })
+    }
+
+    const zonder = rond3(Math.max(0, leesAantal(invoer.zonder) || 0))
+    if (zonder > 1e-9) {
+      picks.push({
+        bron: 'zonder',
+        locatieCode: 'Zonder locatie',
+        locatieId: '',
+        artikelnummer: stap.artikelnummer || '',
+        artikelnaam: stap.artikelnaam || '',
+        aantal: zonder,
+        gevraagd: 0,
+        eenheid: stap.eenheid || '',
+        voorraadOpLocatie: null,
+        opLocatie: null,
+        ordernummers: stap.ordernummers || [],
+        vervangt: '',
+        verdeling: pakVerdeling(rest, zonder),
+        totaalOpen: Number(stap.totaalOpen) || 0,
+      })
+    }
+
     for (const regel of rest) {
       if (regel.rest <= 1e-9) continue
       tekorten.push({

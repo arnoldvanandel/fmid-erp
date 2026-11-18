@@ -4,14 +4,23 @@ import { db } from '../firebase'
 const SLEUTEL = (klantId) => `pickrapport-${klantId}`
 
 function blijftLiggen(p) {
-  const voorraad = Number(p.voorraadOpLocatie ?? p.opLocatie)
+  if (p.bron === 'inkoop' || p.bron === 'zonder') return null
+  const raw = p.voorraadOpLocatie ?? p.opLocatie
+  if (raw == null || raw === '') return null
+  const voorraad = Number(raw)
   if (!Number.isFinite(voorraad)) return null
   return Math.max(0, voorraad - (Number(p.aantal) || 0))
 }
 
 function regelVoorRapport(p) {
   return {
+    bron: p.bron || (p.locatieCode === 'Zonder locatie' ? 'zonder' : p.inkoopordernummer ? 'inkoop' : 'locatie'),
     locatieCode: p.locatieCode || '',
+    locatieId: p.locatieId || '',
+    inkooporderId: p.inkooporderId || '',
+    inkoopregelId: p.inkoopregelId || '',
+    inkoopordernummer: p.inkoopordernummer || '',
+    leverancier: p.leverancier || '',
     artikelnummer: p.artikelnummer || '',
     artikelnaam: p.artikelnaam || '',
     aantal: Number(p.aantal) || 0,

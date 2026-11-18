@@ -399,7 +399,13 @@ export default function PickrapportAfdruk() {
             <tbody>
               {regels.map((r, i) => (
                 <tr key={`${r.artikelnummer}-${r.locatieCode}-${i}`}>
-                  <td className="ontvangst-locatie pickrapport-locatie">{r.locatieCode || '—'}</td>
+                  <td className="ontvangst-locatie pickrapport-locatie">
+                    {r.locatieCode || '—'}
+                    {r.bron === 'inkoop' && r.leverancier ? (
+                      <div className="ontvangst-naam">{r.leverancier}</div>
+                    ) : null}
+                    {r.bron === 'zonder' ? <div className="ontvangst-naam">geen voorraadlocatie</div> : null}
+                  </td>
                   <td>
                     <div className="ontvangst-nummer">{r.artikelnummer}</div>
                     {r.artikelnaam ? <div className="ontvangst-naam">{r.artikelnaam}</div> : null}

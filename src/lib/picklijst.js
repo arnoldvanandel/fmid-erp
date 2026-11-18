@@ -190,7 +190,25 @@ async function voegVerpakkingToe(picks) {
 // ook als dat over meerdere orders of locaties verdeeld is.
 async function verrijkPicklijst(picks, tekorten) {
   const metVerpakking = await voegVerpakkingToe(picks)
-  const stappen = groepeerPickstappen(metVerpakking, tekorten)
+  let stappen = groepeerPickstappen(metVerpakking, tekorten)
+  const zonderVerpakking = stappen.filter((s) => s.artikelId && !s.stuksPerDoos && !s.stuksPerZak)
+  if (zonderVerpakking.length) {
+    const docs = await haalOpIn(
+      'artikelen',
+      documentId(),
+      zonderVerpakking.map((s) => s.artikelId)
+    )
+    const perId = Object.fromEntries(docs.map((a) => [a.id, a]))
+    stappen = stappen.map((s) => {
+      const art = perId[s.artikelId]
+      if (!art) return s
+      return {
+        ...s,
+        stuksPerDoos: Number(art.stuksPerDoos) > 0 ? Number(art.stuksPerDoos) : s.stuksPerDoos || 0,
+        stuksPerZak: Number(art.stuksPerZak) > 0 ? Number(art.stuksPerZak) : s.stuksPerZak || 0,
+      }
+    })
+  }
   const openPerArtikel = new Map(stappen.map((s) => [s.sleutel, s.totaalOpen]))
   return {
     stappen,
