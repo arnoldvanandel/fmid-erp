@@ -310,9 +310,9 @@ export default function InpakMobiel() {
     setRapportFout(null)
   }
 
-  function openRapport() {
+  function openInpaklijst() {
     bewaarRapport()
-    navigate(`/picklijsten/${klantId}/inpakrapport`)
+    navigate(`/picklijsten/${klantId}/inpaklijst`)
   }
 
   if (error) {
@@ -361,7 +361,7 @@ export default function InpakMobiel() {
             dozen={dozen}
             rapportFout={rapportFout}
             bewerking={bewerking}
-            onRapport={openRapport}
+            onRapport={openInpaklijst}
             onVorige={vorige}
             onOpnieuw={opnieuw}
             onWijzig={startWijzig}
@@ -660,7 +660,7 @@ function Klaar({
       {fout && <div className="banner banner-danger">{fout}</div>}
       <div className="pick-mobiel-klaar-acties">
         <button type="button" className="btn btn-primary" onClick={onRapport}>
-          PDF rapport
+          PDF inpaklijst
         </button>
         <button type="button" className="btn btn-secondary" onClick={onVorige}>
           Laatste regel
@@ -668,9 +668,6 @@ function Klaar({
         <button type="button" className="btn btn-secondary" onClick={onOpnieuw}>
           Opnieuw
         </button>
-        <Link className="btn btn-secondary" to={`/picklijsten/${klantId}/inpaklijst`}>
-          PDF inpaklijst
-        </Link>
         <Link className="btn btn-secondary" to="/picklijsten">
           Terug naar picklijsten
         </Link>

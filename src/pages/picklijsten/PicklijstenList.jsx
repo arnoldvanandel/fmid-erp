@@ -16,10 +16,6 @@ function openInpaklijst(klantId) {
   window.open(`/picklijsten/${klantId}/inpaklijst`, '_blank', 'noopener,noreferrer')
 }
 
-function openInpakrapport(klantId) {
-  window.open(`/picklijsten/${klantId}/inpakrapport`, '_blank', 'noopener,noreferrer')
-}
-
 function qrVoor(klant, soort) {
   const naam = [klant.klantcode, klant.naam].filter(Boolean).join(' — ')
   if (soort === 'inpakken') {
@@ -47,7 +43,6 @@ export default function PicklijstenList() {
     orderDirection: 'desc',
   })
   const { data: rapporten, error: foutRapporten } = useCollection('pickrapporten')
-  const { data: inpakrapporten, error: foutInpak } = useCollection('inpakrapporten')
   const [zoek, setZoek] = useState('')
   const [gekozenId, setGekozenId] = useState('')
   const [fout, setFout] = useState(null)
@@ -132,14 +127,6 @@ export default function PicklijstenList() {
     }
     return set
   }, [rapporten])
-
-  const inpakVan = useMemo(() => {
-    const set = new Set()
-    for (const r of inpakrapporten) {
-      if ((r.regels || []).length > 0) set.add(r.klantId || r.id)
-    }
-    return set
-  }, [inpakrapporten])
 
   function handleAfdrukken() {
     const k = gekozenKlant()
@@ -246,9 +233,9 @@ export default function PicklijstenList() {
                 {fout || error}
               </div>
             )}
-            {(foutRapporten || foutInpak) && (
+            {foutRapporten && (
               <div className="banner banner-warning" style={{ marginBottom: 12 }}>
-                Rapporten laden lukt niet. Vernieuw de pagina. {foutRapporten || foutInpak}
+                Rapporten laden lukt niet. Vernieuw de pagina. {foutRapporten}
               </div>
             )}
 
@@ -272,11 +259,6 @@ export default function PicklijstenList() {
               <button type="button" className="btn btn-secondary" disabled={loading} onClick={handleInpaklijst}>
                 PDF inpaklijst
               </button>
-              {klantInVeld && inpakVan.has(klantInVeld.id) && (
-                <button type="button" className="btn btn-secondary" onClick={() => openInpakrapport(klantInVeld.id)}>
-                  Inpakrapport
-                </button>
-              )}
             </div>
           </form>
         </div>
@@ -345,11 +327,6 @@ export default function PicklijstenList() {
                         <button type="button" className="btn btn-secondary btn-sm" onClick={() => openInpaklijst(k.id)}>
                           PDF inpaklijst
                         </button>
-                        {inpakVan.has(k.id) && (
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => openInpakrapport(k.id)}>
-                            Inpakrapport
-                          </button>
-                        )}
                       </div>
                     </td>
                   </tr>

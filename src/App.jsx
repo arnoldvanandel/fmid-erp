@@ -31,7 +31,6 @@ import PickrapportAfdruk from './pages/picklijsten/PickrapportAfdruk'
 import PickrapportenList from './pages/picklijsten/PickrapportenList'
 import InpakMobiel from './pages/picklijsten/InpakMobiel'
 import InpaklijstAfdruk from './pages/picklijsten/InpaklijstAfdruk'
-import InpakrapportAfdruk from './pages/picklijsten/InpakrapportAfdruk'
 import VoorraadOverzicht from './pages/voorraad/VoorraadOverzicht'
 import OpVoorraadMobiel from './pages/voorraad/OpVoorraadMobiel'
 import OpVoorraadRapport from './pages/voorraad/OpVoorraadRapport'
@@ -322,14 +321,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <InpaklijstAfdruk />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/picklijsten/:klantId/inpakrapport"
-            element={
-              <ProtectedRoute>
-                <InpakrapportAfdruk />
               </ProtectedRoute>
             }
           />
