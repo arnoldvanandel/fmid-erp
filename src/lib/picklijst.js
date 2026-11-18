@@ -112,6 +112,61 @@ async function verdeelOverVoorraad(openRegels) {
     }
   }
 
+  // Ook locaties tonen die voorraad hebben, maar niet nodig waren voor de
+  // voorgestelde verdeling (één volle locatie verbergt anders de rest).
+  const gezien = new Set(picks.map((p) => `${p.regelId}__${p.artikelId}__${p.locatieId}`))
+  for (const r of openRegels) {
+    const v = vervangerVan[r.id]
+    const bronnen = [
+      {
+        artikelId: r.artikelId,
+        artikelnummer: r.artikelnummer,
+        artikelnaam: r.artikelnaam,
+        vervangt: '',
+        omboekenNaarId: '',
+      },
+      ...(v
+        ? [
+            {
+              artikelId: v.id,
+              artikelnummer: v.artikelnummer,
+              artikelnaam: v.naam,
+              vervangt: r.artikelnummer,
+              omboekenNaarId: r.artikelId,
+            },
+          ]
+        : []),
+    ]
+    for (const bron of bronnen) {
+      if (!bron.artikelId) continue
+      for (const s of standen.filter((x) => x.artikelId === bron.artikelId)) {
+        const sleutel = `${r.id}__${bron.artikelId}__${s.locatieId}`
+        if (gezien.has(sleutel)) continue
+        gezien.add(sleutel)
+        picks.push({
+          sleutel: `${r.id}-${s.id}-extra`,
+          regelId: r.id,
+          regelnummer: r.regelnummer,
+          orderId: r.orderId || '',
+          ordernummer: r.ordernummer || '',
+          artikelId: bron.artikelId,
+          artikelnummer: bron.artikelnummer,
+          artikelnaam: bron.artikelnaam,
+          vervangt: bron.vervangt,
+          omboekenNaarId: bron.omboekenNaarId,
+          locatieId: s.locatieId,
+          klantArtikelnummer: r.klantArtikelnummer || '',
+          eenheid: r.eenheid,
+          locatieCode: locatiesById[s.locatieId]?.code || s.locatieCode || '',
+          sorteercode: Number(locatiesById[s.locatieId]?.sorteercode) || 0,
+          aantal: 0,
+          voorraadOpLocatie: Number(s.aantal),
+          opLocatie: Number(s.aantal),
+        })
+      }
+    }
+  }
+
   const looproute = await laadLooproute()
   const gesorteerd = sorteerPicksOpLooproute(picks, {
     locatiesById,
@@ -319,7 +374,15 @@ function sorteerInpaklijnen(lijnen) {
   })
 }
 
-// Nieuwe pickrapporten bewaren per orderregel hoeveel er gepickt is.
+function voegLocatieToe(lijn, code) {
+  const locatie = String(code || '').trim()
+  if (!locatie) return
+  if (!Array.isArray(lijn.locatieCodes)) lijn.locatieCodes = []
+  if (!lijn.locatieCodes.includes(locatie)) lijn.locatieCodes.push(locatie)
+}
+
+// Nieuwe pickrapporten bewaren per orderregel hoeveel er gepickt is,
+// inclusief de locaties (of inkooporder) waarvandaan is gepickt.
 function lijnenUitVerdeling(gepickt) {
   const map = new Map()
   for (const regel of gepickt) {
@@ -331,9 +394,10 @@ function lijnenUitVerdeling(gepickt) {
       const bestaand = map.get(sleutel)
       if (bestaand) {
         bestaand.aantal += aantal
+        voegLocatieToe(bestaand, regel.locatieCode)
         continue
       }
-      map.set(sleutel, {
+      const lijn = {
         sleutel,
         regelId: stuk.regelId || '',
         regelnummer: stuk.regelnummer ?? '',
@@ -343,7 +407,10 @@ function lijnenUitVerdeling(gepickt) {
         artikelnaam: regel.artikelnaam || '',
         eenheid: regel.eenheid || '',
         aantal,
-      })
+        locatieCodes: [],
+      }
+      voegLocatieToe(lijn, regel.locatieCode)
+      map.set(sleutel, lijn)
     }
   }
   return sorteerInpaklijnen([...map.values()])
@@ -405,7 +472,7 @@ async function lijnenUitOudRapport(klantId, gepickt) {
     if (pak <= 0) continue
     resterend.set(gepicktNummer, (resterend.get(gepicktNummer) || 0) - pak)
     const bron = gepickt.find((p) => p.artikelnummer === gepicktNummer)
-    lijnen.push({
+    const lijn = {
       sleutel: `${regel.id}-${gepicktNummer}`,
       regelId: regel.id,
       regelnummer: regel.regelnummer,
@@ -415,7 +482,13 @@ async function lijnenUitOudRapport(klantId, gepickt) {
       artikelnaam: bron?.artikelnaam || regel.artikelnaam,
       eenheid: regel.eenheid || bron?.eenheid || '',
       aantal: pak,
-    })
+      locatieCodes: [],
+    }
+    for (const p of gepickt) {
+      if (p.artikelnummer !== gepicktNummer) continue
+      voegLocatieToe(lijn, p.locatieCode)
+    }
+    lijnen.push(lijn)
   }
   return lijnen
 }

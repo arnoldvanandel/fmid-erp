@@ -484,6 +484,11 @@ function Regel({ lijn, rest, toegewezen, fout, melding }) {
       </div>
       <div className="inpak-nu-artikel">{lijn.artikelnummer}</div>
       {lijn.artikelnaam ? <div className="pick-mobiel-naam">{lijn.artikelnaam}</div> : null}
+      {(lijn.locatieCodes || []).length > 0 || lijn.locatieCode ? (
+        <div className="pick-mobiel-extra">
+          Gepickt van {(lijn.locatieCodes || []).join(', ') || lijn.locatieCode}
+        </div>
+      ) : null}
       {toegewezen > 0 && !vol ? (
         <div className="pick-mobiel-extra">
           {aantal(toegewezen)} van {aantal(lijn.aantal)} zit al in een doos

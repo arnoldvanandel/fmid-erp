@@ -58,6 +58,7 @@ export function bouwInpakrapport({ klant, lijnen, verdeling, gebruiker }) {
         artikelnummer: lijn.artikelnummer || '',
         artikelnaam: lijn.artikelnaam || '',
         eenheid: lijn.eenheid || '',
+        locatieCode: (lijn.locatieCodes || []).filter(Boolean).join(', ') || lijn.locatieCode || '',
         aantal,
       }
     })
@@ -73,6 +74,17 @@ export function bouwInpakrapport({ klant, lijnen, verdeling, gebruiker }) {
   }
 }
 
+function voegLocatieTekstToe(regel, code) {
+  const locatie = String(code || '').trim()
+  if (!locatie) return
+  const bekend = String(regel.locatieCode || '')
+    .split(',')
+    .map((d) => d.trim())
+    .filter(Boolean)
+  if (bekend.includes(locatie)) return
+  regel.locatieCode = bekend.length ? `${bekend.join(', ')}, ${locatie}` : locatie
+}
+
 export function dozenVanRapport(regels) {
   const dozen = new Map()
   for (const r of regels || []) {
@@ -80,8 +92,10 @@ export function dozenVanRapport(regels) {
     const perRegel = dozen.get(r.doos)
     const sleutel = [r.orderId, r.regelnummer, r.artikelnummer].join('|')
     const bestaand = perRegel.get(sleutel)
-    if (bestaand) bestaand.aantal += Number(r.aantal) || 0
-    else perRegel.set(sleutel, { ...r, aantal: Number(r.aantal) || 0 })
+    if (bestaand) {
+      bestaand.aantal += Number(r.aantal) || 0
+      voegLocatieTekstToe(bestaand, r.locatieCode)
+    } else perRegel.set(sleutel, { ...r, aantal: Number(r.aantal) || 0 })
   }
   return [...dozen.entries()]
     .sort(([a], [b]) => String(a).localeCompare(String(b), 'nl', { numeric: true }))

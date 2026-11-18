@@ -255,9 +255,9 @@ export function standaardPickInvoer(stap) {
   const anboAantal = rond3(anbo.reduce((s, l) => s + (Number(l.voorgesteld) || 0), 0))
   const bonfixAantal = bon.length ? bonfixTePakken(stap.totaalOpen, anboAantal, bon[0].stuksPerZak || 0).voorgesteld : 0
   const locaties = {}
-  for (const l of anbo) locaties[l.sleutel] = invoerVan(l.voorgesteld || 0)
+  for (const l of anbo) locaties[l.sleutel] = l.voorgesteld > 0 ? invoerVan(l.voorgesteld) : ''
   bon.forEach((l, i) => {
-    locaties[l.sleutel] = i === 0 ? invoerVan(bonfixAantal) : ''
+    locaties[l.sleutel] = i === 0 && bonfixAantal > 0 ? invoerVan(bonfixAantal) : ''
   })
   return {
     anboTotaal: invoerVan(anboAantal),

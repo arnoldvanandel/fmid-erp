@@ -116,6 +116,7 @@ export default function InpaklijstAfdruk() {
           <table className="doc-regels pick-regels">
             <thead>
               <tr>
+                <th>Locatie</th>
                 <th>Verkooporder</th>
                 <th>Artikelnr.</th>
                 <th>Omschrijving</th>
@@ -127,7 +128,10 @@ export default function InpaklijstAfdruk() {
             <tbody>
               {lijnen.map((l) => (
                 <tr key={l.sleutel}>
-                  <td className="pick-locatie doc-nowrap">{l.ordernummer || '—'}</td>
+                  <td className="pick-locatie doc-nowrap">
+                    {(l.locatieCodes || []).join(', ') || l.locatieCode || '—'}
+                  </td>
+                  <td className="doc-nowrap">{l.ordernummer || '—'}</td>
                   <td className="doc-artikelnummer doc-nowrap">{l.artikelnummer}</td>
                   <td>{l.artikelnaam}</td>
                   <td className="num pick-aantal">{aantal(l.aantal)}</td>

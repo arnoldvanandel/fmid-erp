@@ -173,8 +173,10 @@ export default function PicklijstAfdruk() {
                     {p.vervangt && <div className="pick-vervangt">omboeken naar {p.vervangt}</div>}
                   </td>
                   <td className="num pick-aantal">
-                    {aantal(p.aantal)}
-                    {p.totaalOpen != null && <div className="pick-voorraad-bij">open {aantal(p.totaalOpen)}</div>}
+                    {Number(p.aantal) > 0 ? aantal(p.aantal) : <span className="pick-voorraad-bij">ook beschikbaar</span>}
+                    {p.totaalOpen != null && Number(p.aantal) > 0 && (
+                      <div className="pick-voorraad-bij">open {aantal(p.totaalOpen)}</div>
+                    )}
                   </td>
                   <td className="doc-nowrap">{p.eenheid}</td>
                   <td className="num">
