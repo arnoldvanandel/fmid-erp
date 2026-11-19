@@ -8,10 +8,7 @@ import { hoofdadres, klantEmailadressen } from '../../lib/verkooporders'
 import KlantKiezerVenster from './KlantKiezerVenster'
 import AanbiedingVoorwaarden from './AanbiedingVoorwaarden'
 import {
-  KOSTENSOORTEN,
-  bewerkingKosten,
   stukSeconden,
-  STANDAARD_UURTARIEF,
   STATUS_LABEL,
   berekenPrijzen,
   calculatieVelden,
@@ -28,7 +25,7 @@ import { aanbiedingMailTekst, aanbiedingTitel, mailAanbieding } from '../../lib/
 import { GetalCel } from '../../components/RegelGrid'
 import MailVenster, { MailStatus } from '../../components/MailVenster'
 import { DocumentenTab } from '../artikelen/ArtikelForm'
-import MateriaalCalculator from './MateriaalCalculator'
+import KostenTabellen from './KostenTabellen'
 
 const TABS = [
   { id: 'artikel', label: '1. Artikel en tekening' },
@@ -111,7 +108,6 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
   const [melding, setMelding] = useState(null)
   const [mail, setMail] = useState(null) // { gegevens, tekst }
   const [mailen, setMailen] = useState(false)
-  const [calculatorRegel, setCalculatorRegel] = useState(null) // index in form.kosten
   const [klantKiezen, setKlantKiezen] = useState(false)
 
   // Andere klant: naam, adres, contactpersoon en taal van de aanbieding gaan mee.
@@ -130,15 +126,6 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
     setKlantKiezen(false)
   }
 
-  // Uitkomst van de materiaalcalculator in de kostenregel zetten.
-  function neemMateriaalOver(index, { materiaal, omschrijving, perStuk }) {
-    set(
-      'kosten',
-      form.kosten.map((k, i) => (i === index ? { ...k, soort: 'Materiaal', materiaal, omschrijving, perStuk } : k))
-    )
-    setCalculatorRegel(null)
-  }
-
   // De status verandert na het mailen buiten het formulier om.
   useEffect(() => {
     if (!gewijzigd) setForm((f) => ({ ...f, status: calculatie.status || f.status }))
@@ -149,20 +136,6 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
     setForm((f) => ({ ...f, [veld]: waarde }))
     setGewijzigd(true)
     setMelding(null)
-  }
-
-  function setRegel(lijst, index, veld, waarde) {
-    set(
-      lijst,
-      form[lijst].map((r, i) => (i === index ? { ...r, [veld]: waarde } : r))
-    )
-  }
-
-  function verwijderRegel(lijst, index) {
-    set(
-      lijst,
-      form[lijst].filter((_, i) => i !== index)
-    )
   }
 
   // ---------------------------------------------------------------- prijstabel
@@ -235,30 +208,6 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
   // Wat er nu in het formulier staat, doorgerekend.
   const velden = useMemo(() => calculatieVelden(form), [form])
   const aantallenLijst = velden.aantallen
-  // Alle bewerkingen samen: instellen (per serie) en bewerken per stuk.
-  const bewerkingTotaal = useMemo(
-    () =>
-      form.bewerkingen.reduce(
-        (som, b) => {
-          const k = bewerkingKosten(b)
-          return { instel: som.instel + k.instel, perStuk: som.perStuk + k.perStuk }
-        },
-        { instel: 0, perStuk: 0 }
-      ),
-    [form.bewerkingen]
-  )
-  // Alle materiaal- en overige kosten samen.
-  const kostenTotaal = useMemo(
-    () =>
-      form.kosten.reduce(
-        (som, k) => ({
-          perStuk: som.perStuk + (Number(k.perStuk) || 0),
-          eenmalig: som.eenmalig + (Number(k.eenmalig) || 0),
-        }),
-        { perStuk: 0, eenmalig: 0 }
-      ),
-    [form.kosten]
-  )
   const opbouw = useMemo(() => kostenOpbouw(velden), [velden])
   const regels = useMemo(() => berekenPrijzen(velden), [velden])
 
@@ -457,274 +406,12 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
               </div>
             </div>
 
-            <div className="regel-grid-kop">
-              <h3>Bewerkingen</h3>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() =>
-                  set('bewerkingen', [
-                    ...form.bewerkingen,
-                    {
-                      omschrijving: '',
-                      instelMinuten: '',
-                      stukSeconden: '',
-                      uurtarief: form.bewerkingen.at(-1)?.uurtarief ?? STANDAARD_UURTARIEF,
-                    },
-                  ])
-                }
-              >
-                + Bewerking
-              </button>
-            </div>
-            <div className="regel-grid-wrap">
-              <table className="regel-grid">
-                <thead>
-                  <tr>
-                    <th>Bewerking</th>
-                    <th className="num">Insteltijd (min)</th>
-                    <th className="num">Tijd per stuk (sec)</th>
-                    <th className="num">Uurtarief (€)</th>
-                    <th className="num">Instelkosten</th>
-                    <th className="num" title="Alleen de bewerkingstijd, zonder instellen">
-                      Bewerken per stuk
-                    </th>
-                    {aantallenLijst.map((a) => (
-                      <th key={a} className="num" title={`Instelkosten verdeeld over ${a} stuks + bewerken per stuk`}>
-                        Per stuk bij {formatNumber(a, 0)}
-                      </th>
-                    ))}
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.bewerkingen.length === 0 ? (
-                    <tr>
-                      <td colSpan={7 + aantallenLijst.length} className="regel-grid-leeg">
-                        Nog geen bewerkingen. Voeg bijvoorbeeld zagen, draaien of frezen toe.
-                      </td>
-                    </tr>
-                  ) : (
-                    form.bewerkingen.map((b, i) => (
-                      <tr key={i}>
-                        <td>
-                          <input
-                            type="text"
-                            value={b.omschrijving}
-                            placeholder="bijv. Draaien"
-                            onChange={(e) => setRegel('bewerkingen', i, 'omschrijving', e.target.value)}
-                          />
-                        </td>
-                        <td className="num">
-                          <GetalCel
-                            value={b.instelMinuten}
-                            decimalen={0}
-                            maxDecimalen={1}
-                            onCommit={(v) => setRegel('bewerkingen', i, 'instelMinuten', v)}
-                          />
-                        </td>
-                        <td className="num">
-                          <GetalCel
-                            value={b.stukSeconden}
-                            decimalen={0}
-                            maxDecimalen={1}
-                            onCommit={(v) => setRegel('bewerkingen', i, 'stukSeconden', v)}
-                          />
-                        </td>
-                        <td className="num">
-                          <GetalCel
-                            value={b.uurtarief}
-                            decimalen={2}
-                            onCommit={(v) => setRegel('bewerkingen', i, 'uurtarief', v)}
-                          />
-                        </td>
-                        <td className="num alleen-lezen">{formatNumber(bewerkingKosten(b).instel, 2)}</td>
-                        <td className="num alleen-lezen">{formatNumber(bewerkingKosten(b).perStuk, 4)}</td>
-                        {aantallenLijst.map((a) => (
-                          <td key={a} className="num alleen-lezen">
-                            {formatNumber(bewerkingKosten(b).instel / a + bewerkingKosten(b).perStuk, 4)}
-                          </td>
-                        ))}
-                        <td className="alleen-lezen" style={{ textAlign: 'right' }}>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => verwijderRegel('bewerkingen', i)}
-                            aria-label="Bewerking verwijderen"
-                          >
-                            ✕
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                {form.bewerkingen.length > 1 && (
-                  <tfoot>
-                    <tr>
-                      <td colSpan={4}>Totaal bewerkingen</td>
-                      <td className="num">{formatNumber(bewerkingTotaal.instel, 2)}</td>
-                      <td className="num">{formatNumber(bewerkingTotaal.perStuk, 4)}</td>
-                      {aantallenLijst.map((a) => (
-                        <td key={a} className="num">
-                          {formatNumber(bewerkingTotaal.instel / a + bewerkingTotaal.perStuk, 4)}
-                        </td>
-                      ))}
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-
-            <div className="regel-grid-kop" style={{ marginTop: 18 }}>
-              <h3>Materiaal en overige kosten</h3>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => {
-                    set('kosten', [
-                      ...form.kosten,
-                      {
-                        soort: 'Materiaal',
-                        omschrijving: '',
-                        perStuk: '',
-                        eenmalig: '',
-                      },
-                    ])
-                    setCalculatorRegel(form.kosten.length)
-                  }}
-                >
-                  + Materiaal
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={() =>
-                    set('kosten', [
-                      ...form.kosten,
-                      {
-                        soort: 'Uitbesteed',
-                        omschrijving: '',
-                        perStuk: '',
-                        eenmalig: '',
-                      },
-                    ])
-                  }
-                >
-                  + Overige kosten
-                </button>
-              </div>
-            </div>
-            <div className="regel-grid-wrap">
-              <table className="regel-grid">
-                <thead>
-                  <tr>
-                    <th>Soort</th>
-                    <th>Omschrijving</th>
-                    <th className="num">Per stuk (€)</th>
-                    <th className="num">Eenmalig (€)</th>
-                    {aantallenLijst.map((a) => (
-                      <th key={a} className="num" title={`Per stuk + eenmalige kosten verdeeld over ${a} stuks`}>
-                        Per stuk bij {formatNumber(a, 0)}
-                      </th>
-                    ))}
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.kosten.length === 0 ? (
-                    <tr>
-                      <td colSpan={5 + aantallenLijst.length} className="regel-grid-leeg">
-                        Nog geen kosten. Voeg materiaal, uitbesteed werk of gereedschap toe.
-                      </td>
-                    </tr>
-                  ) : (
-                    form.kosten.map((k, i) => (
-                      <tr key={i}>
-                        <td>
-                          <select
-                            value={k.soort}
-                            onChange={(e) => {
-                              setRegel('kosten', i, 'soort', e.target.value)
-                              if (e.target.value === 'Materiaal') setCalculatorRegel(i)
-                            }}
-                          >
-                            {KOSTENSOORTEN.map((s) => (
-                              <option key={s}>{s}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            value={k.omschrijving}
-                            placeholder="bijv. Messing staf Ø30"
-                            onChange={(e) => setRegel('kosten', i, 'omschrijving', e.target.value)}
-                          />
-                        </td>
-                        <td className="num">
-                          <GetalCel
-                            value={k.perStuk}
-                            decimalen={2}
-                            maxDecimalen={4}
-                            onCommit={(v) => setRegel('kosten', i, 'perStuk', v)}
-                          />
-                        </td>
-                        <td className="num">
-                          <GetalCel
-                            value={k.eenmalig}
-                            decimalen={2}
-                            onCommit={(v) => setRegel('kosten', i, 'eenmalig', v)}
-                          />
-                        </td>
-                        {aantallenLijst.map((a) => (
-                          <td key={a} className="num alleen-lezen">
-                            {formatNumber((Number(k.perStuk) || 0) + (Number(k.eenmalig) || 0) / a, 4)}
-                          </td>
-                        ))}
-                        <td className="alleen-lezen" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          {k.soort === 'Materiaal' && (
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => setCalculatorRegel(i)}
-                              title="Materiaalprijs per stuk berekenen"
-                            >
-                              Calculator
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => verwijderRegel('kosten', i)}
-                            aria-label="Kostenregel verwijderen"
-                          >
-                            ✕
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                {form.kosten.length > 1 && (
-                  <tfoot>
-                    <tr>
-                      <td colSpan={2}>Totaal materiaal en overige kosten</td>
-                      <td className="num">{formatNumber(kostenTotaal.perStuk, 4)}</td>
-                      <td className="num">{formatNumber(kostenTotaal.eenmalig, 2)}</td>
-                      {aantallenLijst.map((a) => (
-                        <td key={a} className="num">
-                          {formatNumber(kostenTotaal.perStuk + kostenTotaal.eenmalig / a, 4)}
-                        </td>
-                      ))}
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
+            <KostenTabellen
+              bewerkingen={form.bewerkingen}
+              kosten={form.kosten}
+              aantallen={aantallenLijst}
+              wijzig={set}
+            />
 
             {regels.length > 0 && (
               <div className="regel-grid-wrap" style={{ marginTop: 14 }}>
@@ -969,14 +656,6 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
           huidigeKlantId={form.klantId}
           onKies={kiesKlant}
           onAnnuleren={() => setKlantKiezen(false)}
-        />
-      )}
-
-      {calculatorRegel !== null && form.kosten[calculatorRegel] && (
-        <MateriaalCalculator
-          waarde={form.kosten[calculatorRegel].materiaal}
-          onOvernemen={(uitkomst) => neemMateriaalOver(calculatorRegel, uitkomst)}
-          onAnnuleren={() => setCalculatorRegel(null)}
         />
       )}
 

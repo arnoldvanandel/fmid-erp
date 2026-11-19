@@ -4,9 +4,12 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  query,
   runTransaction,
   serverTimestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { haalArtikelOpNummer, zoekTermen } from './artikelZoeken'
@@ -304,6 +307,31 @@ function controleerAanbiedingVelden(velden) {
   if (!velden.adres.naam) throw new Error('Vul de naam in waaraan de aanbieding gericht is.')
 }
 
+// Bewerkingen en kosten zoals ze opgeslagen worden: lege regels eruit, getallen als getal.
+export function schoonBewerkingen(lijst) {
+  return (lijst || [])
+    .filter((b) => String(b.omschrijving || '').trim() || getal(b.instelMinuten) || stukSeconden(b))
+    .map((b) => ({
+      omschrijving: String(b.omschrijving || '').trim(),
+      instelMinuten: getal(b.instelMinuten),
+      stukSeconden: stukSeconden(b),
+      uurtarief: getal(b.uurtarief),
+    }))
+}
+
+export function schoonKosten(lijst) {
+  return (lijst || [])
+    .filter((k) => String(k.omschrijving || '').trim() || getal(k.perStuk) || getal(k.eenmalig))
+    .map((k) => ({
+      soort: KOSTENSOORTEN.includes(k.soort) ? k.soort : 'Overig',
+      omschrijving: String(k.omschrijving || '').trim(),
+      perStuk: getal(k.perStuk),
+      eenmalig: getal(k.eenmalig),
+      // Invoer van de materiaalcalculator, zodat je hem later kunt bijstellen.
+      ...(k.soort === 'Materiaal' && k.materiaal ? { materiaal: schoonMateriaal(k.materiaal) } : {}),
+    }))
+}
+
 // Velden van het formulier -> wat we opslaan. De berekende regels gaan mee
 // (`regels`), zodat lijst en aanbieding niet opnieuw hoeven te rekenen.
 export function calculatieVelden(form) {
@@ -319,24 +347,8 @@ export function calculatieVelden(form) {
     klantArtikelnummer: String(form.klantArtikelnummer || '').trim(),
     revisie: String(form.revisie || '').trim(),
     aantallen,
-    bewerkingen: (form.bewerkingen || [])
-      .filter((b) => String(b.omschrijving || '').trim() || getal(b.instelMinuten) || stukSeconden(b))
-      .map((b) => ({
-        omschrijving: String(b.omschrijving || '').trim(),
-        instelMinuten: getal(b.instelMinuten),
-        stukSeconden: stukSeconden(b),
-        uurtarief: getal(b.uurtarief),
-      })),
-    kosten: (form.kosten || [])
-      .filter((k) => String(k.omschrijving || '').trim() || getal(k.perStuk) || getal(k.eenmalig))
-      .map((k) => ({
-        soort: KOSTENSOORTEN.includes(k.soort) ? k.soort : 'Overig',
-        omschrijving: String(k.omschrijving || '').trim(),
-        perStuk: getal(k.perStuk),
-        eenmalig: getal(k.eenmalig),
-        // Invoer van de materiaalcalculator, zodat je hem later kunt bijstellen.
-        ...(k.soort === 'Materiaal' && k.materiaal ? { materiaal: schoonMateriaal(k.materiaal) } : {}),
-      })),
+    bewerkingen: schoonBewerkingen(form.bewerkingen),
+    kosten: schoonKosten(form.kosten),
     marge: getal(form.marge),
     prijzen,
   }
@@ -428,19 +440,74 @@ export async function maakArtikelAanbieding({ klant, gebruiker }) {
   return { ...aanbieding, id: ref.id, datum: new Date() }
 }
 
+// Calculatie bij één regel van een aanbieding met artikelen: bewerkingen,
+// kosten en opslag, doorgerekend voor het aantal van die regel. Zonder eigen
+// prijs (`prijsHandmatig`) geldt de adviesprijs (kostprijs + opslag).
+// Geeft null als de regel geen calculatie heeft.
+export function regelCalculatie(regel) {
+  const calc = regel?.calculatie
+  const aantal = getal(regel?.aantal)
+  if (!calc || !(aantal > 0)) return null
+  const [uitkomst] = berekenPrijzen({
+    ...calc,
+    aantallen: [aantal],
+    prijzen: regel.prijsHandmatig ? { [String(aantal)]: regel.prijs } : {},
+  })
+  return uitkomst
+}
+
+// De laatste gewone calculatie van een artikel, als voorstel voor een regel.
+export async function zoekCalculatieVanArtikel(artikelId) {
+  if (!artikelId) return null
+  const snap = await getDocs(query(collection(db, 'calculaties'), where('artikelId', '==', artikelId)))
+  const tijd = (c) => c.datum?.toMillis?.() || 0
+  const gevonden = snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((c) => !isArtikelAanbieding(c))
+    .sort((a, b) => tijd(b) - tijd(a))[0]
+  if (!gevonden) return null
+  return {
+    calculatienummer: gevonden.calculatienummer,
+    calculatie: {
+      bewerkingen: (gevonden.bewerkingen || []).map(({ stukMinuten, ...b }) => ({
+        ...b,
+        stukSeconden: stukSeconden({ ...b, stukMinuten }),
+      })),
+      kosten: (gevonden.kosten || []).map((k) => ({ ...k })),
+      marge: gevonden.marge ?? STANDAARD_MARGE,
+    },
+  }
+}
+
 export function artikelAanbiedingVelden(form) {
   const tekst = (v) => String(v || '').trim()
   const artikelRegels = (form.artikelRegels || [])
     .filter((r) => r.artikelId || tekst(r.artikelnummer))
-    .map((r) => ({
-      artikelId: r.artikelId || '',
-      artikelnummer: tekst(r.artikelnummer),
-      omschrijving: tekst(r.omschrijving),
-      klantArtikelnummer: tekst(r.klantArtikelnummer),
-      eenheid: tekst(r.eenheid) || 'Stuks',
-      aantal: getal(r.aantal),
-      prijs: rond(r.prijs, 4),
-    }))
+    .map((r) => {
+      const regel = {
+        artikelId: r.artikelId || '',
+        artikelnummer: tekst(r.artikelnummer),
+        omschrijving: tekst(r.omschrijving),
+        klantArtikelnummer: tekst(r.klantArtikelnummer),
+        eenheid: tekst(r.eenheid) || 'Stuks',
+        aantal: getal(r.aantal),
+        prijs: rond(r.prijs, 4),
+      }
+      if (!r.calculatie) return regel
+      // Met calculatie volgt de prijs de calculatie, tenzij hij zelf is ingevuld.
+      regel.calculatie = {
+        bewerkingen: schoonBewerkingen(r.calculatie.bewerkingen),
+        kosten: schoonKosten(r.calculatie.kosten),
+        marge: getal(r.calculatie.marge),
+      }
+      regel.prijsHandmatig = Boolean(r.prijsHandmatig)
+      const uitkomst = regelCalculatie(regel)
+      if (uitkomst) {
+        regel.prijs = uitkomst.prijs
+        regel.kostprijs = rond(uitkomst.kostprijs, 4)
+      }
+      return regel
+    })
   return {
     ...aanbiedingVelden(form),
     artikelRegels,
@@ -487,7 +554,8 @@ export async function laadCalculatieVoorAfdruk(calculatieId) {
 // hetzelfde artikel; bij een aanbieding met artikelen staan ze zoals ingevuld.
 export function documentRegels(calculatie) {
   if (isArtikelAanbieding(calculatie)) {
-    return (calculatie.artikelRegels || []).map((r) => ({
+    // De calculatie per regel is intern en gaat niet mee naar de klant.
+    return (calculatie.artikelRegels || []).map(({ calculatie: _c, kostprijs: _k, prijsHandmatig: _h, ...r }) => ({
       ...r,
       revisie: '',
       bedrag: getal(r.prijs) * getal(r.aantal),

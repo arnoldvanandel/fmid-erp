@@ -9,8 +9,10 @@ import {
   STATUS_LABEL,
   artikelAanbiedingVelden,
   laadCalculatieVoorAfdruk,
+  regelCalculatie,
   verwijderCalculatie,
   wijzigArtikelAanbieding,
+  zoekCalculatieVanArtikel,
 } from '../../lib/calculaties'
 import { aanbiedingMailTekst, aanbiedingTitel, mailAanbieding } from '../../lib/calculatieMail'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
@@ -18,6 +20,7 @@ import { GetalCel, gridToets } from '../../components/RegelGrid'
 import MailVenster, { MailStatus } from '../../components/MailVenster'
 import KlantKiezerVenster from './KlantKiezerVenster'
 import AanbiedingVoorwaarden from './AanbiedingVoorwaarden'
+import RegelCalculatieVenster from './RegelCalculatieVenster'
 
 let volgendeSleutel = 1
 const metSleutel = (r) => ({ ...r, sleutel: volgendeSleutel++ })
@@ -76,6 +79,7 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
   const [mail, setMail] = useState(null) // { gegevens, tekst }
   const [mailen, setMailen] = useState(false)
   const [klantKiezen, setKlantKiezen] = useState(false)
+  const [calcVenster, setCalcVenster] = useState(null) // { sleutel, voorstel, bron }
 
   // De status verandert na het mailen buiten het formulier om.
   useEffect(() => {
@@ -115,13 +119,78 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
     setMelding(null)
   }
 
-  function getalRegel(regel, veld, waarde) {
-    if (waarde === '' || Number(waarde) === Number(regel[veld])) return
+  function getalRegel(regel, veld, waarde, getoond = regel[veld]) {
+    if (waarde === '' || Number(waarde) === Number(getoond)) return
     if (veld === 'aantal' && !(Number(waarde) > 0)) {
       setError('Het aantal moet groter dan 0 zijn.')
       return
     }
     setRegel(regel.sleutel, veld, Number(waarde))
+    // Een zelf ingevulde prijs gaat voor de prijs uit de calculatie.
+    if (veld === 'prijs' && regel.calculatie) setRegel(regel.sleutel, 'prijsHandmatig', true)
+  }
+
+  // ---------------------------------------------------------------- calculatie per regel
+
+  // Zonder eigen calculatie beginnen we met die van een andere regel met
+  // hetzelfde artikel, anders met de laatste calculatie van het artikel.
+  async function openCalculatie(regel) {
+    setError(null)
+    if (regel.calculatie) {
+      setCalcVenster({ sleutel: regel.sleutel })
+      return
+    }
+    const ander = form.artikelRegels.find(
+      (r) => r.sleutel !== regel.sleutel && r.artikelId === regel.artikelId && r.calculatie
+    )
+    if (ander) {
+      setCalcVenster({
+        sleutel: regel.sleutel,
+        voorstel: ander.calculatie,
+        bron: `Overgenomen van de regel met ${formatNumber(ander.aantal, 0)} stuks van dit artikel. Pas aan wat nodig is.`,
+      })
+      return
+    }
+    try {
+      const gevonden = await zoekCalculatieVanArtikel(regel.artikelId)
+      setCalcVenster({
+        sleutel: regel.sleutel,
+        voorstel: gevonden?.calculatie,
+        bron: gevonden
+          ? `Overgenomen uit calculatie ${gevonden.calculatienummer} van dit artikel. Pas aan wat nodig is.`
+          : null,
+      })
+    } catch {
+      // Zoeken mislukt: gewoon leeg beginnen.
+      setCalcVenster({ sleutel: regel.sleutel })
+    }
+  }
+
+  function neemCalculatieOver({ calculatie, prijs, prijsHandmatig }) {
+    const sleutel = calcVenster.sleutel
+    setForm((f) => ({
+      ...f,
+      artikelRegels: f.artikelRegels.map((r) => (r.sleutel === sleutel ? { ...r, calculatie, prijs, prijsHandmatig } : r)),
+    }))
+    setGewijzigd(true)
+    setMelding(null)
+    setCalcVenster(null)
+  }
+
+  // De prijs blijft staan, maar rekent niet meer mee met het aantal.
+  function haalCalculatieWeg() {
+    const sleutel = calcVenster.sleutel
+    setForm((f) => ({
+      ...f,
+      artikelRegels: f.artikelRegels.map((r) => {
+        if (r.sleutel !== sleutel) return r
+        const { calculatie: _calc, prijsHandmatig: _hand, kostprijs: _kost, ...rest } = r
+        return { ...rest, prijs: regelCalculatie(r)?.prijs ?? r.prijs }
+      }),
+    }))
+    setGewijzigd(true)
+    setMelding(null)
+    setCalcVenster(null)
   }
 
   function verwijderRegel(sleutel) {
@@ -327,73 +396,101 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
               <th>Art.nr. klant</th>
               <th className="num">Aantal</th>
               <th>Eenheid</th>
+              <th className="num" title="Kostprijs per stuk uit de calculatie van de regel">
+                Kostprijs
+              </th>
               <th className="num">Prijs per stuk ({form.valuta})</th>
               <th className="num">Bedrag ({form.valuta})</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {form.artikelRegels.map((r, i) => (
-              <tr key={r.sleutel}>
-                <td className="alleen-lezen">{r.artikelnummer}</td>
-                <td>
-                  <input
-                    type="text"
-                    data-rij={i}
-                    data-kolom="omschrijving"
-                    value={r.omschrijving}
-                    onChange={(e) => setRegel(r.sleutel, 'omschrijving', e.target.value)}
-                    onKeyDown={gridToets}
-                    aria-label="Omschrijving"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="text"
-                    data-rij={i}
-                    data-kolom="klantArtikelnummer"
-                    value={r.klantArtikelnummer}
-                    onChange={(e) => setRegel(r.sleutel, 'klantArtikelnummer', e.target.value)}
-                    onKeyDown={gridToets}
-                    aria-label="Artikelnummer van de klant"
-                  />
-                </td>
-                <td className="num">
-                  <GetalCel
-                    rij={i}
-                    kolom="aantal"
-                    value={r.aantal}
-                    decimalen={0}
-                    maxDecimalen={2}
-                    onCommit={(v) => getalRegel(r, 'aantal', v)}
-                  />
-                </td>
-                <td className="alleen-lezen">{r.eenheid}</td>
-                <td className="num">
-                  <GetalCel
-                    rij={i}
-                    kolom="prijs"
-                    value={r.prijs}
-                    decimalen={2}
-                    maxDecimalen={4}
-                    onCommit={(v) => getalRegel(r, 'prijs', v)}
-                  />
-                </td>
-                <td className="num alleen-lezen">
-                  {formatNumber((Number(r.aantal) || 0) * (Number(r.prijs) || 0), 2)}
-                </td>
-                <td className="alleen-lezen" style={{ textAlign: 'right' }}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => verwijderRegel(r.sleutel)}
-                    aria-label={`Regel ${r.artikelnummer} verwijderen`}
+            {form.artikelRegels.map((r, i) => {
+              // Met calculatie rekent de prijs mee met het aantal.
+              const calc = regelCalculatie(r)
+              const prijs = calc ? calc.prijs : r.prijs
+              return (
+                <tr key={r.sleutel}>
+                  <td className="alleen-lezen">{r.artikelnummer}</td>
+                  <td>
+                    <input
+                      type="text"
+                      data-rij={i}
+                      data-kolom="omschrijving"
+                      value={r.omschrijving}
+                      onChange={(e) => setRegel(r.sleutel, 'omschrijving', e.target.value)}
+                      onKeyDown={gridToets}
+                      aria-label="Omschrijving"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      data-rij={i}
+                      data-kolom="klantArtikelnummer"
+                      value={r.klantArtikelnummer}
+                      onChange={(e) => setRegel(r.sleutel, 'klantArtikelnummer', e.target.value)}
+                      onKeyDown={gridToets}
+                      aria-label="Artikelnummer van de klant"
+                    />
+                  </td>
+                  <td className="num">
+                    <GetalCel
+                      rij={i}
+                      kolom="aantal"
+                      value={r.aantal}
+                      decimalen={0}
+                      maxDecimalen={2}
+                      onCommit={(v) => getalRegel(r, 'aantal', v)}
+                    />
+                  </td>
+                  <td className="alleen-lezen">{r.eenheid}</td>
+                  <td
+                    className="num alleen-lezen"
+                    title={
+                      calc
+                        ? `Opslag ${formatNumber(calc.opslagPct, 1)}% · marge ${formatNumber(calc.margePct, 1)}%`
+                        : undefined
+                    }
                   >
-                    ✕
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    {calc ? formatNumber(calc.kostprijs, 2) : ''}
+                  </td>
+                  <td className="num">
+                    <GetalCel
+                      rij={i}
+                      kolom="prijs"
+                      value={prijs}
+                      decimalen={2}
+                      maxDecimalen={4}
+                      onCommit={(v) => getalRegel(r, 'prijs', v, prijs)}
+                    />
+                  </td>
+                  <td className="num alleen-lezen">
+                    {formatNumber((Number(r.aantal) || 0) * (Number(prijs) || 0), 2)}
+                  </td>
+                  <td className="alleen-lezen" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <button
+                      type="button"
+                      className={'btn btn-sm ' + (r.calculatie ? 'btn-secondary' : 'btn-ghost')}
+                      onClick={() => openCalculatie(r)}
+                      title={
+                        r.calculatie ? 'Calculatie van deze regel bekijken of aanpassen' : 'Prijs berekenen met een calculatie'
+                      }
+                    >
+                      Calculatie
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => verwijderRegel(r.sleutel)}
+                      aria-label={`Regel ${r.artikelnummer} verwijderen`}
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
 
             <tr
               ref={nieuweRijRef}
@@ -441,6 +538,7 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
                 />
               </td>
               <td className="alleen-lezen">{nieuweRegel.artikel?.eenheid || ''}</td>
+              <td className="alleen-lezen"></td>
               <td className="num">
                 <GetalCel
                   rij={aantalRegels}
@@ -465,7 +563,7 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={6}>
+              <td colSpan={7}>
                 {formatNumber(aantalRegels, 0)} {aantalRegels === 1 ? 'regel' : 'regels'}
               </td>
               <td className="num">{formatNumber(totaal, 2)}</td>
@@ -477,6 +575,8 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
       <p className="hint" style={{ marginTop: 8 }}>
         Kies een artikel, vul het aantal en de prijs per stuk in en druk op Enter. De verkoopprijs van het artikel wordt
         voorgesteld. Hetzelfde artikel mag vaker voorkomen, bijvoorbeeld voor een staffel met verschillende aantallen.
+        Met Calculatie bereken je de prijs uit bewerkingen, materiaal en kosten; die prijs rekent mee als je het aantal
+        aanpast. De calculatie komt niet op de aanbieding.
       </p>
 
       <AanbiedingVoorwaarden form={form} set={set} calculatiedatum={aanbieding.calculatiedatum} />
@@ -511,6 +611,18 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
           onKies={kiesKlant}
           onAnnuleren={() => setKlantKiezen(false)}
           uitleg="Naam, adres, contactpersoon en taal van de aanbieding worden die van de gekozen klant. De artikelen blijven staan."
+        />
+      )}
+
+      {calcVenster && form.artikelRegels.some((r) => r.sleutel === calcVenster.sleutel) && (
+        <RegelCalculatieVenster
+          regel={form.artikelRegels.find((r) => r.sleutel === calcVenster.sleutel)}
+          voorstel={calcVenster.voorstel}
+          bron={calcVenster.bron}
+          valuta={form.valuta}
+          onOvernemen={neemCalculatieOver}
+          onWeghalen={haalCalculatieWeg}
+          onAnnuleren={() => setCalcVenster(null)}
         />
       )}
 
