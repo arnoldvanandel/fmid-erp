@@ -237,9 +237,12 @@ export default function KlantPicklijstAfdruk() {
         </div>
         <p className="doc-instructie">
           Vink elke regel af en noteer bij afwijkingen het gepickte aantal. Dezelfde artikelen uit meerdere
-          orders staan samengevoegd op één regel. De volgorde volgt de looproute (afstandsmatrix of
-          sorteercode van de locatie). Geef de lijst daarna terug aan verkoop; de voorraad wordt afgeboekt
-          bij het maken van de pakbon per order.
+          orders staan samengevoegd op één regel.
+          {lijst.bonEerst
+            ? ' Bij Bonfix staan eerst de BON-artikelen; A-artikelen volgen als alternatief. Een BON-regel met “omboeken naar” wordt bij de pakbon omgeboekt naar het A-artikel.'
+            : ' De volgorde volgt de looproute. Een BON-artikel met “omboeken naar” is het alternatief als het A-artikel niet genoeg op voorraad is.'}{' '}
+          Geef de lijst daarna terug aan verkoop; de voorraad wordt afgeboekt bij het maken van de pakbon per
+          order.
         </p>
       </div>
       {qrOpen && <PicklijstQrVenster klant={klant} onClose={() => setQrOpen(false)} />}

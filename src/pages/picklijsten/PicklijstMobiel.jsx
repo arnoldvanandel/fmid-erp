@@ -15,9 +15,9 @@ import {
 } from '../../lib/pickrapport'
 import { useOpenInkoopVoorArtikel } from '../../hooks/useOpenInkoopVoorArtikel'
 import {
+  alternatiefTePakken,
   anboLocaties,
   bonfixLocaties,
-  bonfixTePakken,
   controlePickInvoer,
   invoerVan,
   leegPickInvoer,
@@ -523,7 +523,13 @@ function LocatieTegels({ locs, invoer, onLocatie, onVul, onNul, nulBezig }) {
             }}
           >
             <strong>{loc.locatieCode}</strong>
-            {loc.isBonfix ? <div className="pick-tegel-meta">Bonfix {loc.artikelnummer}</div> : null}
+            {loc.isBonfix ? (
+              <div className="pick-tegel-meta">BON {loc.artikelnummer}</div>
+            ) : loc.isAlternatief ? (
+              <div className="pick-tegel-meta">Alternatief {loc.artikelnummer}</div>
+            ) : loc.artikelnummer ? (
+              <div className="pick-tegel-meta">{loc.artikelnummer}</div>
+            ) : null}
             <div className="pick-tegel-meta">ligt er {aantal(loc.voorraad)}</div>
             <div className="pick-tegel-meta">blijft {aantal(blijft)}</div>
             <AantalInput
@@ -646,16 +652,22 @@ function ExtraBronnen({ stap, invoer, onInvoer }) {
 
 function StapKaart({ stap, invoer, scan, melding, nulBezig, onScan, onInvoer, onNul }) {
   const eenheid = stap.eenheid || 'stuks'
-  const anbo = anboLocaties(stap)
-  const bon = bonfixLocaties(stap)
-  const anboSom = somInvoer(anbo, invoer.locaties)
-  const bonSom = somInvoer(bon, invoer.locaties)
-  const bonInfo = bon.length ? bonfixTePakken(stap.totaalOpen, anboSom, bon[0].stuksPerZak || 0) : null
-  const anboPak = anbo[0] || {}
-  const bonPak = bon[0] || {}
-  const bonTekst = bonInfo
-    ? verpakkingTekst(verpakkingVanAantal(bonInfo.voorgesteld, bonPak.stuksPerDoos, bonPak.stuksPerZak))
+  const eerste = anboLocaties(stap)
+  const alternatief = bonfixLocaties(stap)
+  const eersteSom = somInvoer(eerste, invoer.locaties)
+  const altSom = somInvoer(alternatief, invoer.locaties)
+  const altInfo = alternatief.length ? alternatiefTePakken(stap, eersteSom) : null
+  const eerstePak = eerste[0] || {}
+  const altPak = alternatief[0] || {}
+  const altTekst = altInfo
+    ? verpakkingTekst(verpakkingVanAantal(altInfo.voorgesteld, altPak.stuksPerDoos, altPak.stuksPerZak))
     : ''
+  const eersteIsBon = Boolean(eerstePak.isBonfix)
+  const altIsBon = Boolean(altPak.isBonfix)
+  const eersteLabel = eersteIsBon ? 'BON gepakt' : alternatief.length ? 'ANBO gepakt' : 'Picken'
+  const eersteTotaalLabel = eersteIsBon ? 'Totaal BON' : alternatief.length ? 'Totaal ANBO' : 'Totaal'
+  const altLabel = altIsBon ? 'Bonfix' : 'ANBO (alternatief)'
+  const altTotaalLabel = altIsBon ? 'Totaal Bonfix' : 'Totaal ANBO'
 
   return (
     <div className="pick-mobiel-kaart">
@@ -664,6 +676,7 @@ function StapKaart({ stap, invoer, scan, melding, nulBezig, onScan, onInvoer, on
           <div className="pick-mobiel-label">Artikel</div>
           <div className="pick-mobiel-artikel">{stap.artikelnummer}</div>
           {stap.artikelnaam ? <div className="pick-mobiel-naam">{stap.artikelnaam}</div> : null}
+          {stap.bonEerst ? <div className="pick-mobiel-extra">Bonfix: eerst BON, daarna A als alternatief</div> : null}
         </div>
         {onScan && (
           <button
@@ -706,20 +719,23 @@ function StapKaart({ stap, invoer, scan, melding, nulBezig, onScan, onInvoer, on
         <p>Dit artikel ligt nergens op voorraad. Kies een open inkooporder of pak zonder locatie.</p>
       ) : (
         <>
-          {anbo.length > 0 && (
+          {eerste.length > 0 && (
             <div className="pick-sectie">
-              <div className="pick-mobiel-label">{bon.length ? 'ANBO gepakt' : 'Picken'}</div>
+              <div className="pick-mobiel-label">{eersteLabel}</div>
               <div className="pick-sectie-aantal">
-                {aantal(anboSom)} <span>{eenheid}</span>
+                {aantal(eersteSom)} <span>{eenheid}</span>
               </div>
-              <VerpakkingWeergave hoeveelheid={anboSom} doos={anboPak.stuksPerDoos} zak={anboPak.stuksPerZak} />
+              <VerpakkingWeergave hoeveelheid={eersteSom} doos={eerstePak.stuksPerDoos} zak={eerstePak.stuksPerZak} />
+              {eerste.some((l) => l.vervangt) ? (
+                <p className="pick-mobiel-extra">Wordt omgeboekt naar {stap.artikelnummer}.</p>
+              ) : null}
               <VerpakkingVelden
-                doos={anboPak.stuksPerDoos}
-                zak={anboPak.stuksPerZak}
+                doos={eerstePak.stuksPerDoos}
+                zak={eerstePak.stuksPerZak}
                 onTotaal={(waarde) => onInvoer(pasTotaalInvoer(stap, invoer, 'anbo', waarde))}
               />
               <div className="field">
-                <label htmlFor="anbo-totaal">{bon.length ? 'Totaal ANBO' : 'Totaal'}</label>
+                <label htmlFor="anbo-totaal">{eersteTotaalLabel}</label>
                 <AantalInput
                   id="anbo-totaal"
                   value={invoer.anboTotaal ?? ''}
@@ -730,7 +746,7 @@ function StapKaart({ stap, invoer, scan, melding, nulBezig, onScan, onInvoer, on
                 </span>
               </div>
               <LocatieTegels
-                locs={anbo}
+                locs={eerste}
                 invoer={invoer}
                 onLocatie={(sleutel, waarde) => onInvoer(pasLocatieInvoer(stap, invoer, sleutel, waarde))}
                 onVul={(sleutel) => onInvoer(vulLocatieInvoer(stap, invoer, sleutel))}
@@ -740,44 +756,48 @@ function StapKaart({ stap, invoer, scan, melding, nulBezig, onScan, onInvoer, on
             </div>
           )}
 
-          {bon.length > 0 && bonInfo && (
+          {alternatief.length > 0 && altInfo && (
             <div className="banner banner-info">
-              Bonfix nog pakken: {aantal(bonInfo.voorgesteld)} {eenheid}
-              {bonTekst ? ` (${bonTekst})` : ''}
+              {altLabel} nog pakken: {aantal(altInfo.voorgesteld)} {eenheid}
+              {altTekst ? ` (${altTekst})` : ''}
               .
-              {Math.abs(bonInfo.exact - bonInfo.voorgesteld) > 0.001
-                ? ` Na ANBO blijven er ${aantal(bonInfo.exact)} open; dat is afgerond naar hele zakjes.`
+              {Math.abs(altInfo.exact - altInfo.voorgesteld) > 0.001
+                ? ` Na de eerste keus blijven er ${aantal(altInfo.exact)} open; dat is afgerond naar hele zakjes.`
                 : ''}
-              {Math.abs(bonSom - bonInfo.voorgesteld) > 0.001 ? ` Ingevuld: ${aantal(bonSom)}.` : ''}
+              {Math.abs(altSom - altInfo.voorgesteld) > 0.001 ? ` Ingevuld: ${aantal(altSom)}.` : ''}
             </div>
           )}
 
-          {bon.length > 0 && (
+          {alternatief.length > 0 && (
             <div className="pick-sectie">
-              <div className="pick-mobiel-label">Bonfix</div>
+              <div className="pick-mobiel-label">{altLabel}</div>
               <div className="pick-sectie-aantal">
-                {aantal(bonSom)} <span>{eenheid}</span>
+                {aantal(altSom)} <span>{eenheid}</span>
               </div>
-              <VerpakkingWeergave hoeveelheid={bonSom} doos={bonPak.stuksPerDoos} zak={bonPak.stuksPerZak} />
-              <p className="pick-mobiel-extra">Wordt omgeboekt naar {stap.artikelnummer}.</p>
+              <VerpakkingWeergave hoeveelheid={altSom} doos={altPak.stuksPerDoos} zak={altPak.stuksPerZak} />
+              {alternatief.some((l) => l.vervangt) ? (
+                <p className="pick-mobiel-extra">Wordt omgeboekt naar {stap.artikelnummer}.</p>
+              ) : null}
               <VerpakkingVelden
-                doos={bonPak.stuksPerDoos}
-                zak={bonPak.stuksPerZak}
+                doos={altPak.stuksPerDoos}
+                zak={altPak.stuksPerZak}
                 onTotaal={(waarde) => onInvoer(pasTotaalInvoer(stap, invoer, 'bonfix', waarde))}
               />
               <div className="field">
-                <label htmlFor="bonfix-totaal">Totaal Bonfix</label>
+                <label htmlFor="bonfix-totaal">{altTotaalLabel}</label>
                 <AantalInput
                   id="bonfix-totaal"
                   value={invoer.bonfixTotaal ?? ''}
                   onValue={(waarde) => onInvoer(pasTotaalInvoer(stap, invoer, 'bonfix', waarde))}
                 />
                 <span className="hint">
-                  Dit mag afwijken van wat er op de locatie ligt, bijvoorbeeld een heel zakje. Tik een locatie om het hele totaal daar te zetten.
+                  {altIsBon
+                    ? 'Dit mag afwijken van wat er op de locatie ligt, bijvoorbeeld een heel zakje. Tik een locatie om het hele totaal daar te zetten.'
+                    : 'Tik een locatie om het hele totaal daar te zetten.'}
                 </span>
               </div>
               <LocatieTegels
-                locs={bon}
+                locs={alternatief}
                 invoer={invoer}
                 onLocatie={(sleutel, waarde) => onInvoer(pasLocatieInvoer(stap, invoer, sleutel, waarde))}
                 onVul={(sleutel) => onInvoer(vulLocatieInvoer(stap, invoer, sleutel))}

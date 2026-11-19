@@ -228,9 +228,12 @@ export default function PicklijstAfdruk() {
           <div>Colli / pallets: ________</div>
         </div>
         <p className="doc-instructie">
-          Vink elke regel af en noteer bij afwijkingen het gepickte aantal. Een BON-artikel met "omboeken naar"
-          wordt omgeboekt naar het A-artikel en als A-artikel geleverd. Geef de lijst daarna terug aan
-          verkoop; de voorraad wordt afgeboekt bij het maken van de pakbon.
+          Vink elke regel af en noteer bij afwijkingen het gepickte aantal.
+          {lijst.bonEerst
+            ? ' Bij Bonfix staan eerst de BON-artikelen; A-artikelen volgen als alternatief.'
+            : ' Een BON-artikel met “omboeken naar” is het alternatief als het A-artikel niet genoeg op voorraad is.'}{' '}
+          Een BON-regel met “omboeken naar” wordt omgeboekt naar het A-artikel en als A-artikel geleverd. Geef
+          de lijst daarna terug aan verkoop; de voorraad wordt afgeboekt bij het maken van de pakbon.
         </p>
       </div>
     </div>

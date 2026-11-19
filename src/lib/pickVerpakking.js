@@ -66,12 +66,23 @@ export function bonfixTePakken(totaalOpen, anboGepakt, stuksPerZak) {
   return { exact, voorgesteld: rondOpNaarZakjes(exact, stuksPerZak) }
 }
 
+// Eerste keus: normaal het A-artikel (ANBO), bij Bonfix het BON-artikel.
 export function anboLocaties(stap) {
-  return (stap?.locaties || []).filter((l) => !l.isBonfix)
+  return (stap?.locaties || []).filter((l) => !l.isAlternatief)
 }
 
+// Alternatief: normaal het BON-artikel (Bonfix), bij Bonfix het A-artikel.
 export function bonfixLocaties(stap) {
-  return (stap?.locaties || []).filter((l) => l.isBonfix)
+  return (stap?.locaties || []).filter((l) => l.isAlternatief)
+}
+
+// Alleen een BON-artikel wordt naar hele zakjes afgerond.
+function zakAlternatief(locs) {
+  return locs[0]?.isBonfix ? Number(locs[0].stuksPerZak) || 0 : 0
+}
+
+export function alternatiefTePakken(stap, eersteGepakt) {
+  return bonfixTePakken(stap.totaalOpen, eersteGepakt, zakAlternatief(bonfixLocaties(stap)))
 }
 
 export function somInvoer(locaties, waarden) {
@@ -130,7 +141,7 @@ function voegTekort(stap, t) {
 
 function afrondStap(stap) {
   const vraag = [...stap.vraagMap.values()].map(({ vast, ...v }) => v)
-  const locaties = [...stap.locaties].sort((a, b) => Number(a.isBonfix) - Number(b.isBonfix))
+  const locaties = [...stap.locaties].sort((a, b) => Number(a.isAlternatief) - Number(b.isAlternatief))
   const totaalOpen = rond3(vraag.reduce((s, v) => s + (Number(v.aantal) || 0), 0))
   const tekort = rond3(vraag.reduce((s, v) => s + (Number(v.tekort) || 0), 0))
   const { vraagMap, ...rest } = stap
@@ -154,7 +165,8 @@ function legeStap(key, bron) {
 
 // Eén scherm per verkoopartikel: alle locaties, inclusief het Bonfix-vervangende artikel.
 // De volgorde blijft de looproute (eerste locatie die we tegenkomen).
-export function groepeerPickstappen(picks, tekorten = []) {
+// Met bonEerst (Bonfix) is het BON-artikel de eerste keus en het A-artikel het alternatief.
+export function groepeerPickstappen(picks, tekorten = [], { bonEerst = false } = {}) {
   const groepen = new Map()
   const volgorde = []
 
@@ -204,6 +216,7 @@ export function groepeerPickstappen(picks, tekorten = []) {
         voorraad,
         voorgesteld: Number(p.aantal) || 0,
         isBonfix: Boolean(p.vervangt),
+        isAlternatief: bonEerst ? !p.vervangt : Boolean(p.vervangt),
         vervangt: p.vervangt || '',
         omboekenNaarId: p.omboekenNaarId || '',
         stuksPerDoos: Number(p.stuksPerDoos) || 0,
@@ -253,7 +266,7 @@ export function standaardPickInvoer(stap) {
   const anbo = anboLocaties(stap)
   const bon = bonfixLocaties(stap)
   const anboAantal = rond3(anbo.reduce((s, l) => s + (Number(l.voorgesteld) || 0), 0))
-  const bonfixAantal = bon.length ? bonfixTePakken(stap.totaalOpen, anboAantal, bon[0].stuksPerZak || 0).voorgesteld : 0
+  const bonfixAantal = bon.length ? alternatiefTePakken(stap, anboAantal).voorgesteld : 0
   const locaties = {}
   for (const l of anbo) locaties[l.sleutel] = l.voorgesteld > 0 ? invoerVan(l.voorgesteld) : ''
   bon.forEach((l, i) => {
@@ -351,7 +364,7 @@ function metBonfix(stap, invoer, anboAantal, locaties) {
   if (!bon.length || zelfde) {
     return { ...invoer, anboTotaal: invoerVan(anboAantal), locaties }
   }
-  const voorgesteld = bonfixTePakken(stap.totaalOpen, anboAantal, bon[0].stuksPerZak || 0).voorgesteld
+  const voorgesteld = alternatiefTePakken(stap, anboAantal).voorgesteld
   const nieuw = { ...locaties }
   bon.forEach((l, i) => {
     nieuw[l.sleutel] = i === 0 ? invoerVan(voorgesteld) : ''
@@ -368,14 +381,14 @@ export function pasLocatieInvoer(stap, invoer, locSleutel, waarde) {
   const loc = (stap.locaties || []).find((l) => l.sleutel === locSleutel)
   if (!loc) return { ...basis, locaties: { ...basis.locaties, [locSleutel]: waarde } }
 
-  const locs = loc.isBonfix ? bonfixLocaties(stap) : anboLocaties(stap)
+  const locs = loc.isAlternatief ? bonfixLocaties(stap) : anboLocaties(stap)
   const eerste = locs[0]
   const locaties = { ...basis.locaties, [locSleutel]: waarde }
 
   // Een andere locatie dan de eerste houdt het totaal gelijk: het verschil
   // gaat van de eerste locatie af, zodat Bonfix niet mee verspringt.
   if (eerste && loc.sleutel !== eerste.sleutel) {
-    const totaal = leesAantal(loc.isBonfix ? basis.bonfixTotaal : basis.anboTotaal)
+    const totaal = leesAantal(loc.isAlternatief ? basis.bonfixTotaal : basis.anboTotaal)
     if (totaal != null) {
       const rest = somInvoer(
         locs.filter((l) => l.sleutel !== eerste.sleutel),
@@ -386,7 +399,7 @@ export function pasLocatieInvoer(stap, invoer, locSleutel, waarde) {
     return { ...basis, locaties }
   }
 
-  if (loc.isBonfix) {
+  if (loc.isAlternatief) {
     return { ...basis, locaties, bonfixTotaal: invoerVan(somInvoer(locs, locaties)) }
   }
   return metBonfix(stap, basis, somInvoer(locs, locaties), locaties)
@@ -412,7 +425,7 @@ export function vulLocatieInvoer(stap, invoer, locSleutel) {
   const basis = invoer || standaardPickInvoer(stap)
   const loc = (stap.locaties || []).find((l) => l.sleutel === locSleutel)
   if (!loc) return basis
-  const bon = loc.isBonfix
+  const bon = loc.isAlternatief
   const locs = bon ? bonfixLocaties(stap) : anboLocaties(stap)
   const totaal = leesAantal(bon ? basis.bonfixTotaal : basis.anboTotaal) || 0
   const locaties = { ...basis.locaties }

@@ -29,7 +29,15 @@ export function vervangendeNummers(artikelnummer) {
   return [...new Set([`BON${rest}`, `BON${rest.toUpperCase()}`, `BON${[eerste.toUpperCase(), ...overig].join(' ')}`])]
 }
 
-async function verdeelOverVoorraad(openRegels) {
+// Bij Bonfix gaat het BON-artikel voor en is het A-artikel het alternatief.
+// Een klant kan dit ook zelf aan of uit hebben (bonArtikelenEerst).
+export function bonArtikelenEerst(klant) {
+  if (!klant) return false
+  if (typeof klant.bonArtikelenEerst === 'boolean') return klant.bonArtikelenEerst
+  return /bonfix/i.test(String(klant.naam || ''))
+}
+
+async function verdeelOverVoorraad(openRegels, { bonEerst = false } = {}) {
   const kandidaten = openRegels.flatMap((r) => vervangendeNummers(r.artikelnummer))
   const vervangers = await haalOpIn('artikelen', 'artikelnummer', kandidaten)
   const vervangerVan = {}
@@ -61,10 +69,9 @@ async function verdeelOverVoorraad(openRegels) {
   for (const r of openRegels) {
     let nodig = r.nogTeLeveren
     const v = vervangerVan[r.id]
-    const plekken = [
-      ...standen.filter((s) => s.artikelId === r.artikelId).sort((a, b) => vrij[b.id] - vrij[a.id]),
-      ...(v ? standen.filter((s) => s.artikelId === v.id).sort((a, b) => vrij[b.id] - vrij[a.id]) : []),
-    ]
+    const eigen = standen.filter((s) => s.artikelId === r.artikelId).sort((a, b) => vrij[b.id] - vrij[a.id])
+    const vervangend = v ? standen.filter((s) => s.artikelId === v.id).sort((a, b) => vrij[b.id] - vrij[a.id]) : []
+    const plekken = bonEerst ? [...vervangend, ...eigen] : [...eigen, ...vervangend]
     for (const s of plekken) {
       if (nodig <= 0) break
       const pak = Math.min(nodig, vrij[s.id])
@@ -117,26 +124,25 @@ async function verdeelOverVoorraad(openRegels) {
   const gezien = new Set(picks.map((p) => `${p.regelId}__${p.artikelId}__${p.locatieId}`))
   for (const r of openRegels) {
     const v = vervangerVan[r.id]
-    const bronnen = [
-      {
-        artikelId: r.artikelId,
-        artikelnummer: r.artikelnummer,
-        artikelnaam: r.artikelnaam,
-        vervangt: '',
-        omboekenNaarId: '',
-      },
-      ...(v
-        ? [
-            {
-              artikelId: v.id,
-              artikelnummer: v.artikelnummer,
-              artikelnaam: v.naam,
-              vervangt: r.artikelnummer,
-              omboekenNaarId: r.artikelId,
-            },
-          ]
-        : []),
-    ]
+    const eigen = {
+      artikelId: r.artikelId,
+      artikelnummer: r.artikelnummer,
+      artikelnaam: r.artikelnaam,
+      vervangt: '',
+      omboekenNaarId: '',
+    }
+    const vervangend = v
+      ? {
+          artikelId: v.id,
+          artikelnummer: v.artikelnummer,
+          artikelnaam: v.naam,
+          vervangt: r.artikelnummer,
+          omboekenNaarId: r.artikelId,
+        }
+      : null
+    const bronnen = bonEerst
+      ? [...(vervangend ? [vervangend] : []), eigen]
+      : [eigen, ...(vervangend ? [vervangend] : [])]
     for (const bron of bronnen) {
       if (!bron.artikelId) continue
       for (const s of standen.filter((x) => x.artikelId === bron.artikelId)) {
@@ -168,11 +174,15 @@ async function verdeelOverVoorraad(openRegels) {
   }
 
   const looproute = await laadLooproute()
-  const gesorteerd = sorteerPicksOpLooproute(picks, {
+  let gesorteerd = sorteerPicksOpLooproute(picks, {
     locatiesById,
     afstanden: looproute.afstanden,
     startZone: looproute.startZone,
   })
+  // Bij Bonfix: eerst alle BON-regels, daarna de A-artikelen als alternatief.
+  if (bonEerst) {
+    gesorteerd = [...gesorteerd].sort((a, b) => Number(!a.vervangt) - Number(!b.vervangt))
+  }
 
   return { picks: gesorteerd, tekorten, locatiesById, looproute }
 }
@@ -243,9 +253,9 @@ async function voegVerpakkingToe(picks) {
 
 // Verpakking (doos/zak) en het totaal dat er van het artikel openstaat,
 // ook als dat over meerdere orders of locaties verdeeld is.
-async function verrijkPicklijst(picks, tekorten) {
+async function verrijkPicklijst(picks, tekorten, { bonEerst = false } = {}) {
   const metVerpakking = await voegVerpakkingToe(picks)
-  let stappen = groepeerPickstappen(metVerpakking, tekorten)
+  let stappen = groepeerPickstappen(metVerpakking, tekorten, { bonEerst })
   const zonderVerpakking = stappen.filter((s) => s.artikelId && !s.stuksPerDoos && !s.stuksPerZak)
   if (zonderVerpakking.length) {
     const docs = await haalOpIn(
@@ -266,7 +276,7 @@ async function verrijkPicklijst(picks, tekorten) {
   }
   const openPerArtikel = new Map(stappen.map((s) => [s.sleutel, s.totaalOpen]))
   return {
-    stappen,
+    stappen: stappen.map((s) => ({ ...s, bonEerst })),
     picks: metVerpakking.map((p) => ({
       ...p,
       totaalOpen: openPerArtikel.get(String(p.omboekenNaarId || p.artikelId || p.artikelnummer || '')) ?? p.aantal,
@@ -288,9 +298,10 @@ export async function maakPicklijst(verkooporderId) {
     }))
     .filter((r) => r.nogTeLeveren > 0)
 
-  const { picks: ruwePicks, tekorten } = await verdeelOverVoorraad(open)
-  const { picks, stappen } = await verrijkPicklijst(ruwePicks, tekorten)
-  return { ...gegevens, picks, stappen, tekorten, openRegels: open.length }
+  const bonEerst = bonArtikelenEerst(gegevens.klant)
+  const { picks: ruwePicks, tekorten } = await verdeelOverVoorraad(open, { bonEerst })
+  const { picks, stappen } = await verrijkPicklijst(ruwePicks, tekorten, { bonEerst })
+  return { ...gegevens, picks, stappen, tekorten, openRegels: open.length, bonEerst }
 }
 
 // Alle open regels van één klant (over meerdere verkooporders) in één picklijst,
@@ -338,7 +349,8 @@ export async function maakPicklijstPerKlant(klantId) {
     })
     .filter((r) => r.nogTeLeveren > 0 && orderById[r.verkooporderId])
 
-  const { picks: ruwePicks, tekorten } = await verdeelOverVoorraad(open)
+  const bonEerst = bonArtikelenEerst(klant)
+  const { picks: ruwePicks, tekorten } = await verdeelOverVoorraad(open, { bonEerst })
   const picks = voegPicksSamen(ruwePicks)
 
   // Na samenvoegen opnieuw op looproute (volgorde blijft via locatieId).
@@ -346,15 +358,19 @@ export async function maakPicklijstPerKlant(klantId) {
   const locatieIds = [...new Set(picks.map((p) => p.locatieId))]
   const locatieDocs = await haalOpIn('locaties', documentId(), locatieIds)
   const locatiesById = Object.fromEntries(locatieDocs.map((l) => [l.id, l]))
-  const gesorteerd = sorteerPicksOpLooproute(picks, {
+  let gesorteerd = sorteerPicksOpLooproute(picks, {
     locatiesById,
     afstanden: looproute.afstanden,
     startZone: looproute.startZone,
   })
-  const verrijkt = await verrijkPicklijst(gesorteerd, tekorten)
+  if (bonEerst) {
+    gesorteerd = [...gesorteerd].sort((a, b) => Number(!a.vervangt) - Number(!b.vervangt))
+  }
+  const verrijkt = await verrijkPicklijst(gesorteerd, tekorten, { bonEerst })
 
   return {
     klant,
+    bonEerst,
     orders: orders
       .filter((o) => open.some((r) => r.orderId === o.id))
       .sort((a, b) => String(a.ordernummer).localeCompare(String(b.ordernummer), 'nl', { numeric: true })),
