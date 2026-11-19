@@ -102,6 +102,8 @@ Streepjescodes uit `INVENTITEMBARCODE` komen op het artikel: `barcodeDoos`
 en `barcodeZak` (streepjescodesetup DOOS en ZAK), plus `barcodeCodes` zodat
 de telefoon beide kan scannen. Een gevulde hoeveelheid op die barcode
 (bijna altijd leeg in Axapta) wordt `stuksPerDoos` of `stuksPerZak`.
+Barcodes die niet in Axapta staan (Bonfix-import of handmatig gekoppeld)
+worden door de sync niet gewist.
 
 ## Node-script (niet gebruiken op de Pi)
 

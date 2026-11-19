@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import ArtikelKiezer from '../../components/ArtikelKiezer'
 import AantalInput from '../../components/AantalInput'
 import BarcodeCamera, { cameraBeschikbaar } from '../../components/BarcodeCamera'
+import BarcodeKoppelen from '../../components/BarcodeKoppelen'
 import LocatieKiezer from '../../components/LocatieKiezer'
 import { useAuth } from '../../contexts/AuthContext'
 import { haalArtikelOpBarcode, haalArtikelenOp } from '../../lib/artikelZoeken'
@@ -45,6 +46,7 @@ export default function OpVoorraadMobiel() {
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
   const [melding, setMelding] = useState(null)
+  const [onbekendeBarcode, setOnbekendeBarcode] = useState('')
   const barcodeRef = useRef(null)
 
   useEffect(() => {
@@ -105,11 +107,13 @@ export default function OpVoorraadMobiel() {
     try {
       const gevonden = await haalArtikelOpBarcode(waarde)
       if (!gevonden) {
-        setFout(`Geen artikel met barcode of artikelnummer "${waarde}". Vul de barcode in bij het artikel.`)
+        setOnbekendeBarcode(waarde)
+        setFout(`Geen artikel met barcode of artikelnummer "${waarde}". Koppel de barcode aan een artikel.`)
         barcodeRef.current?.focus()
         barcodeRef.current?.select()
         return
       }
+      setOnbekendeBarcode('')
       kiesArtikel(gevonden)
     } catch (err) {
       setFout(err.message)
@@ -493,6 +497,19 @@ export default function OpVoorraadMobiel() {
           onSluiten={() => setCamera(false)}
         />
       )}
+      {onbekendeBarcode ? (
+        <BarcodeKoppelen
+          barcode={onbekendeBarcode}
+          onGekoppeld={(art) => {
+            const code = onbekendeBarcode
+            setOnbekendeBarcode('')
+            setFout(null)
+            setBarcode(code)
+            kiesArtikel(art)
+          }}
+          onSluiten={() => setOnbekendeBarcode('')}
+        />
+      ) : null}
     </div>
   )
 }

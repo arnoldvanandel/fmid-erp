@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AantalInput from '../../components/AantalInput'
 import BarcodeCamera, { CameraIcoon } from '../../components/BarcodeCamera'
+import BarcodeKoppelen from '../../components/BarcodeKoppelen'
 import LocatieKiezer from '../../components/LocatieKiezer'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
@@ -68,6 +69,7 @@ export default function OntvangstMobiel() {
   const [zoeken, setZoeken] = useState(false)
   const [camera, setCamera] = useState(false)
   const [scanBezig, setScanBezig] = useState(false)
+  const [onbekendeBarcode, setOnbekendeBarcode] = useState('')
   const [sessieId, setSessieId] = useState(leesOpenSessieId)
   const locatieVraag = useRef(0)
 
@@ -429,10 +431,12 @@ export default function OntvangstMobiel() {
     try {
       const gevonden = await haalArtikelOpBarcode(waarde)
       if (!gevonden) {
-        setFout(`Geen artikel met barcode of artikelnummer "${waarde}". Vul de barcode in bij het artikel.`)
+        setOnbekendeBarcode(waarde)
+        setFout(`Geen artikel met barcode of artikelnummer "${waarde}". Koppel de barcode aan een artikel.`)
         setLijstOpen(true)
         return
       }
+      setOnbekendeBarcode('')
       kiesArtikel(gevonden)
     } catch (err) {
       setFout(err.message)
@@ -934,6 +938,17 @@ export default function OntvangstMobiel() {
           onSluiten={() => setCamera(false)}
         />
       )}
+      {onbekendeBarcode ? (
+        <BarcodeKoppelen
+          barcode={onbekendeBarcode}
+          onGekoppeld={(art) => {
+            setOnbekendeBarcode('')
+            setFout(null)
+            kiesArtikel(art)
+          }}
+          onSluiten={() => setOnbekendeBarcode('')}
+        />
+      ) : null}
     </div>
   )
 }

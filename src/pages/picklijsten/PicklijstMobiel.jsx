@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import AantalInput from '../../components/AantalInput'
 import BarcodeCamera, { CameraIcoon, cameraBeschikbaar } from '../../components/BarcodeCamera'
+import BarcodeKoppelen from '../../components/BarcodeKoppelen'
 import { useAuth } from '../../contexts/AuthContext'
 import { haalArtikelOpBarcode } from '../../lib/artikelZoeken'
 import { formatNumber } from '../../lib/format'
@@ -84,6 +85,7 @@ export default function PicklijstMobiel() {
   const [rapportKlaar, setRapportKlaar] = useState(false)
   const [camera, setCamera] = useState(false)
   const [scan, setScan] = useState(null)
+  const [koppelBarcode, setKoppelBarcode] = useState('')
   const [nulBezig, setNulBezig] = useState(null)
   const scanVraag = useRef(0)
   const inhoudRef = useRef(null)
@@ -209,8 +211,10 @@ export default function PicklijstMobiel() {
       if (vraag !== scanVraag.current) return
       if (!artikel) {
         setScan({ status: 'onbekend', code })
+        setKoppelBarcode(code)
         return
       }
+      setKoppelBarcode('')
       const ids = new Set([regel.artikelId, ...regel.locaties.map((l) => l.artikelId)])
       const nummers = new Set([regel.artikelnummer, ...regel.locaties.map((l) => l.artikelnummer)])
       if (ids.has(artikel.id) || nummers.has(artikel.artikelnummer)) setScan({ status: 'goed', code })
@@ -376,6 +380,31 @@ export default function PicklijstMobiel() {
           onSluiten={() => setCamera(false)}
         />
       )}
+      {koppelBarcode && stap ? (
+        <BarcodeKoppelen
+          barcode={koppelBarcode}
+          voorstel={(() => {
+            const bon = stap.locaties.find((l) => l.isBonfix)
+            const loc = stap.bonEerst && bon ? bon : stap.locaties[0] || bon
+            return {
+              id: loc?.artikelId || stap.artikelId,
+              artikelnummer: loc?.artikelnummer || stap.artikelnummer,
+              naam: loc?.artikelnaam || stap.artikelnaam,
+              stuksPerDoos: loc?.stuksPerDoos || stap.stuksPerDoos,
+              stuksPerZak: loc?.stuksPerZak || stap.stuksPerZak,
+              barcodeDoos: '',
+              barcodeZak: '',
+              barcodeCodes: [],
+            }
+          })()}
+          onGekoppeld={() => {
+            const code = koppelBarcode
+            setKoppelBarcode('')
+            controleerScan(code)
+          }}
+          onSluiten={() => setKoppelBarcode('')}
+        />
+      ) : null}
     </div>
   )
 }
@@ -420,7 +449,7 @@ function ScanUitslag({ scan, stap }) {
   }
   return (
     <div className="banner banner-warning">
-      {scan.melding || `Geen artikel met barcode ${scan.code} gevonden. Controleer het artikelnummer.`}
+      {scan.melding || `Geen artikel met barcode ${scan.code} gevonden. Koppel hem aan dit of een ander artikel.`}
     </div>
   )
 }

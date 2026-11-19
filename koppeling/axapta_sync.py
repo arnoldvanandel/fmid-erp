@@ -402,15 +402,13 @@ def schrijf_barcodes(db, barcodes, artikelen):
         batches.set('artikelen', artikel['id'], payload)
         artikel.update(payload)
         bijgewerkt += 1
-    leeg = {'barcodeDoos': '', 'barcodeZak': '', 'barcode': '', 'barcodeCodes': []}
+    # Barcodes die niet in Axapta staan (Bonfix-import, handmatig gekoppeld)
+    # niet wissen: anders verdwijnen die bij de volgende sync.
     for nummer, artikel in artikelen.items():
         if nummer in barcodes:
             continue
-        if not (artikel.get('barcodeDoos') or artikel.get('barcodeZak') or artikel.get('barcodeCodes')):
-            continue
-        batches.set('artikelen', artikel['id'], leeg)
-        artikel.update(leeg)
-        gewist += 1
+        if artikel.get('barcodeDoos') or artikel.get('barcodeZak') or artikel.get('barcodeCodes'):
+            overgeslagen += 1
     batches.klaar()
     return {
         'artikelen': len(barcodes),

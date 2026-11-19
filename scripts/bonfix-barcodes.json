@@ -1,0 +1,1766 @@
+[
+  {
+    "bonfixCode": "53005",
+    "barcode": "8717845530051",
+    "artcodeLev": "A104 15-15",
+    "artikelnummer": "BON104 15-15",
+    "omschrijving": "BONFIX Knel C-staal 104 rechte koppeling 15 x 15 mm",
+    "stuksPerDoos": 120,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53010",
+    "barcode": "8717845530105",
+    "artcodeLev": "A104 22-22",
+    "artikelnummer": "BON104 22-22",
+    "omschrijving": "BONFIX Knel C-staal 104 rechte koppeling 22 x 22 mm",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53015",
+    "barcode": "8717845530150",
+    "artcodeLev": "A104 28-28",
+    "artikelnummer": "BON104 28-28",
+    "omschrijving": "BONFIX Knel C-staal 104 rechte koppeling 28 x 28 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "53020",
+    "barcode": "8717845530204",
+    "artcodeLev": "A104 35-35",
+    "artikelnummer": "BON104 35-35",
+    "omschrijving": "BONFIX Knel C-staal 104 rechte koppeling 35 x 35 mm",
+    "stuksPerDoos": 15,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53105",
+    "barcode": "8717845531058",
+    "artcodeLev": "A104 22-15",
+    "artikelnummer": "BON104 22-15",
+    "omschrijving": "BONFIX Knel C-staal 104 rechte verloopkoppeling 22 x 15 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53110",
+    "barcode": "8717845531102",
+    "artcodeLev": "A104 28-22",
+    "artikelnummer": "BON104 28-22",
+    "omschrijving": "BONFIX Knel C-staal 104 rechte verloopkoppeling 28 x 22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53115",
+    "barcode": "8717845531157",
+    "artcodeLev": "A104 35-28",
+    "artikelnummer": "BON104 35-28",
+    "omschrijving": "BONFIX Knel C-staal 104 rechte verloopkoppeling 35 x 28 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53120",
+    "barcode": "8717845531201",
+    "artcodeLev": "A104 42-35",
+    "artikelnummer": "BON104 42-35",
+    "omschrijving": "BONFIX Knel C-staal 104 rechte verloopkoppeling 42 x 35 mm",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53205",
+    "barcode": "8717845532055",
+    "artcodeLev": "A116 15-15",
+    "artikelnummer": "BON116 15-15",
+    "omschrijving": "BONFIX Knel C-staal 116 overschuifkoppeling 15 x 15 mm",
+    "stuksPerDoos": 120,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53210",
+    "barcode": "8717845532109",
+    "artcodeLev": "A116 22-22",
+    "artikelnummer": "BON116 22-22",
+    "omschrijving": "BONFIX Knel C-staal 116 overschuifkoppeling 22 x 22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53215",
+    "barcode": "8717845532154",
+    "artcodeLev": "A116 28-28",
+    "artikelnummer": "BON116 28-28",
+    "omschrijving": "BONFIX Knel C-staal 116 overschuifkoppeling 28 x 28 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "53220",
+    "barcode": "8717845532208",
+    "artcodeLev": "A116 35-35",
+    "artikelnummer": "BON116 35-35",
+    "omschrijving": "BONFIX Knel C-staal 116 overschuifkoppeling 35 x 35 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53225",
+    "barcode": "8717845532253",
+    "artcodeLev": "A116 42-42",
+    "artikelnummer": "BON116 42-42",
+    "omschrijving": "BONFIX Knel C-staal 116 overschuifkoppeling 42 x 42 mm",
+    "stuksPerDoos": 12,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53305",
+    "barcode": "8717845533052",
+    "artcodeLev": "A106 3/8-15",
+    "artikelnummer": "BON106 3/8-15",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 3/8\" bu.dr. x 15 mm",
+    "stuksPerDoos": 180,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53310",
+    "barcode": "8717845533106",
+    "artcodeLev": "A106 1/2-15",
+    "artikelnummer": "BON106 1/2-15",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 1/2\" bu.dr. x 15 mm",
+    "stuksPerDoos": 180,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53315",
+    "barcode": "8717845533151",
+    "artcodeLev": "A106 1/2-22",
+    "artikelnummer": "BON106 1/2-22",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 1/2\" bu.dr. x 22 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53320",
+    "barcode": "8717845533205",
+    "artcodeLev": "A106 3/4-15",
+    "artikelnummer": "BON106 3/4-15",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 3/4\" bu.dr. x 15 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53325",
+    "barcode": "8717845533250",
+    "artcodeLev": "A106 3/4-22",
+    "artikelnummer": "BON106 3/4-22",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 3/4\" bu.dr. x 22 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53330",
+    "barcode": "8717845533304",
+    "artcodeLev": "A106 3/4-28",
+    "artikelnummer": "BON106 3/4-28",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 3/4\" bu.dr. x 28 mm",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53340",
+    "barcode": "8717845533403",
+    "artcodeLev": "A106 1-22",
+    "artikelnummer": "BON106 1-22",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 1\" bu.dr. 22 mm",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53345",
+    "barcode": "8717845533458",
+    "artcodeLev": "A106 1-28",
+    "artikelnummer": "BON106 1-28",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 1\" bu.dr. 28 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53350",
+    "barcode": "8717845533502",
+    "artcodeLev": "A106 1-35",
+    "artikelnummer": "BON106 1-35",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 1\" bu.dr. 35 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53360",
+    "barcode": "8717845533601",
+    "artcodeLev": "A106 5/4-35",
+    "artikelnummer": "BON106 5/4-35",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 1 1/4\" bu.dr. x 35 mm",
+    "stuksPerDoos": 15,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53365",
+    "barcode": "8717845533656",
+    "artcodeLev": "A106 5/4-42",
+    "artikelnummer": "BON106 5/4-42",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk 1 1/4\" bu.dr. x 42 mm",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53405",
+    "barcode": "8717845534059",
+    "artcodeLev": "A107 3/8-15",
+    "artikelnummer": "BON107 3/8-15",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 3/8\" bi.dr. x 15 mm",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53410",
+    "barcode": "8717845534103",
+    "artcodeLev": "A107 1/2-15",
+    "artikelnummer": "BON107 1/2-15",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 1/2\" bi.dr. x 15 mm",
+    "stuksPerDoos": 140,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53415",
+    "barcode": "8717845534158",
+    "artcodeLev": "A107 1/2-22",
+    "artikelnummer": "BON107 1/2-22",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 1/2\" bi.dr. x 22 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53420",
+    "barcode": "8717845534202",
+    "artcodeLev": "A107 1/2-28",
+    "artikelnummer": "BON107 1/2-28",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 1/2\" bi.dr. x 28 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53425",
+    "barcode": "8717845534257",
+    "artcodeLev": "A107 3/4-15",
+    "artikelnummer": "BON107 3/4-15",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 3/4\" bi.dr. x 15 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53430",
+    "barcode": "8717845534301",
+    "artcodeLev": "A107 3/4-22",
+    "artikelnummer": "BON107 3/4-22",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 3/4\" bi.dr. x 22 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53435",
+    "barcode": "8717845534356",
+    "artcodeLev": "A107 3/4-28",
+    "artikelnummer": "BON107 3/4-28",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 3/4\" bi.dr. x 28 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53440",
+    "barcode": "8717845534400",
+    "artcodeLev": "A107 3/4-35",
+    "artikelnummer": "BON107 3/4-35",
+    "omschrijving": "BONFIX 107 Schroefbus 3/4\" binnendraad x 35 mm",
+    "stuksPerDoos": 25,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53445",
+    "barcode": "8717845534455",
+    "artcodeLev": "A107 1-22",
+    "artikelnummer": "BON107 1-22",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 1\" bi.dr. x 22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53450",
+    "barcode": "8717845534509",
+    "artcodeLev": "A107 1-28",
+    "artikelnummer": "BON107 1-28",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 1\" bi.dr. x 28 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53455",
+    "barcode": "8717845534554",
+    "artcodeLev": "A107 1-35",
+    "artikelnummer": "BON107 1-35",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 1\" bi.dr. x 35 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53460",
+    "barcode": "8717845534608",
+    "artcodeLev": "A107 1-42",
+    "artikelnummer": "BON107 1-42",
+    "omschrijving": "BONFIX 107 Schroefbus 1\" binnendraad x 42 mm",
+    "stuksPerDoos": 12,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53465",
+    "barcode": "8717845534653",
+    "artcodeLev": "A107 5/4-35",
+    "artikelnummer": "BON107 5/4-35",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 1 1/4\" bi.dr. x 35 mm",
+    "stuksPerDoos": 15,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53470",
+    "barcode": "8717845534707",
+    "artcodeLev": "A107 5/4-42",
+    "artikelnummer": "BON107 5/4-42",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus 1 1/4\" bi.dr. x 42 mm",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53505",
+    "barcode": "8717845535056",
+    "artcodeLev": "A105 15-15",
+    "artikelnummer": "BON105 15-15",
+    "omschrijving": "BONFIX Knel C-staal 105 kniekoppeling 15 x 15 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53510",
+    "barcode": "8717845535100",
+    "artcodeLev": "A105 22-22",
+    "artikelnummer": "BON105 22-22",
+    "omschrijving": "BONFIX Knel C-staal 105 kniekoppeling 22 x 22 mm",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53515",
+    "barcode": "8717845535155",
+    "artcodeLev": "A105 28-28",
+    "artikelnummer": "BON105 28-28",
+    "omschrijving": "BONFIX Knel C-staal 105 kniekoppeling 28 x 28 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "53520",
+    "barcode": "8717845535209",
+    "artcodeLev": "A105 35-35",
+    "artikelnummer": "BON105 35-35",
+    "omschrijving": "BONFIX Knel C-staal 105 kniekoppeling 35 x 35 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53525",
+    "barcode": "8717845535254",
+    "artcodeLev": "A105 42-42",
+    "artikelnummer": "BON105 42-42",
+    "omschrijving": "BONFIX Knel C-staal 105 kniekoppeling 42 x 42 mm",
+    "stuksPerDoos": 8,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53605",
+    "barcode": "8717845536053",
+    "artcodeLev": "A105 22-15",
+    "artikelnummer": "BON105 22-15",
+    "omschrijving": "BONFIX Knel C-staal 105 verloopknie 22 x 15 mm",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53610",
+    "barcode": "8717845536107",
+    "artcodeLev": "A105 28-22",
+    "artikelnummer": "BON105 28-22",
+    "omschrijving": "BONFIX Knel C-staal 105 verloopknie 28 x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53705",
+    "barcode": "8717845537050",
+    "artcodeLev": "A108 3/8-15",
+    "artikelnummer": "BON108 3/8-15",
+    "omschrijving": "BONFIX Knel C-staal 108 kniekoppeling 3/8\" bu.dr. x 15 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53710",
+    "barcode": "8717845537104",
+    "artcodeLev": "A108 1/2-15",
+    "artikelnummer": "BON108 1/2-15",
+    "omschrijving": "BONFIX Knel C-staal 108 kniekoppeling 1/2\" bu.dr. x 15 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53715",
+    "barcode": "8717845537159",
+    "artcodeLev": "A108 1/2-22",
+    "artikelnummer": "BON108 1/2-22",
+    "omschrijving": "BONFIX Knel C-staal 108 kniekoppeling 1/2\" bu.dr. x 22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53720",
+    "barcode": "8717845537203",
+    "artcodeLev": "A108 3/4-22",
+    "artikelnummer": "BON108 3/4-22",
+    "omschrijving": "BONFIX Knel C-staal 108 kniekoppeling 3/4\" bu.dr. x 22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53725",
+    "barcode": "8717845537258",
+    "artcodeLev": "A108 3/4-28",
+    "artikelnummer": "BON108 3/4-28",
+    "omschrijving": "BONFIX 108 Kniekoppeling 3/4\" buitendraad x 28 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53730",
+    "barcode": "8717845537302",
+    "artcodeLev": "A108 1-28",
+    "artikelnummer": "BON108 1-28",
+    "omschrijving": "BONFIX Knel C-staal 108 kniekoppeling 1\" bu.dr. 28 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "53735",
+    "barcode": "8717845537357",
+    "artcodeLev": "A108 1-35",
+    "artikelnummer": "BON108 1-35",
+    "omschrijving": "BONFIX 108 Kniekoppeling 1\" buitendraad x 35 mm",
+    "stuksPerDoos": 16,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53740",
+    "barcode": "8717845537401",
+    "artcodeLev": "A108 5/4-35",
+    "artikelnummer": "BON108 5/4-35",
+    "omschrijving": "BONFIX Knel C-staal 108 kniekoppeling 1 1/4\" bu.dr. x 35 mm",
+    "stuksPerDoos": 12,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53745",
+    "barcode": "8717845537456",
+    "artcodeLev": "A108 5/4-42",
+    "artikelnummer": "BON108 5/4-42",
+    "omschrijving": "BONFIX 108 Kniekoppeling 5/4\" buitendraad x 42 mm",
+    "stuksPerDoos": 8,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53805",
+    "barcode": "8717845538057",
+    "artcodeLev": "A108A 3/8-15",
+    "artikelnummer": "BON108A 3/8-15",
+    "omschrijving": "BONFIX Knel C-staal 108A kniekoppeling 3/8\" bi.dr. x 15 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53810",
+    "barcode": "8717845538101",
+    "artcodeLev": "A108A 1/2-15",
+    "artikelnummer": "BON108A 1/2-15",
+    "omschrijving": "BONFIX Knel C-staal 108A kniekoppeling 1/2\" bi.dr. x 15 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53815",
+    "barcode": "8717845538156",
+    "artcodeLev": "A108A 1/2-22",
+    "artikelnummer": "BON108A 1/2-22",
+    "omschrijving": "BONFIX Knel C-staal 108A kniekoppeling 1/2\" bi.dr. x 22 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53820",
+    "barcode": "8717845538200",
+    "artcodeLev": "A108A 3/4-22",
+    "artikelnummer": "BON108A 3/4-22",
+    "omschrijving": "BONFIX Knel C-staal 108A kniekoppeling 3/4\" bi.dr. x 22 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53825",
+    "barcode": "8717845538255",
+    "artcodeLev": "A108A 3/4-28",
+    "artikelnummer": "BON108A 3/4-28",
+    "omschrijving": "BONFIX 108A Kniekoppeling 3/4\" binnendraad x 28 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53830",
+    "barcode": "8717845538309",
+    "artcodeLev": "A108A 1-28",
+    "artikelnummer": "BON108A 1-28",
+    "omschrijving": "BONFIX Knel C-staal 108A kniekopppeling 1\" bi.dr. 28 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "53835",
+    "barcode": "8717845538354",
+    "artcodeLev": "A108A 1-35",
+    "artikelnummer": "BON108A 1-35",
+    "omschrijving": "BONFIX 108A Kniekopppeling 1\" binnendraad x 35 mm",
+    "stuksPerDoos": 12,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53840",
+    "barcode": "8717845538408",
+    "artcodeLev": "A108A 5/4-35",
+    "artikelnummer": "BON108A 5/4-35",
+    "omschrijving": "BONFIX 108A Kniekoppeling 5/4\" binnendraad x 35 mm",
+    "stuksPerDoos": 8,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53845",
+    "barcode": "8717845538453",
+    "artcodeLev": "A108A 5/4-42",
+    "artikelnummer": "BON108A 5/4-42",
+    "omschrijving": "BONFIX 108A Kniekoppeling 5/4\" binnendraad x 42 mm",
+    "stuksPerDoos": 6,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "53905",
+    "barcode": "8717845539054",
+    "artcodeLev": "A103 rnd 15-15",
+    "artikelnummer": "BON103 rnd 15-15",
+    "omschrijving": "BONFIX Knel C-staal 103SP insteekkniekopp. 15 x Ø15 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "53910",
+    "barcode": "8717845539108",
+    "artcodeLev": "A103 rnd 22-22",
+    "artikelnummer": "BON103 rnd 22-22",
+    "omschrijving": "BONFIX Knel C-staal 103SP insteekkniekopp. 22 x Ø22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54005",
+    "barcode": "8717845540050",
+    "artcodeLev": "A105 15-15ontl",
+    "artikelnummer": "BON105 15-15ontl",
+    "omschrijving": "BONFIX Knel C-staal 105SP ontluchtingskniekopp. 15 x 15 mm",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54010",
+    "barcode": "8717845540104",
+    "artcodeLev": "A105 22-22ontl",
+    "artikelnummer": "BON105 22-22ontl",
+    "omschrijving": "BONFIX Knel C-staal 105SP ontluchtingskniekoppeling 22x22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54105",
+    "barcode": "8717845541057",
+    "artcodeLev": "A109 15-15-15",
+    "artikelnummer": "BON109 15-15-15",
+    "omschrijving": "BONFIX Knel C-staal 109 T-stuk 15 x 15 x 15 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54110",
+    "barcode": "8717845541101",
+    "artcodeLev": "A109 22-22-22",
+    "artikelnummer": "BON109 22-22-22",
+    "omschrijving": "BONFIX Knel C-staal 109 T-stuk 22 x 22 x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54115",
+    "barcode": "8717845541156",
+    "artcodeLev": "A109 28-28-28",
+    "artikelnummer": "BON109 28-28-28",
+    "omschrijving": "BONFIX Knel C-staal 109 T-stuk 28 x 28 x 28 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54120",
+    "barcode": "8717845541200",
+    "artcodeLev": "A109 35-35-35",
+    "artikelnummer": "BON109 35-35-35",
+    "omschrijving": "BONFIX Knel C-staal 109 T-stuk 35 x 35 x 35 mm",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54125",
+    "barcode": "8717845541255",
+    "artcodeLev": "A109 42-42-42",
+    "artikelnummer": "BON109 42-42-42",
+    "omschrijving": "BONFIX Knel C-staal 109 T-stuk 42 x 42 x 42 mm",
+    "stuksPerDoos": 6,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54205",
+    "barcode": "8717845542054",
+    "artcodeLev": "A109 15-22-15",
+    "artikelnummer": "BON109 15-22-15",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 15 x 22 x 15 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54210",
+    "barcode": "8717845542108",
+    "artcodeLev": "A109 22-15-15",
+    "artikelnummer": "BON109 22-15-15",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 22 x 15 x 15 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54215",
+    "barcode": "8717845542153",
+    "artcodeLev": "A109 22-15-22",
+    "artikelnummer": "BON109 22-15-22",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 22 x 15 x 22 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54220",
+    "barcode": "8717845542207",
+    "artcodeLev": "A109 22-22-15",
+    "artikelnummer": "BON109 22-22-15",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 22 x 22 x 15 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54225",
+    "barcode": "8717845542252",
+    "artcodeLev": "A109 22-28-22",
+    "artikelnummer": "BON109 22-28-22",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 22 x 28 x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54230",
+    "barcode": "8717845542306",
+    "artcodeLev": "A109 28-15-22",
+    "artikelnummer": "BON109 28-15-22",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 28 x 15 x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54235",
+    "barcode": "8717845542351",
+    "artcodeLev": "A109 28-15-28",
+    "artikelnummer": "BON109 28-15-28",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 28 x 15 x 28 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54240",
+    "barcode": "8717845542405",
+    "artcodeLev": "A109 28-22-22",
+    "artikelnummer": "BON109 28-22-22",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 28 x 22 x 22 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54245",
+    "barcode": "8717845542450",
+    "artcodeLev": "A109 28-22-28",
+    "artikelnummer": "BON109 28-22-28",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 28 x 22 x 28 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54250",
+    "barcode": "8717845542504",
+    "artcodeLev": "A109 28-28-22",
+    "artikelnummer": "BON109 28-28-22",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 28 x 28 x 22 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54255",
+    "barcode": "8717845542559",
+    "artcodeLev": "A109 35-22-35",
+    "artikelnummer": "BON109 35-22-35",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 35 x 22 x 35 mm",
+    "stuksPerDoos": 12,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54260",
+    "barcode": "8717845542603",
+    "artcodeLev": "A109 35-28-28",
+    "artikelnummer": "BON109 35-28-28",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 35 x 28 x 28 mm",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54265",
+    "barcode": "8717845542658",
+    "artcodeLev": "A109 35-28-35",
+    "artikelnummer": "BON109 35-28-35",
+    "omschrijving": "BONFIX Knel C-staal 109 verloop T-stuk 35 x 28 x 35 mm",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54305",
+    "barcode": "8717845543051",
+    "artcodeLev": "A110 15-1/2-15",
+    "artikelnummer": "BON110 15-1/2-15",
+    "omschrijving": "BONFIX Knel C-staal 110 T-stuk 15 x 1/2\" bi.dr. x 15 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54310",
+    "barcode": "8717845543105",
+    "artcodeLev": "A110 22-1/2-22",
+    "artikelnummer": "BON110 22-1/2-22",
+    "omschrijving": "BONFIX Knel C-staal 110 T-stuk 22 x 1/2\" bi.dr. x 22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54315",
+    "barcode": "8717845543150",
+    "artcodeLev": "A110 22-3/4-22",
+    "artikelnummer": "BON110 22-3/4-22",
+    "omschrijving": "BONFIX Knel C-staal 110 T-stuk 22 x 3/4\" bi.dr. x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54320",
+    "barcode": "8717845543204",
+    "artcodeLev": "A110 28-1/2-28",
+    "artikelnummer": "BON110 28-1/2-28",
+    "omschrijving": "BONFIX Knel C-staal 110 T-stuk 28 x 1/2\" bi.dr. x 28 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54325",
+    "barcode": "8717845543259",
+    "artcodeLev": "A110 28-3/4-28",
+    "artikelnummer": "BON110 28-3/4-28",
+    "omschrijving": "BONFIX 110 T-stuk 28 x 3/4\" binnendraad x 28 mm",
+    "stuksPerDoos": 25,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54330",
+    "barcode": "8717845543303",
+    "artcodeLev": "A110 35-1/2-35",
+    "artikelnummer": "BON110 35-1/2-35",
+    "omschrijving": "BONFIX Knel C-staal 110 T-stuk 35 x 1/2\" bi.dr. x 35 mm",
+    "stuksPerDoos": 12,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54335",
+    "barcode": "8717845543358",
+    "artcodeLev": "A110 35-3/4-35",
+    "artikelnummer": "BON110 35-3/4-35",
+    "omschrijving": "BONFIX 110 T-stuk 35 x 3/4\" binnendraad x 35 mm",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54340",
+    "barcode": "8717845543402",
+    "artcodeLev": "A110 42-1-42",
+    "artikelnummer": "BON110 42-1-42",
+    "omschrijving": "BONFIX 110 T-stuk 42 x 1\" binnendraad x 42 mm",
+    "stuksPerDoos": 6,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54405",
+    "barcode": "8717845544058",
+    "artcodeLev": "A111 15-1/2-15",
+    "artikelnummer": "BON111 15-1/2-15",
+    "omschrijving": "BONFIX 111 T-koppeling 15 x 1/2 x 15 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54410",
+    "barcode": "8717845544102",
+    "artcodeLev": "A111 22-1/2-22",
+    "artikelnummer": "BON111 22-1/2-22",
+    "omschrijving": "BONFIX 111 T-koppeling 22 x 1/2 x 22 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54415",
+    "barcode": "8717845544157",
+    "artcodeLev": "A111 22-3/4-22",
+    "artikelnummer": "BON111 22-3/4-22",
+    "omschrijving": "BONFIX 111 T-koppeling 22 x 3/4 x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54505",
+    "barcode": "8717845545055",
+    "artcodeLev": "A112 15-15-1/2",
+    "artikelnummer": "BON112 15-15-1/2",
+    "omschrijving": "BONFIX Knel C-staal 112 T-stuk 15 x 15 x 1/2\" bi.dr.",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54510",
+    "barcode": "8717845545109",
+    "artcodeLev": "A112 22-22-1/2",
+    "artikelnummer": "BON112 22-22-1/2",
+    "omschrijving": "BONFIX Knel C-staal 112 T-stuk 22 x 22 x 1/2\" bi.dr.",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54515",
+    "barcode": "8717845545154",
+    "artcodeLev": "A112 22-22-3/4",
+    "artikelnummer": "BON112 22-22-3/4",
+    "omschrijving": "BONFIX 112 T-koppeling 22 x 22 x 3/4\" binnendraad",
+    "stuksPerDoos": 30,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54520",
+    "barcode": "8717845545208",
+    "artcodeLev": "A112 28-28-1/2",
+    "artikelnummer": "BON112 28-28-1/2",
+    "omschrijving": "BONFIX Knel C-staal 112 T-stuk 28 x 28 x 1/2\" bi.dr.",
+    "stuksPerDoos": 25,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54605",
+    "barcode": "8717845546052",
+    "artcodeLev": "A113 22-22-1/2",
+    "artikelnummer": "BON113 22-22-1/2",
+    "omschrijving": "BONFIX 113 T-koppeling 22 x 22 x 1/2\" buitendraad",
+    "stuksPerDoos": 30,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54705",
+    "barcode": "8717845547059",
+    "artcodeLev": "A114 22-15-15-15",
+    "artikelnummer": "BON114 22-15-15-15",
+    "omschrijving": "BONFIX Knel C-staal 114 kruisstuk 22 x 15 x 15 x 15 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54710",
+    "barcode": "8717845547103",
+    "artcodeLev": "A114 22-15-22-15",
+    "artikelnummer": "BON114 22-15-22-15",
+    "omschrijving": "BONFIX 114 Kruisstuk 22 x 15 x 22 x 15 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54715",
+    "barcode": "8717845547158",
+    "artcodeLev": "A114 22-22-22-22",
+    "artikelnummer": "BON114 22-22-22-22",
+    "omschrijving": "BONFIX 114 Kruisstuk 22 x 22 x 22 x 22 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54805",
+    "barcode": "8717845548056",
+    "artcodeLev": "A115 15-15-15",
+    "artikelnummer": "BON115 15-15-15",
+    "omschrijving": "BONFIX Knel C-staal 115 hoek T-stuk 15 x 15 x 15 mm",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54810",
+    "barcode": "8717845548100",
+    "artcodeLev": "A115 22-15-15",
+    "artikelnummer": "BON115 22-15-15",
+    "omschrijving": "BONFIX Knel C-staal 115 hoek T-stuk 22 x 15 x 15 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54815",
+    "barcode": "8717845548155",
+    "artcodeLev": "A115 22-22-15",
+    "artikelnummer": "BON115 22-22-15",
+    "omschrijving": "BONFIX Knel C-staal 115 hoek T-stuk 22 x 22 x 15 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "54820",
+    "barcode": "8717845548209",
+    "artcodeLev": "A115 22-22-22",
+    "artikelnummer": "BON115 22-22-22",
+    "omschrijving": "BONFIX Knel C-staal 115 hoek T-stuk 22 x 22 x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54825",
+    "barcode": "8717845548254",
+    "artcodeLev": "A115 28-28-22",
+    "artikelnummer": "BON115 28-28-22",
+    "omschrijving": "BONFIX 115 Hoek T-koppeling 28 x 28 x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54830",
+    "barcode": "8717845548308",
+    "artcodeLev": "A115 28-28-28",
+    "artikelnummer": "BON115 28-28-28",
+    "omschrijving": "BONFIX 115 Hoek T-koppeling 28 x 28 x 28 mm",
+    "stuksPerDoos": 15,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54905",
+    "barcode": "8717845549053",
+    "artcodeLev": "A118 15-15-15",
+    "artikelnummer": "BON118 15-15-15",
+    "omschrijving": "BONFIX Knel C-staal 118 passeer T-stuk 15 x 15 x 15 mm",
+    "stuksPerDoos": 50,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54910",
+    "barcode": "8717845549107",
+    "artcodeLev": "A118 22-15-22",
+    "artikelnummer": "BON118 22-15-22",
+    "omschrijving": "BONFIX Knel C-staal 118 passeer T-stuk 22 x 15 x 22 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54915",
+    "barcode": "8717845549152",
+    "artcodeLev": "A118 22-22-22",
+    "artikelnummer": "BON118 22-22-22",
+    "omschrijving": "BONFIX Knel C-staal 118 passeer T-stuk 22 x 22 x 22 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "54920",
+    "barcode": "8717845549206",
+    "artcodeLev": "A118 28-15-28",
+    "artikelnummer": "BON118 28-15-28",
+    "omschrijving": "BONFIX 118 Passeer T-koppeling 28 x 15 x 28 mm",
+    "stuksPerDoos": 15,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "54925",
+    "barcode": "8717845549251",
+    "artcodeLev": "A118 28-28-28",
+    "artikelnummer": "BON118 28-28-28",
+    "omschrijving": "BONFIX Knel C-staal 118 passeer T-stuk 28 x 28 x 28 mm",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "55005",
+    "barcode": "8717845550059",
+    "artcodeLev": "A120 15-15-15-15",
+    "artikelnummer": "BON120 15-15-15-15",
+    "omschrijving": "BONFIX Knel C-staal 120 passeerkruisst. 15 x 15 x 15 x 15 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "55010",
+    "barcode": "8717845550103",
+    "artcodeLev": "A120 22-15-15-15",
+    "artikelnummer": "BON120 22-15-15-15",
+    "omschrijving": "BONFIX Knel C-staal 120 passeerkruisst. 22 x 15 x 15 x 15 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55015",
+    "barcode": "8717845550158",
+    "artcodeLev": "A120 22-15-22-15",
+    "artikelnummer": "BON120 22-15-22-15",
+    "omschrijving": "BONFIX 120 Passeerkruisstuk 22 x 15 x 22 x 15 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "55105",
+    "barcode": "8717845551056",
+    "artcodeLev": "A102 1/2-15",
+    "artikelnummer": "BON102 1/2-15",
+    "omschrijving": "BONFIX Knel C-staal 102 radiatorkopp. recht 1/2\" bu. x 15 mm",
+    "stuksPerDoos": 120,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55205",
+    "barcode": "8717845552053",
+    "artcodeLev": "A103 1/2-15",
+    "artikelnummer": "BON103 1/2-15",
+    "omschrijving": "BONFIX Knel C-staal 103 radiatorkopp. haaks 1/2\" bu. x 15 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55305",
+    "barcode": "8717845553050",
+    "artcodeLev": "A205 15",
+    "artikelnummer": "BON205 15",
+    "omschrijving": "BONFIX Knel C-staal 205 wartelmoer 15 mm",
+    "stuksPerDoos": 500,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55310",
+    "barcode": "8717845553104",
+    "artcodeLev": "A205-22SP",
+    "artikelnummer": "BON205-22SP",
+    "omschrijving": "BONFIX Knel C-staal 205 wartelmoer 22 mm",
+    "stuksPerDoos": 300,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55315",
+    "barcode": "8717845553159",
+    "artcodeLev": "A205 28",
+    "artikelnummer": "BON205 28",
+    "omschrijving": "BONFIX Knel C-staal 205 wartelmoer 28 mm",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "55320",
+    "barcode": "8717845553203",
+    "artcodeLev": "A205 35",
+    "artikelnummer": "BON205 35",
+    "omschrijving": "BONFIX Knel C-staal 205 wartelmoer 35 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "55325",
+    "barcode": "8717845553258",
+    "artcodeLev": "A205-42",
+    "artikelnummer": "BON205-42",
+    "omschrijving": "BONFIX Knel C-staal 205 wartelmoer 42 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "55405",
+    "barcode": "8717845554057",
+    "artcodeLev": "A206 15",
+    "artikelnummer": "BON206 15",
+    "omschrijving": "BONFIX Knel C-staal 206 knelring 15 mm",
+    "stuksPerDoos": 1000,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55410",
+    "barcode": "8717845554101",
+    "artcodeLev": "A206 22",
+    "artikelnummer": "BON206 22",
+    "omschrijving": "BONFIX Knel C-staal 206 knelring 22 mm",
+    "stuksPerDoos": 500,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55415",
+    "barcode": "8717845554156",
+    "artcodeLev": "A206 28",
+    "artikelnummer": "BON206 28",
+    "omschrijving": "BONFIX Knel C-staal 206 knelring 28 mm",
+    "stuksPerDoos": 300,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55420",
+    "barcode": "8717845554200",
+    "artcodeLev": "A206 35",
+    "artikelnummer": "BON206 35",
+    "omschrijving": "BONFIX Knel C-staal 206 knelring 35 mm",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55425",
+    "barcode": "8717845554255",
+    "artcodeLev": "A206 42",
+    "artikelnummer": "BON206 42",
+    "omschrijving": "BONFIX Knel C-staal 206 knelring 42 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55430",
+    "barcode": "8717845554309",
+    "artcodeLev": "55430",
+    "artikelnummer": "55430",
+    "omschrijving": "BONFIX 206 Knelring 18 mm",
+    "stuksPerDoos": 1000,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55505",
+    "barcode": "8717845555054",
+    "artcodeLev": "A201 1/2-3/8",
+    "artikelnummer": "BON201 1/2-3/8",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring bruin 3/8\" (15 mm)",
+    "stuksPerDoos": 300,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55506",
+    "barcode": "8717845555061",
+    "artcodeLev": "BON55506",
+    "artikelnummer": "BON55506",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring blauw 3/8\" (15 mm)",
+    "stuksPerDoos": 300,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55510",
+    "barcode": "8717845555108",
+    "artcodeLev": "A206 1/2+",
+    "artikelnummer": "BON206 1/2+",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring bruin 1/2\" (22 mm)",
+    "stuksPerDoos": 300,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55511",
+    "barcode": "8717845555115",
+    "artcodeLev": "BON55511",
+    "artikelnummer": "BON55511",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring blauw 1/2\" (22 mm)",
+    "stuksPerDoos": 300,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55515",
+    "barcode": "8717845555153",
+    "artcodeLev": "A206 3/4",
+    "artikelnummer": "BON206 3/4",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring bruin 3/4\" (28 mm)",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55516",
+    "barcode": "8717845555160",
+    "artcodeLev": "BON55516",
+    "artikelnummer": "BON55516",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring blauw 3/4\" (28 mm)",
+    "stuksPerDoos": 200,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55520",
+    "barcode": "8717845555207",
+    "artcodeLev": "A206 1\"+",
+    "artikelnummer": "BON206 1\"+",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring bruin 1\" (35 mm)",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55521",
+    "barcode": "8717845555214",
+    "artcodeLev": "BON55521",
+    "artikelnummer": "BON55521",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring blauw 1\" (35 mm)",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55525",
+    "barcode": "8717845555252",
+    "artcodeLev": "A206 5/4",
+    "artikelnummer": "BON206 5/4",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring bruin 1 1/4\" (42 mm)",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55530",
+    "barcode": "8717845555306",
+    "artcodeLev": "A206 1.1/2+",
+    "artikelnummer": "BON206 1.1/2+",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring bruin 1 1/2\" (54 mm)",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "55535",
+    "barcode": "8717845555351",
+    "artcodeLev": "A206 2+",
+    "artikelnummer": "BON206 2+",
+    "omschrijving": "BONFIX Knel C-staal 206 dikw. knelring dikwandig bruin 2\"",
+    "stuksPerDoos": 10,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "55605",
+    "barcode": "8717845556051",
+    "artcodeLev": "A204 15-ontl",
+    "artikelnummer": "BON204 15-ontl",
+    "omschrijving": "BONFIX Knel C-staal 204 ontluchtingsplaatje 15 mm",
+    "stuksPerDoos": 250,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55610",
+    "barcode": "8717845556105",
+    "artcodeLev": "A204 22-ontl",
+    "artikelnummer": "BON204 22-ontl",
+    "omschrijving": "BONFIX Knel C-staal 204 ontluchtingsplaatje 22 mm",
+    "stuksPerDoos": 200,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55705",
+    "barcode": "8717845557058",
+    "artcodeLev": "A202 15",
+    "artikelnummer": "BON202 15",
+    "omschrijving": "BONFIX Knel C-staal 202 afsluitplaatje 15 mm",
+    "stuksPerDoos": 500,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55710",
+    "barcode": "8717845557102",
+    "artcodeLev": "A202 22",
+    "artikelnummer": "BON202 22",
+    "omschrijving": "BONFIX Knel C-staal 202 afsluitplaatje 22 mm",
+    "stuksPerDoos": 200,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55715",
+    "barcode": "8717845557157",
+    "artcodeLev": "A202 28",
+    "artikelnummer": "BON202 28",
+    "omschrijving": "BONFIX 202 Afsluitplaatje 28 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "55805",
+    "barcode": "8717845558055",
+    "artcodeLev": "A207 15",
+    "artikelnummer": "BON207 15",
+    "omschrijving": "BONFIX Knel C-staal 207 eindkoppeling 15 mm",
+    "stuksPerDoos": 200,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55810",
+    "barcode": "8717845558109",
+    "artcodeLev": "A207 22",
+    "artikelnummer": "BON207 22",
+    "omschrijving": "BONFIX Knel C-staal 207 eindkoppeling 22 mm",
+    "stuksPerDoos": 120,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55815",
+    "barcode": "8717845558154",
+    "artcodeLev": "A207 28",
+    "artikelnummer": "BON207 28",
+    "omschrijving": "BONFIX Knel C-staal 207 eindkoppeling 28 mm",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55820",
+    "barcode": "8717845558208",
+    "artcodeLev": "A207 35",
+    "artikelnummer": "BON207 35",
+    "omschrijving": "BONFIX Knel C-staal 207 eindkoppeling 35 mm",
+    "stuksPerDoos": 30,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "55825",
+    "barcode": "8717845558253",
+    "artcodeLev": "A207 42",
+    "artikelnummer": "BON207 42",
+    "omschrijving": "BONFIX Knel C-staal 207 eindkoppeling 42 mm",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "55905",
+    "barcode": "8717845559052",
+    "artcodeLev": "A201 22-15",
+    "artikelnummer": "BON201 22-15",
+    "omschrijving": "BONFIX Knel C-staal 201 verloopset 22 x 15 mm",
+    "stuksPerDoos": 250,
+    "stuksPerZak": 50
+  },
+  {
+    "bonfixCode": "55910",
+    "barcode": "8717845559106",
+    "artcodeLev": "A201 28-15",
+    "artikelnummer": "BON201 28-15",
+    "omschrijving": "BONFIX Knel C-staal 201 verloopset 28 x 15 mm",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 1
+  },
+  {
+    "bonfixCode": "55915",
+    "barcode": "8717845559151",
+    "artcodeLev": "A201 28-22",
+    "artikelnummer": "BON201 28-22",
+    "omschrijving": "BONFIX Knel C-staal 201 verloopset 28 x 22 mm",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "55920",
+    "barcode": "8717845559205",
+    "artcodeLev": "A201 35-22",
+    "artikelnummer": "BON201 35-22",
+    "omschrijving": "BONFIX Knel C-staal 201 verloopset 35 x 22 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55925",
+    "barcode": "8717845559250",
+    "artcodeLev": "A201 35-28",
+    "artikelnummer": "BON201 35-28",
+    "omschrijving": "BONFIX 201 Verloopset 35 x 28 mm",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "55930",
+    "barcode": "8717845559304",
+    "artcodeLev": "A201 42-22",
+    "artikelnummer": "BON201 42-22",
+    "omschrijving": "BONFIX Knel C-staal 201 verloopset 42 x 22 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 1
+  },
+  {
+    "bonfixCode": "55935",
+    "barcode": "8717845559359",
+    "artcodeLev": "A201 42-28",
+    "artikelnummer": "BON201 42-28",
+    "omschrijving": "BONFIX Knel C-staal 201 verloopset 42 x 28 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 1
+  },
+  {
+    "bonfixCode": "55940",
+    "barcode": "8717845559403",
+    "artcodeLev": "A201 42-35",
+    "artikelnummer": "BON201 42-35",
+    "omschrijving": "BONFIX Knel C-staal 201 verloopset 42 x 35 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "56010",
+    "barcode": "8717845560102",
+    "artcodeLev": "A010 22",
+    "artikelnummer": "BON010 22",
+    "omschrijving": "BONFIX 010 Aanlasunit 22 mm",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "56015",
+    "barcode": "8717845560157",
+    "artcodeLev": "A010 28",
+    "artikelnummer": "BON010 28",
+    "omschrijving": "BONFIX Aanlasunit 28 mm",
+    "stuksPerDoos": 80,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "56105",
+    "barcode": "8717845561055",
+    "artcodeLev": "A303 3/4-15",
+    "artikelnummer": "BON303 3/4-15",
+    "omschrijving": "BONFIX 303 Expansievatbeugel 3/4\" binnendraad x 15 mm",
+    "stuksPerDoos": 4,
+    "stuksPerZak": 1
+  },
+  {
+    "bonfixCode": "56205",
+    "barcode": "8717845562052",
+    "artcodeLev": "A305 22",
+    "artikelnummer": "BON305 22",
+    "omschrijving": "BONFIX Knel C-staal 305 universeel luchtpot 22 mm",
+    "stuksPerDoos": 40,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "56210",
+    "barcode": "8717845562106",
+    "artcodeLev": "A305 28",
+    "artikelnummer": "BON305 28",
+    "omschrijving": "BONFIX Knel C-staal 305 universeel luchtpot 28 mm",
+    "stuksPerDoos": 25,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "56305",
+    "barcode": "8717845563059",
+    "artcodeLev": "A106sp 3/8-3/8",
+    "artikelnummer": "BON106sp 3/8-3/8",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk lang 3/8\" bu. x knel dikw.",
+    "stuksPerDoos": 40,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "56310",
+    "barcode": "8717845563103",
+    "artcodeLev": "A106sp 1/2-1/2",
+    "artikelnummer": "BON106sp 1/2-1/2",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk lang 1/2\" bu. x knel dikw.",
+    "stuksPerDoos": 60,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "56315",
+    "barcode": "8717845563158",
+    "artcodeLev": "A106sp 3/4-3/4",
+    "artikelnummer": "BON106sp 3/4-3/4",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk lang 3/4\" bu. x knel dikw.",
+    "stuksPerDoos": 30,
+    "stuksPerZak": 5
+  },
+  {
+    "bonfixCode": "56320",
+    "barcode": "8717845563202",
+    "artcodeLev": "A106sp 1-1",
+    "artikelnummer": "BON106sp 1-1",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk lang 1\" bu. x knel dikw.",
+    "stuksPerDoos": 20,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "56325",
+    "barcode": "8717845563257",
+    "artcodeLev": "A106sp 5/4-5/4",
+    "artikelnummer": "BON106sp 5/4-5/4",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk lang 1 1/4\" bu x knel dikw.",
+    "stuksPerDoos": 8,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "56330",
+    "barcode": "8717845563301",
+    "artcodeLev": "A106sp 1.1/2-1.1/2",
+    "artikelnummer": "BON106sp 1.1/2-1.1/2",
+    "omschrijving": "BONFIX 106 Puntstuk lang 3/2'' x 3/2''",
+    "stuksPerDoos": 6,
+    "stuksPerZak": 1
+  },
+  {
+    "bonfixCode": "56335",
+    "barcode": "8717845563356",
+    "artcodeLev": "A106sp 2-2",
+    "artikelnummer": "BON106sp 2-2",
+    "omschrijving": "BONFIX Knel C-staal 106 puntstuk lang 2\" bu. x knel dikw.",
+    "stuksPerDoos": 4,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "56425",
+    "barcode": "8717845564254",
+    "artcodeLev": "A107sp 1.1/2 - 1.1/2",
+    "artikelnummer": "BON107sp 1.1/2 - 1.1/2",
+    "omschrijving": "BONFIX 107 Schroefbus lang 3/2 x 3/2 mm",
+    "stuksPerDoos": 6,
+    "stuksPerZak": 1
+  },
+  {
+    "bonfixCode": "56430",
+    "barcode": "8717845564308",
+    "artcodeLev": "A107sp 2-2",
+    "artikelnummer": "BON107sp 2-2",
+    "omschrijving": "BONFIX Knel C-staal 107 schroefbus lang 2\" bi. x knel dikw.",
+    "stuksPerDoos": 4,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "56505",
+    "barcode": "8717845565053",
+    "artcodeLev": "A116 1.1/2 - 1.1/2",
+    "artikelnummer": "BON116 1.1/2 - 1.1/2",
+    "omschrijving": "BONFIX 116 Overschuifkoppeling 3/2\" x 3/2\"",
+    "stuksPerDoos": 6,
+    "stuksPerZak": 1
+  },
+  {
+    "bonfixCode": "56510",
+    "barcode": "8717845565107",
+    "artcodeLev": "A116 2-2+",
+    "artikelnummer": "BON116 2-2+",
+    "omschrijving": "BONFIX Knel C-staal 116 overschuifkopp. 2\" x knel dikw.",
+    "stuksPerDoos": 3,
+    "stuksPerZak": null
+  },
+  {
+    "bonfixCode": "58205",
+    "barcode": "8717845582050",
+    "artcodeLev": "A208S 14 2",
+    "artikelnummer": "BON208S 14 2",
+    "omschrijving": "BONFIX 208 Aansluitkoppeling Alupex 14 x 2",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "58210",
+    "barcode": "8717845582104",
+    "artcodeLev": "A208S 16-2",
+    "artikelnummer": "BON208S 16-2",
+    "omschrijving": "BONFIX 208 Aansluitkoppeling Alupex 16 x 2",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "58300",
+    "barcode": "8717845583002",
+    "artcodeLev": "A208 12-2",
+    "artikelnummer": "BON208 12-2",
+    "omschrijving": "BONFIX 208 Aansluitkoppeling PEX 12 x 2,0",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "58305",
+    "barcode": "8717845583057",
+    "artcodeLev": "A208 14-2",
+    "artikelnummer": "BON208 14-2",
+    "omschrijving": "BONFIX 208 Aansluitkoppeling PEX 14 x 2,0",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "58310",
+    "barcode": "8717845583101",
+    "artcodeLev": "A208 16 2",
+    "artikelnummer": "BON208 16 2",
+    "omschrijving": "BONFIX 208 Aansluitkoppeling PEX 16 x 2,0 (M22 x 1.5)",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "58405",
+    "barcode": "8717845584054",
+    "artcodeLev": "58405",
+    "artikelnummer": "58405",
+    "omschrijving": "BONFIX-Therm 209 Aansluitset voor koperen buis 15 mm",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "58410",
+    "barcode": "8717845584108",
+    "artcodeLev": "A209 17 15",
+    "artikelnummer": "BON209 17 15",
+    "omschrijving": "BONFIX Therm 209 aansluitset voor stalen buis 15 mm",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "58505",
+    "barcode": "8717845585051",
+    "artcodeLev": "A205 17-15",
+    "artikelnummer": "BON205 17-15",
+    "omschrijving": "BONFIX Knel C-staal 205 moer voor verdeler 17 - 15 mm",
+    "stuksPerDoos": 400,
+    "stuksPerZak": 25
+  },
+  {
+    "bonfixCode": "58605",
+    "barcode": "8717845586058",
+    "artcodeLev": "A202 U",
+    "artikelnummer": "BON202 U",
+    "omschrijving": "BONFIX 202 Afsluitplaat t.b.v. Unicor",
+    "stuksPerDoos": 200,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "58610",
+    "barcode": "8717845586102",
+    "artcodeLev": "A202 17",
+    "artikelnummer": "BON202 17",
+    "omschrijving": "BONFIX 202 Afsluitplaat 17 mm",
+    "stuksPerDoos": 300,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "58705",
+    "barcode": "8717845587055",
+    "artcodeLev": "A102Sp rnd 15-17",
+    "artikelnummer": "BON102Sp rnd 15-17",
+    "omschrijving": "BONFIX Knel C-staal 102 Insteekkoppeling 17 x 15 mm",
+    "stuksPerDoos": 120,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "58805",
+    "barcode": "8717845588052",
+    "artcodeLev": "A104 17-15 klem",
+    "artikelnummer": "BON104 17-15 klem",
+    "omschrijving": "BONFIX 104 Rechte koppeling 15 x 17",
+    "stuksPerDoos": 120,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "58810",
+    "barcode": "8717845588106",
+    "artcodeLev": "A104 17-17",
+    "artikelnummer": "BON104 17-17",
+    "omschrijving": "BONFIX 104 Rechte koppeling 17 x 17",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "58905",
+    "barcode": "8717845589059",
+    "artcodeLev": "A105 17-15 klem",
+    "artikelnummer": "BON105 17-15 klem",
+    "omschrijving": "BONFIX 105 Verloopkniekoppeling 17 x 15",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "58910",
+    "barcode": "8717845589103",
+    "artcodeLev": "A105 17-17",
+    "artikelnummer": "BON105 17-17",
+    "omschrijving": "BONFIX 105 Verloopkniekoppeling 17 x 17",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "59005",
+    "barcode": "8717845590055",
+    "artcodeLev": "A106 1/2-17",
+    "artikelnummer": "BON106 1/2-17",
+    "omschrijving": "BONFIX Knel C-staal 106 overgangskopp. M22, 17 mm x 1/2\" bu.",
+    "stuksPerDoos": 150,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "59105",
+    "barcode": "8717845591052",
+    "artcodeLev": "A107 1/2-17",
+    "artikelnummer": "BON107 1/2-17",
+    "omschrijving": "BONFIX 107 Schroefbus 1/2 x 17",
+    "stuksPerDoos": 120,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "59205",
+    "barcode": "8717845592059",
+    "artcodeLev": "A108 1/2-17",
+    "artikelnummer": "BON108 1/2-17",
+    "omschrijving": "BONFIX 108 Kniekoppeling 1/2 x 17",
+    "stuksPerDoos": 100,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "59305",
+    "barcode": "8717845593056",
+    "artcodeLev": "A109 17-17-17",
+    "artikelnummer": "BON109 17-17-17",
+    "omschrijving": "BONFIX 109 T-koppeling 17 x 17 x 17",
+    "stuksPerDoos": 80,
+    "stuksPerZak": 10
+  },
+  {
+    "bonfixCode": "59510",
+    "barcode": "8717845595104",
+    "artcodeLev": "A222 RA",
+    "artikelnummer": "BON222 RA",
+    "omschrijving": "BONFIX 222 RA Onderblok 2 pijpssysteem",
+    "stuksPerDoos": 20,
+    "stuksPerZak": 10
+  }
+]
