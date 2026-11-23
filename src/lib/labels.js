@@ -4,8 +4,10 @@ export const LABELPRINTER_URL = 'http://127.0.0.1:8791'
 export const PRINTER_SLEUTEL = 'fmid.labelPrinter'
 
 // Eén paginaformaat voor de labelprinter. Komt overeen met het afdrukbereik
-// van de Excel-bladen (ongeveer 94 × 96 mm).
+// van de Excel-bladen (ongeveer 94 × 96 mm). De afdruk schuift 4 mm naar rechts
+// zodat het bereik op de sticker valt.
 export const LABEL_MAAT = { breedteMm: 96, hoogteMm: 98 }
+export const AFDRUK_VERSCHUIVING_MM = 4
 
 const MERK = {
   PCC: 'pcc.jpg',

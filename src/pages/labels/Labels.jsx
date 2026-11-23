@@ -6,6 +6,7 @@ import { haalArtikelOpBarcode, zoekArtikelen } from '../../lib/artikelZoeken'
 import {
   LABEL_KLANTEN,
   LABEL_MAAT,
+  AFDRUK_VERSCHUIVING_MM,
   artikelSleutel,
   artikelenVoorKlant,
   bewaarPrinterNaam,
@@ -255,7 +256,15 @@ export default function Labels() {
           backgroundColor: '#ffffff',
           useCORS: true,
         })
-        const pngBase64 = canvas.toDataURL('image/png').split(',')[1]
+        const verschuivingPx = Math.round(canvas.width * (AFDRUK_VERSCHUIVING_MM / LABEL_MAAT.breedteMm))
+        const vel = document.createElement('canvas')
+        vel.width = canvas.width
+        vel.height = canvas.height
+        const ctx = vel.getContext('2d')
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, vel.width, vel.height)
+        ctx.drawImage(canvas, verschuivingPx, 0)
+        const pngBase64 = vel.toDataURL('image/png').split(',')[1]
         await drukAfOpPrinter({
           printer: doel,
           copies: kopieen,

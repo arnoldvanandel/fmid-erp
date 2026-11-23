@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 import { code128Modules } from '../../lib/code128'
 import { familieVan, fotoUrl, labelDatum, merkBestand, LABEL_MAAT } from '../../lib/labels'
 
@@ -96,9 +96,45 @@ function Lijn({ x, y, w }) {
   return <div className="etiket-lijn" style={{ left: mm(x), top: mm(y), width: mm(w) }} />
 }
 
-function FotoAbs({ src, x, y, w, h }) {
+// html2canvas negeert object-fit en rekt de foto over de hele rechthoek.
+// Daarom krijgt de afbeelding zelf de maat die in het vak past.
+function pasInVak(nw, nh, x, y, w, h) {
+  const verhouding = nw / nh
+  const vak = w / h
+  const bw = verhouding > vak ? w : h * verhouding
+  const bh = verhouding > vak ? w / verhouding : h
+  return { left: x + (w - bw) / 2, top: y + (h - bh) / 2, width: bw, height: bh }
+}
+
+function Beeld({ src, x, y, w, h }) {
+  const imgRef = useRef(null)
+  const [passend, setPassend] = useState(null)
+  useEffect(() => {
+    const img = imgRef.current
+    if (!img) return undefined
+    function meet() {
+      if (!img.naturalWidth || !img.naturalHeight) return
+      setPassend(pasInVak(img.naturalWidth, img.naturalHeight, x, y, w, h))
+    }
+    if (img.complete) meet()
+    img.addEventListener('load', meet)
+    return () => img.removeEventListener('load', meet)
+  }, [src, x, y, w, h])
   if (!src) return null
-  return <img src={src} alt="" className="etiket-foto-abs" style={{ left: mm(x), top: mm(y), width: mm(w), height: mm(h) }} />
+  const plek = passend || { left: x, top: y, width: w, height: h }
+  return (
+    <img
+      ref={imgRef}
+      src={src}
+      alt=""
+      className="etiket-foto-abs"
+      style={{ left: mm(plek.left), top: mm(plek.top), width: mm(plek.width), height: mm(plek.height) }}
+    />
+  )
+}
+
+function FotoAbs({ src, x, y, w, h }) {
+  return <Beeld src={src} x={x} y={y} w={w} h={h} />
 }
 
 function Tabel({ grid, children }) {
@@ -365,11 +401,12 @@ function Bonfix({ label, foto }) {
           </td>
         </Rij>
       </Tabel>
-      <img
+      <Beeld
         src={merkBestand('PCC-BONFIX')}
-        alt=""
-        className="etiket-foto-abs"
-        style={{ left: mm(x[2] + 5.38), top: mm(3.7), width: mm(x[5] + 31.66 - (x[2] + 5.38)), height: mm(y[2] + 10.38 - 3.7) }}
+        x={x[2] + 5.38}
+        y={3.7}
+        w={x[5] + 31.66 - (x[2] + 5.38)}
+        h={y[2] + 10.38 - 3.7}
       />
       <FotoAbs src={foto} x={x[1]} y={y[7]} w={x[6] - x[1]} h={y[13] - y[7]} />
     </>
