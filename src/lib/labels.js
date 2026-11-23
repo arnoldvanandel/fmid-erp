@@ -153,15 +153,41 @@ export function bewaarPrinterNaam(naam) {
   localStorage.setItem(PRINTER_SLEUTEL, naam || '')
 }
 
+// Chrome blokkeert een https-site die http://127.0.0.1 aanroept, tenzij het verzoek
+// als loopback is aangemerkt. Oudere browsers kennen die optie niet.
+function labelprinterVerzoek(pad, opties = {}) {
+  const url = `${LABELPRINTER_URL}${pad}`
+  const basis = { mode: 'cors', ...opties }
+  try {
+    return new Request(url, { ...basis, targetAddressSpace: 'loopback' })
+  } catch {
+    return new Request(url, basis)
+  }
+}
+
+async function labelprinterFetch(pad, opties) {
+  try {
+    return await fetch(labelprinterVerzoek(pad, opties))
+  } catch (err) {
+    const bericht = String(err?.message || '')
+    if (/failed to fetch/i.test(bericht)) {
+      throw new Error(
+        'Geen antwoord van de labelprinter op deze pc. Laat het venster met node scripts/labelprinter.mjs openstaan. In Chrome: slotje bij het adres, site-instellingen, lokaal netwerk of loopback toestaan.'
+      )
+    }
+    throw err
+  }
+}
+
 export async function haalPrintersOp() {
-  const res = await fetch(`${LABELPRINTER_URL}/printers`, { signal: AbortSignal.timeout(1500) })
+  const res = await labelprinterFetch('/printers', { signal: AbortSignal.timeout(1500) })
   if (!res.ok) throw new Error('Labelprinter niet bereikbaar')
   const data = await res.json()
   return { printers: data.printers || [], printer: String(data.printer || '').trim() }
 }
 
 export async function zetPrinterVast(printer) {
-  const res = await fetch(`${LABELPRINTER_URL}/instelling`, {
+  const res = await labelprinterFetch('/instelling', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ printer }),
@@ -173,7 +199,7 @@ export async function zetPrinterVast(printer) {
 }
 
 export async function drukAfOpPrinter({ printer, copies, pngBase64, widthMm, heightMm }) {
-  const res = await fetch(`${LABELPRINTER_URL}/print`, {
+  const res = await labelprinterFetch('/print', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ printer, copies, pngBase64, widthMm, heightMm }),

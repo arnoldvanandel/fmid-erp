@@ -311,8 +311,8 @@ export default function Labels() {
               )}
               {service === 'uit' && (
                 <div className="banner banner-warning" style={{ marginTop: 12 }}>
-                  Start op deze pc <code>npm run labelprinter</code>. Daarna kun je de labelprinter vastzetten. Labels
-                  gaan dan daarheen, niet naar de standaardprinter van Windows.
+                  Start op deze pc <code>node scripts/labelprinter.mjs</code> en laat dat venster open. Daarna kun je de
+                  labelprinter vastzetten. Labels gaan dan daarheen, niet naar de standaardprinter van Windows.
                 </div>
               )}
               {service === 'klaar' && !vast && (
