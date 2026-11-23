@@ -12,6 +12,7 @@ import {
   drukAfOpPrinter,
   haalPrintersOp,
   klantVanSoort,
+  loopbackStatus,
   labelDatum,
   laadLabelcatalogus,
   locatieUrl,
@@ -42,6 +43,7 @@ export default function Labels() {
   const [bezig, setBezig] = useState(false)
   const [bezigPrint, setBezigPrint] = useState(false)
   const [fout, setFout] = useState(null)
+  const [verbindingFout, setVerbindingFout] = useState(null)
   const [melding, setMelding] = useState(null)
 
   const artikelen = useMemo(() => artikelenVoorKlant(catalogus, klant), [catalogus, klant])
@@ -67,26 +69,46 @@ export default function Labels() {
     }
   }, [])
 
+  function pasPrintersToe({ printers: lijst, printer: opgeslagen }) {
+    setPrinters(lijst)
+    setService('klaar')
+    if (opgeslagen) {
+      setPrinter(opgeslagen)
+      setVast(opgeslagen)
+      setWijzigen(false)
+      bewaarPrinterNaam(opgeslagen)
+    } else if (printerNaam()) {
+      setPrinter(printerNaam())
+      setWijzigen(true)
+    }
+  }
+
+  async function printersOphalen() {
+    setService('bezig')
+    setVerbindingFout(null)
+    try {
+      pasPrintersToe(await haalPrintersOp())
+    } catch (err) {
+      setService('uit')
+      setVerbindingFout(err.message)
+    }
+  }
+
   useEffect(() => {
     let weg = false
-    haalPrintersOp()
-      .then(({ printers: lijst, printer: opgeslagen }) => {
-        if (weg) return
-        setPrinters(lijst)
-        setService('klaar')
-        if (opgeslagen) {
-          setPrinter(opgeslagen)
-          setVast(opgeslagen)
-          setWijzigen(false)
-          bewaarPrinterNaam(opgeslagen)
-        } else if (printerNaam()) {
-          setPrinter(printerNaam())
-          setWijzigen(true)
-        }
-      })
-      .catch(() => {
-        if (!weg) setService('uit')
-      })
+    loopbackStatus().then((status) => {
+      if (weg) return
+      // Een verzoek zonder klik wordt door Chrome geweigerd, vaak zonder venster.
+      if (status === 'prompt') {
+        setService('wacht')
+        return
+      }
+      if (status === 'denied') {
+        setService('geweigerd')
+        return
+      }
+      printersOphalen()
+    })
     return () => {
       weg = true
     }
@@ -285,7 +307,9 @@ export default function Labels() {
                       onChange={(e) => kiesPrinter(e.target.value)}
                       disabled={service !== 'klaar'}
                     >
-                      <option value="">{service === 'klaar' ? 'Kies een printer' : 'Printers laden…'}</option>
+                      <option value="">
+                        {service === 'klaar' ? 'Kies een printer' : service === 'bezig' ? 'Printers laden…' : 'Nog geen printers'}
+                      </option>
                       {printer && !printers.includes(printer) && <option value={printer}>{printer}</option>}
                       {printers.map((naam) => (
                         <option key={naam} value={naam}>
@@ -309,10 +333,38 @@ export default function Labels() {
                   )}
                 </div>
               )}
+              {service === 'wacht' && (
+                <div className="banner banner-warning" style={{ marginTop: 12 }}>
+                  Klik op Printers zoeken. Chrome vraagt dan of FMID de labelprinter op deze pc mag bereiken. Kies
+                  Toestaan. Laat het venster met <code>node scripts/labelprinter.mjs</code> openstaan.
+                  <div>
+                    <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={printersOphalen}>
+                      Printers zoeken
+                    </button>
+                  </div>
+                </div>
+              )}
+              {service === 'geweigerd' && (
+                <div className="banner banner-warning" style={{ marginTop: 12 }}>
+                  Chrome blokkeert de labelprinter. Klik op het slotje bij het adres, open site-instellingen en zet
+                  lokaal netwerk of loopback op Toestaan.
+                  <div>
+                    <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={printersOphalen}>
+                      Printers zoeken
+                    </button>
+                  </div>
+                </div>
+              )}
               {service === 'uit' && (
                 <div className="banner banner-warning" style={{ marginTop: 12 }}>
-                  Start op deze pc <code>node scripts/labelprinter.mjs</code> en laat dat venster open. Daarna kun je de
-                  labelprinter vastzetten. Labels gaan dan daarheen, niet naar de standaardprinter van Windows.
+                  {verbindingFout ||
+                    'Geen antwoord van de labelprinter. Laat het venster met node scripts/labelprinter.mjs openstaan.'}{' '}
+                  Blijft het zo, zet bij het slotje lokaal netwerk terug op Vragen of Toestaan en klik opnieuw.
+                  <div>
+                    <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={printersOphalen}>
+                      Opnieuw proberen
+                    </button>
+                  </div>
                 </div>
               )}
               {service === 'klaar' && !vast && (

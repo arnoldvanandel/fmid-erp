@@ -179,8 +179,20 @@ async function labelprinterFetch(pad, opties) {
   }
 }
 
+// Chrome vraagt toestemming voor http://127.0.0.1 vanaf de live site.
+// Niet de oude naam 'local-network-access': die laat oudere Chrome vastlopen.
+export async function loopbackStatus() {
+  if (typeof navigator === 'undefined' || !navigator.permissions?.query) return 'onbekend'
+  try {
+    const status = await navigator.permissions.query({ name: 'loopback-network' })
+    return status.state || 'onbekend'
+  } catch {
+    return 'onbekend'
+  }
+}
+
 export async function haalPrintersOp() {
-  const res = await labelprinterFetch('/printers', { signal: AbortSignal.timeout(1500) })
+  const res = await labelprinterFetch('/printers')
   if (!res.ok) throw new Error('Labelprinter niet bereikbaar')
   const data = await res.json()
   return { printers: data.printers || [], printer: String(data.printer || '').trim() }
