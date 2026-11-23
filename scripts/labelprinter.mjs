@@ -34,11 +34,25 @@ async function schrijfInstelling(printer) {
   await writeFile(pad, JSON.stringify({ printer }, null, 2), 'utf8')
 }
 
+// Windows PowerShell 5.1 (STA). Niet pwsh: System.Drawing print daar vaak niet.
+function powershellPad() {
+  const root = process.env.SystemRoot || 'C:\\Windows'
+  return join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+}
+
+function korteFout(tekst, code) {
+  const regel = String(tekst || '')
+    .split(/\r?\n/)
+    .map((r) => r.trim())
+    .find((r) => r && !r.startsWith('+') && !r.startsWith('At line') && !r.startsWith('CategoryInfo') && !r.startsWith('FullyQualified'))
+  return regel || `PowerShell stopte met code ${code}`
+}
+
 function powershell(script, env) {
   return new Promise((resolve, reject) => {
     const kind = spawn(
-      'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      powershellPad(),
+      ['-NoProfile', '-STA', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
       { env: { ...process.env, ...env }, windowsHide: true }
     )
     let uit = ''
@@ -52,7 +66,7 @@ function powershell(script, env) {
     kind.on('error', reject)
     kind.on('close', (code) => {
       if (code === 0) resolve(uit.trim())
-      else reject(new Error(fout.trim() || uit.trim() || `PowerShell stopte met code ${code}`))
+      else reject(new Error(korteFout(fout || uit, code)))
     })
   })
 }
@@ -108,20 +122,41 @@ $pd.Dispose()
   }
 }
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Private-Network': 'true',
+}
+
 function stuur(res, status, body) {
   const json = JSON.stringify(body)
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Length': Buffer.byteLength(json),
+    ...CORS,
   })
   res.end(json)
 }
 
+async function leesBody(req) {
+  const stukken = []
+  let totaal = 0
+  for await (const stuk of req) {
+    totaal += stuk.length
+    if (totaal > 25 * 1024 * 1024) throw new Error('Label is te groot om te versturen')
+    stukken.push(stuk)
+  }
+  return Buffer.concat(stukken).toString('utf8')
+}
+
 const server = createServer(async (req, res) => {
+  req.on('error', (e) => {
+    console.error('Verzoek afgebroken:', e.message)
+  })
   if (req.method === 'OPTIONS') {
-    stuur(res, 204, {})
+    res.writeHead(204, CORS)
+    res.end()
     return
   }
   try {
@@ -130,9 +165,7 @@ const server = createServer(async (req, res) => {
       return
     }
     if (req.method === 'POST' && req.url.startsWith('/instelling')) {
-      const stukken = []
-      for await (const stuk of req) stukken.push(stuk)
-      const body = JSON.parse(Buffer.concat(stukken).toString('utf8') || '{}')
+      const body = JSON.parse((await leesBody(req)) || '{}')
       const naam = String(body.printer || '').trim()
       if (!naam) throw new Error('Kies een printer')
       const lijst = await printers()
@@ -142,19 +175,30 @@ const server = createServer(async (req, res) => {
       return
     }
     if (req.method === 'POST' && req.url.startsWith('/print')) {
-      const stukken = []
-      for await (const stuk of req) stukken.push(stuk)
-      const body = JSON.parse(Buffer.concat(stukken).toString('utf8') || '{}')
+      const body = JSON.parse((await leesBody(req)) || '{}')
+      console.log(`Afdrukken naar ${body.printer || '(vastgezet)'}…`)
       await drukAf(body)
+      console.log('Afdrukken gelukt')
       stuur(res, 200, { ok: true })
       return
     }
     stuur(res, 404, { fout: 'Niet gevonden' })
   } catch (e) {
-    stuur(res, 500, { fout: e.message || 'Afdrukken mislukt' })
+    console.error(e.message || e)
+    if (!res.headersSent) stuur(res, 500, { fout: e.message || 'Afdrukken mislukt' })
   }
 })
 
+server.requestTimeout = 0
+server.headersTimeout = 0
 server.listen(POORT, HOST, () => {
   console.log(`Labelprinter luistert op http://${HOST}:${POORT}`)
+  console.log('Laat dit venster open zolang je labels afdrukt.')
+})
+
+process.on('uncaughtException', (e) => {
+  console.error('Onverwachte fout:', e)
+})
+process.on('unhandledRejection', (e) => {
+  console.error('Onverwachte fout:', e)
 })
