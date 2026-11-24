@@ -6,7 +6,7 @@ import MateriaalCalculator from './MateriaalCalculator'
 
 // De twee tabellen van een calculatie: bewerkingen (instellen + tijd per stuk)
 // en materiaal en overige kosten. Gebruikt door de calculatie en door de
-// calculatie per regel van een aanbieding met artikelen.
+// calculatie per artikel van een aanbieding.
 // `wijzig(veld, lijst)` krijgt de nieuwe lijst 'bewerkingen' of 'kosten'.
 export default function KostenTabellen({ bewerkingen, kosten, aantallen: aantallenLijst, wijzig }) {
   const [calculatorRegel, setCalculatorRegel] = useState(null) // index in kosten

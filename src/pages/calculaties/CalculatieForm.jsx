@@ -244,7 +244,7 @@ export default function CalculatieForm({ calculatie: start, startFout = null, on
     try {
       controleerAanbieding()
       if (gewijzigd && !(await slaOp())) return
-      window.open(`/calculaties/${calculatie.id}/afdruk`, '_blank', 'noopener')
+      window.open(`/aanbiedingen/${calculatie.id}/afdruk`, '_blank', 'noopener')
     } catch (err) {
       setError(err.message)
     }

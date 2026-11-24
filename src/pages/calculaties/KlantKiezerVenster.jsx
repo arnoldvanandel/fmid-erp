@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react'
 import Modal from '../../components/Modal'
 import { useCollection } from '../../hooks/useCollection'
 
-// Een klant kiezen: een andere klant voor een bestaande calculatie, of de
-// klant van een nieuwe aanbieding met artikelen. Zelfde lijst als bij
-// "Nieuwe calculatie"; geblokkeerde klanten staan er niet in.
+// Een klant kiezen: voor een nieuwe aanbieding, of een andere klant voor een
+// bestaande. Geblokkeerde klanten staan er niet in.
 export default function KlantKiezerVenster({
   huidigeKlantId,
   onKies,

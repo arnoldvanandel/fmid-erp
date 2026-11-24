@@ -17,13 +17,15 @@ import { hoofdadres, plusDagen } from './verkooporders'
 import { schoonMateriaal } from './materiaalCalculator'
 import { VALUTA } from './stamgegevens'
 
-// Calculaties en aanbiedingen aan de klant:
-//   1. artikel aanmaken (eerste 3 letters van de klant + het artikelnummer van de klant)
-//   2. tekening bij het artikel zetten (artikeldocumenten, zie lib/documenten.js)
-//   3. calculatie maken: bewerkingen en kosten, per aantal een kostprijs
-//   4. prijs per aantal en de leveringsvoorwaarden invullen
-//   5. aanbieding naar de klant mailen (lib/calculatieMail.js)
-// Alles staat in één document in `calculaties` (CA-000001, teller counters/calculaties).
+// Aanbiedingen aan de klant, met per artikel een calculatie:
+//   1. aanbieding aanmaken voor een klant
+//   2. artikelen toevoegen: bestaand, of nieuw (eerste 3 letters van de klant +
+//      het artikelnummer van de klant, met de tekening bij het artikel)
+//   3. per artikel een calculatie maken: bewerkingen en kosten, per aantal een prijs
+//   4. leveringsvoorwaarden invullen en naar de klant mailen (lib/calculatieMail.js)
+// Alles staat in één document in `calculaties` (CA-000001, teller
+// counters/calculaties) met `soort: 'artikelen'`. Documenten zonder soort zijn
+// calculaties van voor deze opzet (één artikel); die blijven te openen.
 
 export const STATUS_LABEL = {
   concept: 'Concept',
@@ -214,62 +216,23 @@ async function maakOfVindArtikel({ klant, artikelnummer, klantArtikelnummer, oms
   return { artikel: { ...payload, id: ref.id }, nieuw: true }
 }
 
-export async function maakCalculatie({ klant, artikelnummer, klantArtikelnummer, revisie, omschrijving, gebruiker }) {
+// Nieuw artikel voor een aanbieding; bestaat het nummer al, dan dat artikel.
+export async function maakAanbiedingArtikel({ klant, artikelnummer, klantArtikelnummer, omschrijving }) {
   if (!klant?.id) throw new Error('Kies een klant.')
-  if (klant.geblokkeerd) throw new Error(`Klant ${klant.klantcode} is geblokkeerd.`)
   const nummer = String(artikelnummer || '').trim()
   const klantNummer = String(klantArtikelnummer || '').trim()
   const naam = String(omschrijving || '').trim()
   if (!klantNummer) throw new Error('Vul het artikelnummer van de klant in.')
   if (!nummer) throw new Error('Vul ons artikelnummer in.')
   if (!naam) throw new Error('Vul een omschrijving in.')
-
   const { artikel, nieuw } = await maakOfVindArtikel({
     klant,
     artikelnummer: nummer,
     klantArtikelnummer: klantNummer,
     omschrijving: naam,
   })
-  const calculatienummer = await volgendNummer()
-
-  const calculatie = {
-    calculatienummer,
-    status: 'concept',
-    calculatiedatum: vandaag(),
-    klantId: klant.id,
-    klantcode: klant.klantcode || '',
-    klantNaam: klant.naam || '',
-    adres: hoofdadres(klant),
-    contactpersoon: klant.contactpersoon || '',
-    taal: klant.taal || 'nl',
-    valuta: klant.valuta || 'EUR',
-    artikelId: artikel.id,
-    artikelnummer: artikel.artikelnummer,
-    klantArtikelnummer: klantNummer,
-    // Revisie van de tekening waarop de calculatie gemaakt is.
-    revisie: String(revisie || '').trim(),
-    omschrijving: naam,
-    eenheid: artikel.eenheid || 'Stuks',
-    // Stap 3: de calculatie zelf.
-    aantallen: [1],
-    bewerkingen: [],
-    kosten: [],
-    marge: STANDAARD_MARGE,
-    prijzen: {},
-    // Stap 4: voorwaarden bij de prijs.
-    referentie: '',
-    leveringsvoorwaarde: klant.leveringsvoorwaarde || '',
-    levertijd: '',
-    geldigDagen: STANDAARD_GELDIG_DAGEN,
-    betalingstermijn: Number(klant.betalingstermijn ?? 30),
-    opmerkingen: '',
-    notities: '',
-    behandeldDoor: gebruiker || '',
-    aangemaaktDoor: gebruiker || '',
-    datum: serverTimestamp(),
-  }
-  const ref = await addDoc(collection(db, 'calculaties'), calculatie)
-  return { calculatie: { ...calculatie, id: ref.id, datum: new Date() }, artikelNieuw: nieuw }
+  if (artikel.geblokkeerd) throw new Error(`Artikel ${artikel.artikelnummer} is geblokkeerd.`)
+  return { artikel, nieuw }
 }
 
 // Velden die elke aanbieding heeft: klant, adres en de voorwaarden.
@@ -394,11 +357,10 @@ export async function wijzigCalculatie(calculatie, form) {
 }
 
 // ---------------------------------------------------------------------------
-// Aanbieding met bestaande artikelen
+// Aanbieding met artikelen
 // ---------------------------------------------------------------------------
-// Geen calculatie, maar een lijst artikelen met een zelf ingevulde prijs per
-// stuk. Zelfde collectie, nummering, voorwaarden, afdruk en mail; herkenbaar
-// aan `soort: 'artikelen'` en de regels in `artikelRegels`.
+// Een lijst artikelen met een prijs per stuk: zelf ingevuld of uit een
+// calculatie. Herkenbaar aan `soort: 'artikelen'` en de regels in `artikelRegels`.
 
 export function isArtikelAanbieding(calculatie) {
   return calculatie?.soort === 'artikelen'
@@ -456,25 +418,37 @@ export function regelCalculatie(regel) {
   return uitkomst
 }
 
-// De laatste gewone calculatie van een artikel, als voorstel voor een regel.
+// De laatste calculatie van een artikel, als voorstel: uit een aanbieding
+// (`artikelIds`) of uit een oude calculatie (`artikelId`).
 export async function zoekCalculatieVanArtikel(artikelId) {
   if (!artikelId) return null
-  const snap = await getDocs(query(collection(db, 'calculaties'), where('artikelId', '==', artikelId)))
-  const tijd = (c) => c.datum?.toMillis?.() || 0
-  const gevonden = snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((c) => !isArtikelAanbieding(c))
-    .sort((a, b) => tijd(b) - tijd(a))[0]
+  const bron = collection(db, 'calculaties')
+  const [oud, aanbiedingen] = await Promise.all([
+    getDocs(query(bron, where('artikelId', '==', artikelId))),
+    getDocs(query(bron, where('artikelIds', 'array-contains', artikelId))),
+  ])
+  const tijd = (c) => (c.gewijzigdOp || c.datum)?.toMillis?.() || 0
+  const gevonden = [...oud.docs, ...aanbiedingen.docs]
+    .map((d) => d.data())
+    .map((c) => ({
+      calculatienummer: c.calculatienummer,
+      tijd: tijd(c),
+      calc: isArtikelAanbieding(c)
+        ? (c.artikelRegels || []).find((r) => r.artikelId === artikelId && r.calculatie)?.calculatie
+        : c,
+    }))
+    .filter((c) => c.calc)
+    .sort((a, b) => b.tijd - a.tijd)[0]
   if (!gevonden) return null
   return {
     calculatienummer: gevonden.calculatienummer,
     calculatie: {
-      bewerkingen: (gevonden.bewerkingen || []).map(({ stukMinuten, ...b }) => ({
+      bewerkingen: (gevonden.calc.bewerkingen || []).map(({ stukMinuten, ...b }) => ({
         ...b,
         stukSeconden: stukSeconden({ ...b, stukMinuten }),
       })),
-      kosten: (gevonden.kosten || []).map((k) => ({ ...k })),
-      marge: gevonden.marge ?? STANDAARD_MARGE,
+      kosten: (gevonden.calc.kosten || []).map((k) => ({ ...k })),
+      marge: gevonden.calc.marge ?? STANDAARD_MARGE,
     },
   }
 }
@@ -489,6 +463,7 @@ export function artikelAanbiedingVelden(form) {
         artikelnummer: tekst(r.artikelnummer),
         omschrijving: tekst(r.omschrijving),
         klantArtikelnummer: tekst(r.klantArtikelnummer),
+        revisie: tekst(r.revisie),
         eenheid: tekst(r.eenheid) || 'Stuks',
         aantal: getal(r.aantal),
         prijs: rond(r.prijs, 4),
@@ -511,6 +486,8 @@ export function artikelAanbiedingVelden(form) {
   return {
     ...aanbiedingVelden(form),
     artikelRegels,
+    // Om eerdere calculaties van een artikel terug te vinden.
+    artikelIds: [...new Set(artikelRegels.map((r) => r.artikelId).filter(Boolean))],
     // Voor de lijst: artikelen, aantallen en prijzen in het kort.
     artikelnummer: [...new Set(artikelRegels.map((r) => r.artikelnummer))].join(', '),
     omschrijving: artikelRegels.length === 1 ? artikelRegels[0].omschrijving : `${artikelRegels.length} artikelregels`,
@@ -557,7 +534,7 @@ export function documentRegels(calculatie) {
     // De calculatie per regel is intern en gaat niet mee naar de klant.
     return (calculatie.artikelRegels || []).map(({ calculatie: _c, kostprijs: _k, prijsHandmatig: _h, ...r }) => ({
       ...r,
-      revisie: '',
+      revisie: r.revisie || '',
       bedrag: getal(r.prijs) * getal(r.aantal),
     }))
   }

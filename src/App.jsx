@@ -18,7 +18,7 @@ import OntvangstrapportenList from './pages/inkooporders/OntvangstrapportenList'
 import OntvangstrapportAfdruk from './pages/inkooporders/OntvangstrapportAfdruk'
 import InkoopsjablonenList from './pages/inkooporders/InkoopsjablonenList'
 import VerkoopordersList from './pages/verkooporders/VerkoopordersList'
-import CalculatiesList from './pages/calculaties/CalculatiesList'
+import AanbiedingenList from './pages/calculaties/AanbiedingenList'
 import AanbiedingAfdruk from './pages/calculaties/AanbiedingAfdruk'
 import OpenstaandeOrders from './pages/verkooporders/OpenstaandeOrders'
 import FacturenList from './pages/verkooporders/FacturenList'
@@ -201,17 +201,27 @@ export default function App() {
             }
           />
           <Route
-            path="/calculaties"
+            path="/aanbiedingen"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <CalculatiesList />
+                  <AanbiedingenList />
                 </Layout>
               </ProtectedRoute>
             }
           />
+          {/* Oude adressen van voor de omzetting van calculaties naar aanbiedingen. */}
+          <Route path="/calculaties" element={<Navigate to="/aanbiedingen" replace />} />
           <Route
             path="/calculaties/:id/afdruk"
+            element={
+              <ProtectedRoute>
+                <AanbiedingAfdruk />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/aanbiedingen/:id/afdruk"
             element={
               <ProtectedRoute>
                 <AanbiedingAfdruk />

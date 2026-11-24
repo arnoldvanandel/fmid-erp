@@ -20,7 +20,8 @@ import { GetalCel, gridToets } from '../../components/RegelGrid'
 import MailVenster, { MailStatus } from '../../components/MailVenster'
 import KlantKiezerVenster from './KlantKiezerVenster'
 import AanbiedingVoorwaarden from './AanbiedingVoorwaarden'
-import RegelCalculatieVenster from './RegelCalculatieVenster'
+import ArtikelCalculatieVenster from './ArtikelCalculatieVenster'
+import NieuwArtikelVenster from './NieuwArtikelVenster'
 
 let volgendeSleutel = 1
 const metSleutel = (r) => ({ ...r, sleutel: volgendeSleutel++ })
@@ -48,9 +49,8 @@ function naarForm(c) {
 
 const LEGE_REGEL = { artikelnummer: '', artikel: null, aantal: '', prijs: '', klantArtikelnummer: '' }
 
-// Aanbieding met artikelen die al bestaan: artikel kiezen, aantal en prijs per
-// stuk zelf invullen, dan de voorwaarden. Afdrukken en mailen gaat hetzelfde
-// als bij een calculatie.
+// Aanbieding: artikelen toevoegen (bestaand of nieuw, met tekening), per artikel
+// een calculatie maken of de prijs zelf invullen, en dan de voorwaarden.
 export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
   const { profile, isAdmin } = useAuth()
   const gebruiker = profile?.naam || profile?.email
@@ -63,15 +63,17 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
       }),
     [start.id]
   )
+  const [form, setForm] = useState(() => naarForm(start))
   const [klant, setKlant] = useState(null)
   useEffect(() => {
-    if (!aanbieding.klantId) return undefined
-    return onSnapshot(doc(db, 'klanten', aanbieding.klantId), (snap) => {
+    // De gekozen klant, ook als die nog niet is opgeslagen.
+    setKlant(null)
+    if (!form.klantId) return undefined
+    return onSnapshot(doc(db, 'klanten', form.klantId), (snap) => {
       setKlant(snap.exists() ? { id: snap.id, ...snap.data() } : null)
     })
-  }, [aanbieding.klantId])
+  }, [form.klantId])
 
-  const [form, setForm] = useState(() => naarForm(start))
   const [gewijzigd, setGewijzigd] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -79,7 +81,8 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
   const [mail, setMail] = useState(null) // { gegevens, tekst }
   const [mailen, setMailen] = useState(false)
   const [klantKiezen, setKlantKiezen] = useState(false)
-  const [calcVenster, setCalcVenster] = useState(null) // { sleutel, voorstel, bron }
+  const [calcVenster, setCalcVenster] = useState(null) // { regels, start, bron }
+  const [nieuwArtikel, setNieuwArtikel] = useState(false)
 
   // De status verandert na het mailen buiten het formulier om.
   useEffect(() => {
@@ -130,60 +133,64 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
     if (veld === 'prijs' && regel.calculatie) setRegel(regel.sleutel, 'prijsHandmatig', true)
   }
 
-  // ---------------------------------------------------------------- calculatie per regel
+  // ---------------------------------------------------------------- calculatie per artikel
 
-  // Zonder eigen calculatie beginnen we met die van een andere regel met
-  // hetzelfde artikel, anders met de laatste calculatie van het artikel.
-  async function openCalculatie(regel) {
+  // Eén calculatie voor alle regels (aantallen) van het artikel. Zonder eigen
+  // calculatie beginnen we met de laatste van dit artikel uit een andere aanbieding.
+  async function openCalculatie(regel, alleRegels = form.artikelRegels) {
     setError(null)
-    if (regel.calculatie) {
-      setCalcVenster({ sleutel: regel.sleutel })
+    const regels = alleRegels.filter((r) => (regel.artikelId ? r.artikelId === regel.artikelId : r.sleutel === regel.sleutel))
+    const eigen = regel.calculatie || regels.find((r) => r.calculatie)?.calculatie
+    if (eigen) {
+      setCalcVenster({ regels, start: eigen })
       return
     }
-    const ander = form.artikelRegels.find(
-      (r) => r.sleutel !== regel.sleutel && r.artikelId === regel.artikelId && r.calculatie
-    )
-    if (ander) {
-      setCalcVenster({
-        sleutel: regel.sleutel,
-        voorstel: ander.calculatie,
-        bron: `Overgenomen van de regel met ${formatNumber(ander.aantal, 0)} stuks van dit artikel. Pas aan wat nodig is.`,
-      })
-      return
-    }
+    let gevonden = null
     try {
-      const gevonden = await zoekCalculatieVanArtikel(regel.artikelId)
-      setCalcVenster({
-        sleutel: regel.sleutel,
-        voorstel: gevonden?.calculatie,
-        bron: gevonden
-          ? `Overgenomen uit calculatie ${gevonden.calculatienummer} van dit artikel. Pas aan wat nodig is.`
-          : null,
-      })
+      gevonden = await zoekCalculatieVanArtikel(regel.artikelId)
     } catch {
       // Zoeken mislukt: gewoon leeg beginnen.
-      setCalcVenster({ sleutel: regel.sleutel })
     }
+    setCalcVenster({
+      regels,
+      start: gevonden?.calculatie,
+      bron: gevonden
+        ? `Overgenomen uit ${gevonden.calculatienummer}, de laatste calculatie van dit artikel. Pas aan wat nodig is.`
+        : null,
+    })
   }
 
-  function neemCalculatieOver({ calculatie, prijs, prijsHandmatig }) {
-    const sleutel = calcVenster.sleutel
+  // `rijen`: per aantal { sleutel, aantal, prijs, prijsHandmatig }; zonder
+  // sleutel is het een nieuw aantal, dat onder de andere regels van het artikel komt.
+  function neemCalculatieOver({ calculatie, rijen }) {
+    const voorbeeld = calcVenster.regels[0]
+    const laatste = calcVenster.regels.at(-1).sleutel
+    const nieuw = rijen
+      .filter((rij) => !rij.sleutel)
+      .map((rij) => {
+        const { kostprijs: _kost, ...basis } = voorbeeld
+        return metSleutel({ ...basis, ...rij, calculatie })
+      })
     setForm((f) => ({
       ...f,
-      artikelRegels: f.artikelRegels.map((r) => (r.sleutel === sleutel ? { ...r, calculatie, prijs, prijsHandmatig } : r)),
+      artikelRegels: f.artikelRegels.flatMap((r) => {
+        const rij = rijen.find((x) => x.sleutel === r.sleutel)
+        const bijgewerkt = rij ? { ...r, ...rij, calculatie } : r
+        return r.sleutel === laatste ? [bijgewerkt, ...nieuw] : [bijgewerkt]
+      }),
     }))
     setGewijzigd(true)
     setMelding(null)
     setCalcVenster(null)
   }
 
-  // De prijs blijft staan, maar rekent niet meer mee met het aantal.
+  // De prijzen blijven staan, maar rekenen niet meer mee met het aantal.
   function haalCalculatieWeg() {
-    const sleutel = calcVenster.sleutel
+    const sleutels = calcVenster.regels.map((r) => r.sleutel)
     setForm((f) => ({
       ...f,
       artikelRegels: f.artikelRegels.map((r) => {
-        if (r.sleutel !== sleutel) return r
+        if (!sleutels.includes(r.sleutel)) return r
         const { calculatie: _calc, prijsHandmatig: _hand, kostprijs: _kost, ...rest } = r
         return { ...rest, prijs: regelCalculatie(r)?.prijs ?? r.prijs }
       }),
@@ -191,6 +198,29 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
     setGewijzigd(true)
     setMelding(null)
     setCalcVenster(null)
+  }
+
+  // Nieuw artikel: per aantal een regel, en meteen door naar de calculatie.
+  function voegNieuwArtikelToe({ artikel, omschrijving, klantArtikelnummer, revisie, aantallen, waarschuwing }) {
+    const bestaand = form.artikelRegels.filter((r) => r.artikelId === artikel.id)
+    const regels = aantallen
+      .filter((aantal) => !bestaand.some((r) => Number(r.aantal) === aantal))
+      .map((aantal) =>
+        metSleutel({
+          artikelId: artikel.id,
+          artikelnummer: artikel.artikelnummer,
+          omschrijving,
+          klantArtikelnummer,
+          revisie,
+          eenheid: artikel.eenheid || 'Stuks',
+          aantal,
+          prijs: 0,
+        })
+      )
+    const alle = [...form.artikelRegels, ...regels]
+    set('artikelRegels', alle)
+    setNieuwArtikel(false)
+    openCalculatie(regels[0] || bestaand[0], alle).then(() => waarschuwing && setError(waarschuwing))
   }
 
   function verwijderRegel(sleutel) {
@@ -292,7 +322,7 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
     try {
       controleerAanbieding()
       if (gewijzigd && !(await slaOp())) return
-      window.open(`/calculaties/${aanbieding.id}/afdruk`, '_blank', 'noopener')
+      window.open(`/aanbiedingen/${aanbieding.id}/afdruk`, '_blank', 'noopener')
     } catch (err) {
       setError(err.message)
     }
@@ -386,6 +416,14 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
 
       <div className="regel-grid-kop">
         <h3>Artikelen</h3>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setNieuwArtikel(true)}
+          disabled={!klant}
+        >
+          + Nieuw artikel
+        </button>
       </div>
       <div className="regel-grid-wrap">
         <table className="regel-grid">
@@ -394,6 +432,7 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
               <th>Artikelnummer</th>
               <th>Omschrijving</th>
               <th>Art.nr. klant</th>
+              <th>Rev.</th>
               <th className="num">Aantal</th>
               <th>Eenheid</th>
               <th className="num" title="Kostprijs per stuk uit de calculatie van de regel">
@@ -432,6 +471,17 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
                       onChange={(e) => setRegel(r.sleutel, 'klantArtikelnummer', e.target.value)}
                       onKeyDown={gridToets}
                       aria-label="Artikelnummer van de klant"
+                    />
+                  </td>
+                  <td style={{ width: 60 }}>
+                    <input
+                      type="text"
+                      data-rij={i}
+                      data-kolom="revisie"
+                      value={r.revisie || ''}
+                      onChange={(e) => setRegel(r.sleutel, 'revisie', e.target.value)}
+                      onKeyDown={gridToets}
+                      aria-label="Revisie"
                     />
                   </td>
                   <td className="num">
@@ -474,7 +524,7 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
                       className={'btn btn-sm ' + (r.calculatie ? 'btn-secondary' : 'btn-ghost')}
                       onClick={() => openCalculatie(r)}
                       title={
-                        r.calculatie ? 'Calculatie van deze regel bekijken of aanpassen' : 'Prijs berekenen met een calculatie'
+                        r.calculatie ? 'Calculatie van dit artikel bekijken of aanpassen' : 'Prijs berekenen met een calculatie'
                       }
                     >
                       Calculatie
@@ -527,6 +577,7 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
                   aria-label="Artikelnummer van de klant"
                 />
               </td>
+              <td className="alleen-lezen"></td>
               <td className="num">
                 <GetalCel
                   rij={aantalRegels}
@@ -563,7 +614,7 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={7}>
+              <td colSpan={8}>
                 {formatNumber(aantalRegels, 0)} {aantalRegels === 1 ? 'regel' : 'regels'}
               </td>
               <td className="num">{formatNumber(totaal, 2)}</td>
@@ -573,10 +624,10 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
         </table>
       </div>
       <p className="hint" style={{ marginTop: 8 }}>
-        Kies een artikel, vul het aantal en de prijs per stuk in en druk op Enter. De verkoopprijs van het artikel wordt
-        voorgesteld. Hetzelfde artikel mag vaker voorkomen, bijvoorbeeld voor een staffel met verschillende aantallen.
-        Met Calculatie bereken je de prijs uit bewerkingen, materiaal en kosten; die prijs rekent mee als je het aantal
-        aanpast. De calculatie komt niet op de aanbieding.
+        Kies een bestaand artikel, vul het aantal en de prijs in en druk op Enter, of voeg met + Nieuw artikel een
+        artikel toe op basis van een tekening en een calculatie. Met Calculatie bereken je de prijs uit bewerkingen,
+        materiaal en kosten, voor alle aantallen van het artikel; die prijs rekent mee als je het aantal aanpast. De
+        calculatie komt niet op de aanbieding.
       </p>
 
       <AanbiedingVoorwaarden form={form} set={set} calculatiedatum={aanbieding.calculatiedatum} />
@@ -614,10 +665,19 @@ export default function ArtikelAanbiedingForm({ aanbieding: start, onDone }) {
         />
       )}
 
-      {calcVenster && form.artikelRegels.some((r) => r.sleutel === calcVenster.sleutel) && (
-        <RegelCalculatieVenster
-          regel={form.artikelRegels.find((r) => r.sleutel === calcVenster.sleutel)}
-          voorstel={calcVenster.voorstel}
+      {nieuwArtikel && klant && (
+        <NieuwArtikelVenster
+          klant={klant}
+          gebruiker={gebruiker}
+          onToegevoegd={voegNieuwArtikelToe}
+          onAnnuleren={() => setNieuwArtikel(false)}
+        />
+      )}
+
+      {calcVenster && (
+        <ArtikelCalculatieVenster
+          regels={calcVenster.regels}
+          start={calcVenster.start}
           bron={calcVenster.bron}
           valuta={form.valuta}
           onOvernemen={neemCalculatieOver}
