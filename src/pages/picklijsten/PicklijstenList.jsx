@@ -4,16 +4,20 @@ import { PicklijstQr } from '../../components/PicklijstQrVenster'
 import { useCollection } from '../../hooks/useCollection'
 
 // Startscherm: vul een klant in → genereer de gecombineerde picklijst.
+function padVan(klantId, rest = '') {
+  return `/picklijsten/${encodeURIComponent(klantId)}${rest}`
+}
+
 function openPicklijst(klantId) {
-  window.open(`/picklijsten/${klantId}`, '_blank', 'noopener,noreferrer')
+  window.open(padVan(klantId), '_blank', 'noopener,noreferrer')
 }
 
 function openRapport(klantId) {
-  window.open(`/picklijsten/${klantId}/rapport`, '_blank', 'noopener,noreferrer')
+  window.open(padVan(klantId, '/rapport'), '_blank', 'noopener,noreferrer')
 }
 
 function openInpaklijst(klantId) {
-  window.open(`/picklijsten/${klantId}/inpaklijst`, '_blank', 'noopener,noreferrer')
+  window.open(padVan(klantId, '/inpaklijst'), '_blank', 'noopener,noreferrer')
 }
 
 function qrVoor(klant, soort) {
@@ -22,14 +26,14 @@ function qrVoor(klant, soort) {
     return {
       klant,
       soort,
-      pad: `/picklijsten/${klant.id}/inpakken`,
+      pad: padVan(klant.id, '/inpakken'),
       inleiding: `Scan de code met de telefoon. Het inpakken van ${naam} opent dan.`,
     }
   }
   return {
     klant,
     soort: 'picken',
-    pad: `/picklijsten/${klant.id}/mobiel`,
+    pad: padVan(klant.id, '/mobiel'),
     inleiding: `Scan de code met de telefoon. De picklijst van ${naam} opent dan.`,
   }
 }
@@ -50,33 +54,54 @@ export default function PicklijstenList() {
   const qrRef = useRef(null)
 
   const openPerKlant = useMemo(() => {
+    const opId = new Map(klanten.map((k) => [k.id, k]))
+    const opCode = new Map()
+    for (const k of klanten) {
+      const code = String(k.klantcode ?? '').trim().toLowerCase()
+      if (code && !opCode.has(code)) opCode.set(code, k)
+    }
     const map = {}
     for (const o of orders) {
-      if (!o.klantId) continue
       if (o.status === 'geannuleerd' || o.status === 'geleverd') continue
-      if (!map[o.klantId]) map[o.klantId] = { aantalOrders: 0, ordernummers: [] }
-      map[o.klantId].aantalOrders += 1
-      if (o.ordernummer) map[o.klantId].ordernummers.push(o.ordernummer)
+      const code = String(o.klantcode ?? '').trim()
+      const gekoppeld = (o.klantId && opId.get(o.klantId)) || opCode.get(code.toLowerCase())
+      const id = gekoppeld?.id || (code ? `code:${code}` : '')
+      if (!id) continue
+      if (!map[id]) {
+        map[id] = {
+          id,
+          klantcode: gekoppeld?.klantcode || code,
+          naam: gekoppeld?.naam || o.klantNaam || '',
+          plaats: gekoppeld?.plaats || '',
+          aantalOrders: 0,
+          ordernummers: [],
+        }
+      }
+      map[id].aantalOrders += 1
+      if (o.ordernummer) map[id].ordernummers.push(o.ordernummer)
     }
     return map
-  }, [orders])
+  }, [orders, klanten])
 
   // De keuzelijst wordt bij elke toetsaanslag opnieuw gefilterd.
+  // "581 cema" zoekt op nummer én naam, niet op die tekst als één stuk.
+  const zoekbron = useMemo(() => {
+    const extra = Object.values(openPerKlant).filter((k) => !klanten.some((b) => b.id === k.id))
+    return extra.length ? [...klanten, ...extra] : klanten
+  }, [klanten, openPerKlant])
+
   const gefilterd = useMemo(() => {
-    const q = zoek.trim().toLowerCase()
-    if (!q) return klanten
-    return klanten.filter(
-      (k) =>
-        k.klantcode?.toLowerCase().includes(q) ||
-        k.naam?.toLowerCase().includes(q) ||
-        k.zoeknaam?.toLowerCase().includes(q) ||
-        k.plaats?.toLowerCase().includes(q)
-    )
-  }, [klanten, zoek])
+    const delen = zoek.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    if (delen.length === 0) return klanten
+    return zoekbron.filter((k) => {
+      const hay = [k.klantcode, k.naam, k.zoeknaam, k.plaats].map((v) => String(v ?? '').toLowerCase()).join(' ')
+      return delen.every((deel) => hay.includes(deel))
+    })
+  }, [klanten, zoekbron, zoek])
 
   const gekozen = useMemo(
-    () => klanten.find((k) => k.id === gekozenId) || null,
-    [klanten, gekozenId]
+    () => klanten.find((k) => k.id === gekozenId) || openPerKlant[gekozenId] || null,
+    [klanten, gekozenId, openPerKlant]
   )
 
   function kiesKlant(k) {
@@ -90,7 +115,7 @@ export default function PicklijstenList() {
     const q = zoek.trim().toLowerCase()
     if (!q) return null
     // Exact klantnummer intypen (bijv. 5013) of een unieke treffer werkt ook.
-    const exact = klanten.find((k) => String(k.klantcode || '').trim().toLowerCase() === q)
+    const exact = zoekbron.find((k) => String(k.klantcode || '').trim().toLowerCase() === q)
     if (exact) return exact
     return gefilterd.length === 1 ? gefilterd[0] : null
   }
@@ -144,14 +169,15 @@ export default function PicklijstenList() {
   }
 
   const openRijen = useMemo(() => {
-    return klanten
-      .filter((k) => openPerKlant[k.id])
+    return Object.values(openPerKlant)
       .map((k) => ({
         ...k,
-        aantalOrders: openPerKlant[k.id].aantalOrders,
-        ordernummers: openPerKlant[k.id].ordernummers.slice(0, 5),
+        ordernummers: k.ordernummers.slice(0, 5),
       }))
-  }, [klanten, openPerKlant])
+      .sort((a, b) =>
+        String(a.klantcode).localeCompare(String(b.klantcode), 'nl', { numeric: true, sensitivity: 'base' })
+      )
+  }, [openPerKlant])
 
   const loading = loadingKlanten || loadingOrders
   const error = errorKlanten || errorOrders

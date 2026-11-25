@@ -1,4 +1,4 @@
-import { collection, documentId, getDoc, getDocs, doc, query, where } from 'firebase/firestore'
+import { collection, documentId, getDoc, getDocs, doc, limit, query, where } from 'firebase/firestore'
 import { db } from '../firebase'
 import { laadLooproute, sorteerPicksOpLooproute } from './looproute'
 import { laadPickrapport } from './pickrapport'
@@ -304,19 +304,53 @@ export async function maakPicklijst(verkooporderId) {
   return { ...gegevens, picks, stappen, tekorten, openRegels: open.length, bonEerst }
 }
 
+function orderIsOpen(order) {
+  return order.status !== 'geannuleerd' && order.status !== 'geleverd'
+}
+
+// Orders hangen soms alleen met klantnummer aan de order, zonder klantId.
+// Dan staan ze wel bij openstaande orders, maar niet op de picklijst.
+async function ordersVanKlant(klant) {
+  const snaps = []
+  if (klant.id && !String(klant.id).startsWith('code:')) {
+    snaps.push(getDocs(query(collection(db, 'verkooporders'), where('klantId', '==', klant.id))))
+  }
+  const code = String(klant.klantcode ?? '').trim()
+  if (code) {
+    snaps.push(getDocs(query(collection(db, 'verkooporders'), where('klantcode', '==', code))))
+  }
+  const gevonden = await Promise.all(snaps)
+  const map = new Map()
+  for (const snap of gevonden) {
+    for (const d of snap.docs) map.set(d.id, { id: d.id, ...d.data() })
+  }
+  return [...map.values()].filter(orderIsOpen)
+}
+
+async function klantOphalen(klantId) {
+  if (!klantId) return null
+  if (String(klantId).startsWith('code:')) {
+    const code = String(klantId).slice(5).trim()
+    const snap = await getDocs(query(collection(db, 'klanten'), where('klantcode', '==', code), limit(1)))
+    if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() }
+    return { id: klantId, klantcode: code, naam: '' }
+  }
+  const snap = await getDoc(doc(db, 'klanten', klantId))
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null
+}
+
 // Alle open regels van één klant (over meerdere verkooporders) in één picklijst,
 // op looproute. Zelfde artikel+locatie wordt samengevoegd.
 export async function maakPicklijstPerKlant(klantId) {
   if (!klantId) throw new Error('Geen klant gekozen.')
 
-  const klantSnap = await getDoc(doc(db, 'klanten', klantId))
-  if (!klantSnap.exists()) throw new Error('Klant niet gevonden.')
-  const klant = { id: klantSnap.id, ...klantSnap.data() }
+  const gevondenKlant = await klantOphalen(klantId)
+  if (!gevondenKlant) throw new Error('Klant niet gevonden.')
 
-  const ordersSnap = await getDocs(query(collection(db, 'verkooporders'), where('klantId', '==', klantId)))
-  const orders = ordersSnap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((o) => o.status !== 'geannuleerd' && o.status !== 'geleverd')
+  const orders = await ordersVanKlant(gevondenKlant)
+  const klant = gevondenKlant.naam
+    ? gevondenKlant
+    : { ...gevondenKlant, naam: orders.find((o) => o.klantNaam)?.klantNaam || '' }
 
   if (orders.length === 0) {
     return {
@@ -435,10 +469,8 @@ function lijnenUitVerdeling(gepickt) {
 // Oudere rapporten hebben geen verdeling. Dan het gepickte aantal verdelen
 // over de open orderregels, nooit meer dan er gepickt is.
 async function lijnenUitOudRapport(klantId, gepickt) {
-  const ordersSnap = await getDocs(query(collection(db, 'verkooporders'), where('klantId', '==', klantId)))
-  const orders = ordersSnap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((o) => o.status !== 'geannuleerd' && o.status !== 'geleverd')
+  const klant = await klantOphalen(klantId)
+  const orders = klant ? await ordersVanKlant(klant) : []
   if (orders.length === 0) return []
 
   const regels = await haalOpIn(
