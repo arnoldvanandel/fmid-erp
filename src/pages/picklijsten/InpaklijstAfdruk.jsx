@@ -88,7 +88,7 @@ export default function InpaklijstAfdruk() {
   }
 
   const lijnen = lijst.lijnen || []
-  const pad = `/picklijsten/${klantId}/inpakken`
+  const pad = `/picklijsten/${encodeURIComponent(klantId)}/inpakken`
   const naam = [lijst.klant.klantcode, lijst.klant.naam].filter(Boolean).join(' — ')
 
   return (

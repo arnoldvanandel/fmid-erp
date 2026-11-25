@@ -212,13 +212,22 @@ export async function laadPickrapportOpId(id) {
 
 // Het laatste rapport van deze klant: daar pakt de inpaklijst de regels van.
 // Oudere rondes blijven apart staan.
-export async function laadPickrapport(klantId) {
-  let opgeslagen = null
+export async function laadPickrapport(klantId, { klantcode } = {}) {
+  const code = String(klantcode ?? '').trim()
+  const ids = [...new Set([klantId, code ? `code:${code}` : ''].filter(Boolean))]
+  let beste = null
+  for (const id of ids) beste = nieuwer(beste, leesPickrapportLokaal(id))
   try {
-    const lijst = await rapportenVanKlant(klantId)
-    opgeslagen = lijst[0] || null
+    for (const id of ids) {
+      const lijst = await rapportenVanKlant(id)
+      beste = nieuwer(beste, lijst[0] || null)
+    }
+    if (code) {
+      const snap = await getDocs(query(collection(db, 'pickrapporten'), where('klantcode', '==', code)))
+      for (const d of snap.docs) beste = nieuwer(beste, { id: d.id, ...d.data() })
+    }
   } catch {
-    opgeslagen = null
+    // De lokale kopie blijft bruikbaar als Firestore niet meewerkt.
   }
-  return nieuwer(opgeslagen, leesPickrapportLokaal(klantId))
+  return beste
 }

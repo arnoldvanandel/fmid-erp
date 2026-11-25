@@ -561,11 +561,10 @@ async function vulOntbrekendeOrdernummers(lijnen) {
 export async function maakInpaklijst(klantId) {
   if (!klantId) throw new Error('Geen klant gekozen.')
 
-  const klantSnap = await getDoc(doc(db, 'klanten', klantId))
-  if (!klantSnap.exists()) throw new Error('Klant niet gevonden.')
-  const klant = { id: klantSnap.id, ...klantSnap.data() }
+  const klant = await klantOphalen(klantId)
+  if (!klant) throw new Error('Klant niet gevonden.')
 
-  const rapport = await laadPickrapport(klantId)
+  const rapport = await laadPickrapport(klant.id, { klantcode: klant.klantcode })
   const gepickt = (rapport?.regels || []).filter((r) => (Number(r.aantal) || 0) > 0)
   if (gepickt.length === 0) {
     return { klant, orders: [], lijnen: [], zonderPick: true }

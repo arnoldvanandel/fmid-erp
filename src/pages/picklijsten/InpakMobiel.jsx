@@ -312,7 +312,7 @@ export default function InpakMobiel() {
 
   function openInpaklijst() {
     bewaarRapport()
-    navigate(`/picklijsten/${klantId}/inpaklijst`)
+    navigate(`/picklijsten/${encodeURIComponent(klantId)}/inpaklijst`)
   }
 
   if (error) {
@@ -617,7 +617,7 @@ function Leeg({ zonderPick, klantId }) {
           : 'Er is niets gepickt dat nog ingepakt moet worden.'}
       </p>
       {zonderPick ? (
-        <Link className="btn btn-primary pick-mobiel-terug" to={`/picklijsten/${klantId}/mobiel`}>
+        <Link className="btn btn-primary pick-mobiel-terug" to={`/picklijsten/${encodeURIComponent(klantId)}/mobiel`}>
           Naar de picklijst
         </Link>
       ) : (
