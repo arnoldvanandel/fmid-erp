@@ -51,14 +51,6 @@ SQL. `python3 gereedschap_sync.py --proef` leest alleen en schrijft niets.
 De database staat in `CS_SQL_DATABASE` (standaard dezelfde server en login
 als Axapta).
 
-`verpakking_sync.py` zet de verpakkingsinstructies uit Controlsys in Firestore, voor
-Verpakken doos.
-Het schrijft niets terug naar SQL. `--proef` leest alleen. Cron:
-
-```
-*/15 6-18 * * 1-5 cd /home/pi/koppeling && /usr/bin/python3 verpakking_sync.py >> /home/pi/koppeling/verpakking.log 2>&1
-```
-
 De regel met `--verzoek` hoort bij de knop **Synchroniseren** op de pagina's
 Verkooporders en Voorraad. De knop zet `axaptaSync/verzoek` op `wachten`;
 `--verzoek` kijkt elke minuut of er een verzoek is (1 read, ±1.440 per dag)

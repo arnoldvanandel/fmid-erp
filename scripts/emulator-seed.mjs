@@ -154,8 +154,8 @@ for (const artikel of ['test-1', 'test-2']) {
   })
 }
 
-await zet('verpakkingen/v-1', {
-  bron: 'controlsys', artikelnummer: 'TEST-001', artikelnummerKlant: 'KL-4711', soortDoos: 'Doos 300x200x150',
+await zet('verpakkingen/TEST-001', {
+  artikelnummer: 'TEST-001', artikelnummerKlant: 'KL-4711', soortDoos: 'Doos 300x200x150',
   soortZak: 'PE-zak 200x300', aantalPerZak: 25, zakkenPerDoos: 4, storten: false, karton: true, kartonPerLaag: false,
   soortTape: 'Bruin 50 mm', etiketOpZak: false, etiketOpDoos: true, noppenfolie: false, gewichtPerProduct: 0.12,
   aantalPerDoos: 100, tarraDoos: 0.35, opmerkingen: 'Zakken dichtsealen',

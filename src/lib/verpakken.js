@@ -1,5 +1,6 @@
 // Verpakken van dozen, nagebouwd naar frmVerpakkenDoos uit Controlsys.
-// De verpakkingsinstructies (`verpakkingen`) komen uit koppeling/verpakking_sync.py.
+// De verpakkingsvoorschriften (`verpakkingen`, één per artikel) beheer je in de
+// app (Verpakkingsvoorschriften); de eerste lading kwam uit een Excel van Controlsys.
 // Voorlopig kies je een artikelnummer; de productieorder is (nog) optioneel.
 import {
   collection,
@@ -11,7 +12,9 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  deleteDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '../firebase'
@@ -90,7 +93,7 @@ export async function registreerDoos({ verpakking, productieorder = '', artikeln
   return { ...doos, doosnummer, datum: new Date() }
 }
 
-// Foto per artikel, los van `verpakkingen` omdat de sync die overschrijft.
+// Foto per artikel. Ook de sleutel van het voorschrift in `verpakkingen`.
 export function fotoSleutel(artikelnummer) {
   return encodeURIComponent(String(artikelnummer || '').trim().toUpperCase())
 }
@@ -114,4 +117,110 @@ export async function uploadVerpakkingFoto({ artikelnummer, file, gebruiker }) {
     geuploadDoor: gebruiker || '',
     datum: serverTimestamp(),
   })
+}
+
+// ---- Voorschriften beheren ----
+
+export const JA_NEE_VELDEN = [
+  ['storten', 'Storten'],
+  ['karton', 'Karton'],
+  ['kartonPerLaag', 'Karton per laag'],
+  ['etiketOpZak', 'Etiket op zak'],
+  ['etiketOpDoos', 'Etiket op doos'],
+  ['noppenfolie', 'Noppenfolie'],
+]
+
+function tekst(waarde) {
+  return waarde === null || waarde === undefined ? '' : String(waarde).trim()
+}
+
+function getalOfNull(waarde) {
+  if (waarde === null || waarde === undefined || waarde === '') return null
+  const n = typeof waarde === 'number' ? waarde : Number(String(waarde).trim().replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+function ja(waarde) {
+  if (typeof waarde === 'string') return ['true', '1', 'ja', 'waar'].includes(waarde.trim().toLowerCase())
+  return Boolean(waarde)
+}
+
+// Zet invoer (formulier of Excel) om naar een voorschrift.
+export function maakVoorschrift(v) {
+  const voorschrift = {
+    artikelnummer: tekst(v.artikelnummer),
+    artikelnummerKlant: tekst(v.artikelnummerKlant),
+    soortDoos: tekst(v.soortDoos),
+    soortZak: tekst(v.soortZak),
+    aantalPerZak: getalOfNull(v.aantalPerZak),
+    zakkenPerDoos: getalOfNull(v.zakkenPerDoos),
+    soortTape: tekst(v.soortTape),
+    gewichtPerProduct: getalOfNull(v.gewichtPerProduct),
+    aantalPerDoos: getalOfNull(v.aantalPerDoos),
+    tarraDoos: getalOfNull(v.tarraDoos),
+    opmerkingen: tekst(v.opmerkingen),
+  }
+  for (const [veld] of JA_NEE_VELDEN) voorschrift[veld] = ja(v[veld])
+  return voorschrift
+}
+
+export async function slaVoorschriftOp(voorschrift, gebruiker) {
+  if (!voorschrift.artikelnummer) throw new Error('Artikelnummer is verplicht.')
+  await setDoc(doc(db, 'verpakkingen', fotoSleutel(voorschrift.artikelnummer)), {
+    ...voorschrift,
+    bijgewerktDoor: gebruiker || '',
+    bijgewerkt: serverTimestamp(),
+  })
+}
+
+export function verwijderVoorschrift(id) {
+  return deleteDoc(doc(db, 'verpakkingen', id))
+}
+
+// Kolomvolgorde van VerpakingTabel in Controlsys (ControlsysDataSet), zoals in
+// Verpakkingsvoorschrift.xlsx: Index, Artikelnummer, … , Foto, Opmerkingen.
+const EXCEL_KOLOMMEN = [
+  'index', 'artikelnummer', 'soortDoos', 'soortZak', 'aantalPerZak', 'zakkenPerDoos',
+  'storten', 'karton', 'kartonPerLaag', 'soortTape', 'etiketOpZak', 'etiketOpDoos',
+  'noppenfolie', 'gewichtPerProduct', 'aantalPerDoos', 'tarraDoos',
+  'artikelnummerKlant', 'foto', 'opmerkingen',
+]
+
+// Leest een Excel-export van Controlsys. Geeft de voorschriften (eerste regel
+// per artikel, zoals Controlsys) en het aantal overgeslagen regels.
+export async function leesVoorschriftenUitExcel(file) {
+  const { readSheet } = await import('read-excel-file/browser')
+  const rijen = await readSheet(file)
+  const voorschriften = []
+  const gezien = new Set()
+  let overgeslagen = 0
+  for (const origineel of rijen) {
+    const rij = [...origineel]
+    // De export begint met een lege kolom.
+    while (rij.length > EXCEL_KOLOMMEN.length && (rij[0] === null || rij[0] === '')) rij.shift()
+    const v = Object.fromEntries(EXCEL_KOLOMMEN.map((k, i) => [k, rij[i]]))
+    const nummer = tekst(v.artikelnummer)
+    if (!nummer || typeof v.index === 'string') continue // lege regel of kopregel
+    if (gezien.has(nummer.toUpperCase())) {
+      overgeslagen += 1
+      continue
+    }
+    gezien.add(nummer.toUpperCase())
+    voorschriften.push(maakVoorschrift(v))
+  }
+  return { voorschriften, overgeslagen }
+}
+
+export async function importeerVoorschriften(voorschriften, gebruiker) {
+  for (let i = 0; i < voorschriften.length; i += 400) {
+    const batch = writeBatch(db)
+    for (const v of voorschriften.slice(i, i + 400)) {
+      batch.set(doc(db, 'verpakkingen', fotoSleutel(v.artikelnummer)), {
+        ...v,
+        bijgewerktDoor: gebruiker || '',
+        bijgewerkt: serverTimestamp(),
+      })
+    }
+    await batch.commit()
+  }
 }

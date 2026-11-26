@@ -18,6 +18,7 @@ import {
   zoekVerpakkingen,
 } from '../../lib/verpakken'
 import { DoosEtiket } from './DoosEtiket'
+import VoorschriftForm from './VoorschriftForm'
 import './verpakken.css'
 
 const JA_NEE = [
@@ -60,6 +61,8 @@ export default function VerpakkenDoos() {
   const [fotoDoc, setFotoDoc] = useState(null)
   const [tarraVraag, setTarraVraag] = useState(null)
   const [laatste, setLaatste] = useState(null)
+  const [bewerken, setBewerken] = useState(null)
+  const [ververs, setVervers] = useState(0)
   const [bezig, setBezig] = useState(false)
   const [fout, setFout] = useState(null)
   const [melding, setMelding] = useState(null)
@@ -97,7 +100,7 @@ export default function VerpakkenDoos() {
       weg = true
       clearTimeout(t)
     }
-  }, [term])
+  }, [term, ververs])
 
   useEffect(() => {
     setFotoDoc(null)
@@ -260,11 +263,20 @@ export default function VerpakkenDoos() {
           </div>
         </div>
         {term.trim() && gezocht === term && lijst.length === 0 && (
-          <div className="banner banner-warning">Geen verpakkingsinstructie voor een artikel dat met {term.trim()} begint.</div>
+          <div className="banner banner-warning">
+            Geen verpakkingsvoorschrift voor een artikel dat met {term.trim()} begint.{' '}
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setBewerken({ artikelnummer: term.trim().toUpperCase() })}
+            >
+              Voorschrift toevoegen
+            </button>
+          </div>
         )}
         {verpakking && !volledig && (
           <div className="banner banner-warning">
-            Gewicht per product, aantal per doos of tarragewicht ontbreekt. Vul dat aan in Controlsys.
+            Gewicht per product, aantal per doos of tarragewicht ontbreekt. Vul dat aan in het voorschrift.
           </div>
         )}
       </div>
@@ -313,6 +325,11 @@ export default function VerpakkenDoos() {
             ))}
           </div>
           <Veld label="Opmerkingen" waarde={verpakking?.opmerkingen} />
+          {verpakking && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setBewerken(verpakking)}>
+              Voorschrift bewerken
+            </button>
+          )}
         </div>
 
         <div className="card card-pad verpak-weeg">
@@ -398,6 +415,22 @@ export default function VerpakkenDoos() {
           <div className="hint">Laatste etiket</div>
           <DoosEtiket doos={laatste} ref={etiket} />
         </div>
+      )}
+
+      {bewerken && (
+        <Modal
+          title={bewerken.id ? `Voorschrift ${bewerken.artikelnummer}` : 'Nieuw verpakkingsvoorschrift'}
+          onClose={() => setBewerken(null)}
+          width={720}
+        >
+          <VoorschriftForm
+            voorschrift={bewerken}
+            onDone={() => {
+              setBewerken(null)
+              setVervers((n) => n + 1)
+            }}
+          />
+        </Modal>
       )}
 
       {tarraVraag && (

@@ -37,6 +37,7 @@ import OpVoorraadRapport from './pages/voorraad/OpVoorraadRapport'
 import MutatiesOverzicht from './pages/voorraad/MutatiesOverzicht'
 import ProductieordersList from './pages/productieorders/ProductieordersList'
 import VerpakkenDoos from './pages/verpakken/VerpakkenDoos'
+import Voorschriften from './pages/verpakken/Voorschriften'
 import LocatiesBeheer from './pages/locaties/LocatiesBeheer'
 import LooprouteBeheer from './pages/locaties/LooprouteBeheer'
 import Gebruikersbeheer from './pages/gebruikers/Gebruikersbeheer'
@@ -411,6 +412,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <ProductieordersList />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/verpakken/voorschriften"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Voorschriften />
                 </Layout>
               </ProtectedRoute>
             }

@@ -175,11 +175,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Verpakken doos (zie src/lib/verpakken.js). De instructies komen van de Pi
-    // (koppeling/verpakking_sync.py); in de app alleen lezen.
+    // Verpakken doos (zie src/lib/verpakken.js). Voorschriften worden in de app
+    // beheerd (Verpakkingsvoorschriften), één per artikel.
     match /verpakkingen/{docId} {
       allow read: if isActive();
-      allow create, update, delete: if false;
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
     }
 
     match /verpakkingFotos/{docId} {
