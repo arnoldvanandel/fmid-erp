@@ -51,8 +51,8 @@ SQL. `python3 gereedschap_sync.py --proef` leest alleen en schrijft niets.
 De database staat in `CS_SQL_DATABASE` (standaard dezelfde server en login
 als Axapta).
 
-`verpakking_sync.py` zet de verpakkingsinstructies uit Controlsys en de niet
-beëindigde productieorders uit Axapta in Firestore, voor Verpakken doos.
+`verpakking_sync.py` zet de verpakkingsinstructies uit Controlsys in Firestore, voor
+Verpakken doos.
 Het schrijft niets terug naar SQL. `--proef` leest alleen. Cron:
 
 ```

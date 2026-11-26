@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Verpakkingsinstructies en productieorders → FMID ERP, voor Verpakken doos.
+"""Verpakkingsinstructies → FMID ERP, voor Verpakken doos.
 
-Alleen SELECT op SQL Server, schrijven alleen naar Firestore:
-  - Controlsys `VerpakingTabel` in `verpakkingen`
-  - niet-beëindigde productieorders uit Axapta in `axaptaProductieorders`
+Alleen SELECT op SQL Server (Controlsys `VerpakingTabel`), schrijven alleen
+naar Firestore (`verpakkingen`).
 
 Proef (leest SQL Server, schrijft niets):
 
@@ -20,7 +19,6 @@ import axapta_sync
 from gereedschap_sync import laad_env, rijen, tekst, verbind, vereist, vingerafdruk
 
 STAAT_PAD = Path(__file__).resolve().parent / 'verpakking-staat.json'
-PROD_BEEINDIGD = 7
 
 
 def getal(waarde):
@@ -71,34 +69,6 @@ def lees_verpakkingen(conn):
     return docs
 
 
-def lees_productieorders(conn, bedrijf):
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT PRODID, ITEMID, NAME
-        FROM dbo.PRODTABLE
-        WHERE DATAAREAID = ? AND PRODSTATUS < ?
-    """, bedrijf, PROD_BEEINDIGD)
-    docs = {}
-    for r in rijen(cursor):
-        nummer = tekst(r['PRODID']).upper()
-        if not nummer:
-            continue
-        docs[nummer.replace('/', '_')] = {
-            'bron': 'axapta',
-            'prodId': nummer,
-            'artikelnummer': tekst(r['ITEMID']),
-            'artikelnaam': tekst(r['NAME']),
-        }
-    return docs
-
-
-def gelijke_schrijfwijze(orders, verpakkingen):
-    """SQL Server vergelijkt zonder hoofdletters, Firestore niet."""
-    nummers = {v['artikelnummer'].lower(): v['artikelnummer'] for v in verpakkingen.values()}
-    for order in orders.values():
-        order['artikelnummer'] = nummers.get(order['artikelnummer'].lower(), order['artikelnummer'])
-
-
 def laad_staat():
     try:
         return json.loads(STAAT_PAD.read_text(encoding='utf-8'))
@@ -137,22 +107,15 @@ def main():
         verpakkingen = lees_verpakkingen(conn)
     finally:
         conn.close()
-    conn = axapta_sync.verbind()
-    try:
-        orders = lees_productieorders(conn, vereist('AX_DATAAREAID'))
-    finally:
-        conn.close()
-    gelijke_schrijfwijze(orders, verpakkingen)
 
     print(f'Verpakkingen: {len(verpakkingen)}')
-    print(f'Productieorders: {len(orders)}')
     if '--proef' in sys.argv:
         print('Niets geschreven (--proef).')
         return
     # Een lege tabel is een storing; dan niet alles in Firestore wissen.
-    if not verpakkingen or not orders:
-        raise SystemExit('Geen verpakkingen of productieorders gelezen. Niets geschreven.')
-    schrijf({'verpakkingen': verpakkingen, 'axaptaProductieorders': orders})
+    if not verpakkingen:
+        raise SystemExit('Geen verpakkingen gelezen. Niets geschreven.')
+    schrijf({'verpakkingen': verpakkingen})
 
 
 if __name__ == '__main__':
