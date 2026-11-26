@@ -28,22 +28,21 @@ def getal(waarde):
     return int(n) if n.is_integer() else n
 
 
-def lees_verpakkingen(conn):
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT [Index], Artikelnummer, SoortDoos, SoortZak, AantalPerZak, ZakkenPerDoos,
-               Storten, Karton, KartonPerLaag, SoortTape, EtiketOpZak, EtiketOpDoos,
-               Noppenfolie, GewichtPerProdukt, AantalPerDoos, TareerGewichtDoos,
-               ArtikelnummerKlant, Opmerkingen
-        FROM dbo.VerpakingTabel
-        ORDER BY [Index]
-    """)
+def ja(waarde):
+    """bit uit SQL Server, of 'True'/'False' uit een Excel-export."""
+    if isinstance(waarde, str):
+        return waarde.strip().lower() in ('true', '1', 'ja', 'waar')
+    return bool(waarde)
+
+
+def naar_docs(rijen_):
+    """Rijen met de kolommen van `VerpakingTabel` -> {doc_id: data}."""
     docs = {}
     gezien = set()
-    for r in rijen(cursor):
+    for r in rijen_:
         nummer = tekst(r['Artikelnummer'])
         # Controlsys gebruikt de eerste regel van een artikel.
-        if not nummer or nummer.lower() in gezien:
+        if not nummer or r['Index'] is None or nummer.lower() in gezien:
             continue
         gezien.add(nummer.lower())
         docs[f"v-{int(r['Index'])}"] = {
@@ -54,19 +53,32 @@ def lees_verpakkingen(conn):
             'soortZak': tekst(r['SoortZak']),
             'aantalPerZak': getal(r['AantalPerZak']),
             'zakkenPerDoos': getal(r['ZakkenPerDoos']),
-            'storten': bool(r['Storten']),
-            'karton': bool(r['Karton']),
-            'kartonPerLaag': bool(r['KartonPerLaag']),
+            'storten': ja(r['Storten']),
+            'karton': ja(r['Karton']),
+            'kartonPerLaag': ja(r['KartonPerLaag']),
             'soortTape': tekst(r['SoortTape']),
-            'etiketOpZak': bool(r['EtiketOpZak']),
-            'etiketOpDoos': bool(r['EtiketOpDoos']),
-            'noppenfolie': bool(r['Noppenfolie']),
+            'etiketOpZak': ja(r['EtiketOpZak']),
+            'etiketOpDoos': ja(r['EtiketOpDoos']),
+            'noppenfolie': ja(r['Noppenfolie']),
             'gewichtPerProduct': getal(r['GewichtPerProdukt']),
             'aantalPerDoos': getal(r['AantalPerDoos']),
             'tarraDoos': getal(r['TareerGewichtDoos']),
             'opmerkingen': tekst(r['Opmerkingen']),
         }
     return docs
+
+
+def lees_verpakkingen(conn):
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT [Index], Artikelnummer, SoortDoos, SoortZak, AantalPerZak, ZakkenPerDoos,
+               Storten, Karton, KartonPerLaag, SoortTape, EtiketOpZak, EtiketOpDoos,
+               Noppenfolie, GewichtPerProdukt, AantalPerDoos, TareerGewichtDoos,
+               ArtikelnummerKlant, Opmerkingen
+        FROM dbo.VerpakingTabel
+        ORDER BY [Index]
+    """)
+    return naar_docs(rijen(cursor))
 
 
 def laad_staat():
