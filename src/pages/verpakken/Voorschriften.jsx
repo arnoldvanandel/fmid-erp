@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCollection } from '../../hooks/useCollection'
 import Modal from '../../components/Modal'
@@ -87,9 +88,9 @@ export default function Voorschriften() {
               />
             </>
           )}
-          <button type="button" className="btn btn-primary" onClick={() => setBewerken({})}>
-            + Nieuw voorschrift
-          </button>
+          <Link to="/verpakken/voorschriften/nieuw" className="btn btn-primary">
+            + Voorschrift toevoegen
+          </Link>
         </div>
       </div>
 

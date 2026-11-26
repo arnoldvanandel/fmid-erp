@@ -65,3 +65,4 @@
 @media (max-width: 640px) {
   .verpak-instructie, .verpak-janee { grid-template-columns: 1fr; }
 }
+.verpak-toevoegen { max-width: 820px; }

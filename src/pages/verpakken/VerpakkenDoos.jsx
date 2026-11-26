@@ -47,12 +47,25 @@ function Veld({ label, waarde, eenheid }) {
   )
 }
 
+// Het gekozen artikel blijft staan tot je een andere pagina kiest, ook als de
+// pagina opnieuw laadt (bijv. na het verversen of terugkomen in het tabblad).
+const ARTIKEL_SLEUTEL = 'verpakken-artikel'
+const PAD = '/verpakken'
+
+function bewaardArtikel() {
+  try {
+    return sessionStorage.getItem(ARTIKEL_SLEUTEL) || ''
+  } catch {
+    return ''
+  }
+}
+
 export default function VerpakkenDoos() {
   const { profile } = useAuth()
   const gebruiker = profile?.naam || profile?.email || ''
   const weegschaal = useWeegschaal()
 
-  const [term, setTerm] = useState('')
+  const [term, setTerm] = useState(bewaardArtikel)
   const [lijst, setLijst] = useState([])
   const [gezocht, setGezocht] = useState('')
   const [verpakking, setVerpakking] = useState(null)
@@ -101,6 +114,28 @@ export default function VerpakkenDoos() {
       clearTimeout(t)
     }
   }, [term, ververs])
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(ARTIKEL_SLEUTEL, term)
+    } catch {
+      // Geen sessionStorage (privévenster): dan alleen zolang de pagina openstaat.
+    }
+  }, [term])
+
+  // Vergeten zodra je naar een andere pagina gaat.
+  useEffect(
+    () => () => {
+      if (window.location.pathname !== PAD) {
+        try {
+          sessionStorage.removeItem(ARTIKEL_SLEUTEL)
+        } catch {
+          // niets
+        }
+      }
+    },
+    []
+  )
 
   useEffect(() => {
     setFotoDoc(null)

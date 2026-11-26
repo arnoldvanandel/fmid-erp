@@ -26,7 +26,8 @@ const navItems = [
   { to: '/voorraad/op-voorraad/rapport', label: 'Op voorraad gezet' },
   { to: '/productieorders', label: 'Productieorders' },
   { to: '/verpakken', label: 'Verpakken doos', end: true },
-  { to: '/verpakken/voorschriften', label: 'Verpakkingsvoorschriften' },
+  { to: '/verpakken/voorschriften', label: 'Verpakkingsvoorschriften', end: true },
+  { to: '/verpakken/voorschriften/nieuw', label: 'Voorschrift toevoegen' },
   { to: '/locaties', label: 'Locaties' },
   { to: '/looproute', label: 'Looproute' },
 ]

@@ -24,6 +24,7 @@ const GETALLEN = [
 ]
 
 // Formulier voor één verpakkingsvoorschrift. `voorschrift` zonder id = nieuw.
+// onDone(voorschrift) na opslaan, onDone() bij annuleren of verwijderen.
 export default function VoorschriftForm({ voorschrift, onDone }) {
   const { profile, isAdmin } = useAuth()
   const gebruiker = profile?.naam || profile?.email || ''
@@ -63,7 +64,7 @@ export default function VoorschriftForm({ voorschrift, onDone }) {
         }
       }
       await slaVoorschriftOp(nieuw, gebruiker)
-      onDone?.()
+      onDone?.(nieuw)
     } catch (err) {
       setFout(err.message)
       setBezig(false)
@@ -157,7 +158,7 @@ export default function VoorschriftForm({ voorschrift, onDone }) {
           </button>
         )}
         <div className="verpak-knoppen">
-          <button type="button" className="btn btn-secondary" onClick={onDone} disabled={bezig}>
+          <button type="button" className="btn btn-secondary" onClick={() => onDone?.()} disabled={bezig}>
             Annuleren
           </button>
           <button type="submit" className="btn btn-primary" disabled={bezig}>
