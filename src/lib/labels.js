@@ -32,6 +32,14 @@ export const LABEL_KLANTEN = [
   { id: 'VSH', label: 'VSH', soorten: ['VSH'] },
 ]
 
+// QR-code voor de verpakkingsverordening (EU-PPWR 2025/40, art. 15), aangeleverd door PCC.
+// Alleen het label PCC krijgt hem; PCC-V, -INOX, -KK, -M-C en -M-C1 niet.
+export const PPWR_QR = '/labels/ppwr-qr.png'
+
+export function heeftPpwrQr(soort) {
+  return soort === 'PCC'
+}
+
 export function klantVanSoort(soort) {
   return LABEL_KLANTEN.find((klant) => klant.soorten.includes(soort))?.id || ''
 }

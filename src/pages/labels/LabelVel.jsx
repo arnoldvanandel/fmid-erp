@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
 import { code128Modules } from '../../lib/code128'
-import { familieVan, fotoUrl, labelDatum, merkBestand, LABEL_MAAT } from '../../lib/labels'
+import { familieVan, fotoUrl, heeftPpwrQr, labelDatum, merkBestand, LABEL_MAAT, PPWR_QR } from '../../lib/labels'
 
 // Excel-kolombreedte (teken) naar millimeter, dezelfde omrekening als Excel.
 const MM_PER_PT = 25.4 / 72
@@ -203,6 +203,7 @@ function Pcc({ label, foto, datum }) {
   const { x, y } = PCC
   const merk = merkBestand(label.soort)
   const codeHoog = y[16] - y[13]
+  const metQr = heeftPpwrQr(label.soort)
   return (
     <>
       <Tabel grid={PCC}>
@@ -277,53 +278,103 @@ function Pcc({ label, foto, datum }) {
             {label.en1}
           </td>
         </Rij>
-        {[11, 12, 13].map((n) => (
-          <Rij key={n} grid={PCC} n={n}>
+        {[11, 12, 13].map((n) =>
+          n === 12 && metQr ? (
+            <Rij key={n} grid={PCC} n={n}>
+              <td />
+              <td className="rand-l" />
+              <td />
+              <td />
+              <td className="rand-r ha-c vet" colSpan={2} style={{ fontSize: '10pt' }}>
+                {label.en2}
+              </td>
+            </Rij>
+          ) : (
+            <Rij key={n} grid={PCC} n={n}>
+              <td />
+              <td className="rand-l" />
+              <td />
+              <td />
+              <td />
+              <td className="rand-r" />
+            </Rij>
+          ),
+        )}
+        {metQr ? (
+          <>
+            {/* PPWR (EU 2025/40, art. 15): QR-code links, batchcode ernaast, EAN rechts. */}
+            <Rij grid={PCC} n={14}>
+              <td />
+              <td className="rand-l rand-t rand-b" colSpan={3} rowSpan={4} />
+              <td className="rand-r rand-t cel-code" colSpan={2} rowSpan={3}>
+                <Streepjescode waarde={label.barcode} hoogte={codeHoog} />
+              </td>
+            </Rij>
+            <Rij grid={PCC} n={15}>
+              <td />
+            </Rij>
+            <Rij grid={PCC} n={16}>
+              <td />
+            </Rij>
+            <Rij grid={PCC} n={17}>
+              <td />
+              <td className="bn-r ha-c vlak-calibri" colSpan={2} style={{ fontSize: '8pt' }}>
+                {label.barcode}
+              </td>
+            </Rij>
+          </>
+        ) : (
+          <>
+          <Rij grid={PCC} n={14}>
+            <td />
+            <td className="rand-l rand-t" />
+            <td className="rand-t" />
+            <td className="rand-t" />
+            <td className="rand-r rand-t cel-code" colSpan={2} rowSpan={3}>
+              <Streepjescode waarde={label.barcode} hoogte={codeHoog} />
+            </td>
+          </Rij>
+          <Rij grid={PCC} n={15}>
             <td />
             <td className="rand-l" />
             <td />
             <td />
-            <td />
-            <td className="rand-r" />
           </Rij>
-        ))}
-        <Rij grid={PCC} n={14}>
-          <td />
-          <td className="rand-l rand-t" />
-          <td className="rand-t" />
-          <td className="rand-t" />
-          <td className="rand-r rand-t cel-code" colSpan={2} rowSpan={3}>
-            <Streepjescode waarde={label.barcode} hoogte={codeHoog} />
-          </td>
-        </Rij>
-        <Rij grid={PCC} n={15}>
-          <td />
-          <td className="rand-l" />
-          <td />
-          <td />
-        </Rij>
-        <Rij grid={PCC} n={16}>
-          <td />
-          <td className="rand-l" />
-          <td className="rand-b ha-c vet" colSpan={2} style={{ fontSize: '10pt' }}>
-            {label.en2}
-          </td>
-        </Rij>
-        <Rij grid={PCC} n={17}>
-          <td />
-          <td className="bn-l ha-r vet" style={{ fontSize: '10pt' }}>
-            BN:
-          </td>
-          <td className="bn-m ha-c" style={{ fontSize: '8pt' }}>
-            {datum}
-          </td>
-          <td className="bn-s" />
-          <td className="bn-r ha-c vlak-calibri" colSpan={2} style={{ fontSize: '8pt' }}>
-            {label.barcode}
-          </td>
-        </Rij>
+          <Rij grid={PCC} n={16}>
+            <td />
+            <td className="rand-l" />
+            <td className="rand-b ha-c vet" colSpan={2} style={{ fontSize: '10pt' }}>
+              {label.en2}
+            </td>
+          </Rij>
+          <Rij grid={PCC} n={17}>
+            <td />
+            <td className="bn-l ha-r vet" style={{ fontSize: '10pt' }}>
+              BN:
+            </td>
+            <td className="bn-m ha-c" style={{ fontSize: '8pt' }}>
+              {datum}
+            </td>
+            <td className="bn-s" />
+            <td className="bn-r ha-c vlak-calibri" colSpan={2} style={{ fontSize: '8pt' }}>
+              {label.barcode}
+            </td>
+          </Rij>
+          </>
+        )}
       </Tabel>
       <FotoAbs src={foto} x={x[1] + 0.6} y={y[7] + 0.4} w={x[4] - x[1] - 1.2} h={y[12] - y[7] - 0.8} />
+      {metQr && (
+        <>
+          <Beeld src={PPWR_QR} x={x[1] + 0.8} y={y[13] + 1.2} w={17.5} h={y[17] - y[13] - 2.4} />
+          <Vlak x={x[1] + 19} y={y[13]} w={x[4] - x[1] - 19} h={(y[17] - y[13]) / 2} size={10} vet align="center">
+            BN:
+          </Vlak>
+          <Vlak x={x[1] + 19} y={(y[13] + y[17]) / 2} w={x[4] - x[1] - 19} h={4.5} size={10} align="center">
+            {datum}
+          </Vlak>
+        </>
+      )}
     </>
   )
 }
