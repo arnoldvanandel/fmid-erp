@@ -23,6 +23,8 @@ koppeling/sync-staat.json
 koppeling/sync-staat.json.tmp
 koppeling/gereedschap-staat.json
 koppeling/gereedschap-staat.json.tmp
+koppeling/verpakking-staat.json
+koppeling/verpakking-staat.json.tmp
 
 # Python-cache van de koppelingsscripts
 __pycache__/

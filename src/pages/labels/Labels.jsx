@@ -5,12 +5,10 @@ import { db } from '../../firebase'
 import { haalArtikelOpBarcode, zoekArtikelen } from '../../lib/artikelZoeken'
 import {
   LABEL_KLANTEN,
-  LABEL_MAAT,
-  AFDRUK_VERSCHUIVING_MM,
   artikelSleutel,
   artikelenVoorKlant,
   bewaarPrinterNaam,
-  drukAfOpPrinter,
+  drukElementAf,
   haalPrintersOp,
   klantVanSoort,
   loopbackStatus,
@@ -250,28 +248,7 @@ export default function Labels() {
     if (service === 'klaar' && doel) {
       setBezigPrint(true)
       try {
-        const { default: html2canvas } = await import('html2canvas')
-        const canvas = await html2canvas(voorbeeld.current, {
-          scale: 3,
-          backgroundColor: '#ffffff',
-          useCORS: true,
-        })
-        const verschuivingPx = Math.round(canvas.width * (AFDRUK_VERSCHUIVING_MM / LABEL_MAAT.breedteMm))
-        const vel = document.createElement('canvas')
-        vel.width = canvas.width
-        vel.height = canvas.height
-        const ctx = vel.getContext('2d')
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, vel.width, vel.height)
-        ctx.drawImage(canvas, verschuivingPx, 0)
-        const pngBase64 = vel.toDataURL('image/png').split(',')[1]
-        await drukAfOpPrinter({
-          printer: doel,
-          copies: kopieen,
-          pngBase64,
-          widthMm: LABEL_MAAT.breedteMm,
-          heightMm: LABEL_MAAT.hoogteMm,
-        })
+        await drukElementAf(voorbeeld.current, { printer: doel, copies: kopieen })
         setMelding(`${kopieen} label${kopieen === 1 ? '' : 's'} naar ${doel} gestuurd.`)
       } catch (err) {
         setFout(err.message)

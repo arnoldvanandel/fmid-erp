@@ -175,6 +175,30 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Verpakken doos (zie src/lib/verpakken.js). Instructies en Axapta-orders komen
+    // van de Pi (koppeling/verpakking_sync.py); in de app alleen lezen.
+    match /verpakkingen/{docId} {
+      allow read: if isActive();
+      allow create, update, delete: if false;
+    }
+
+    match /axaptaProductieorders/{docId} {
+      allow read: if isActive();
+      allow create, update, delete: if false;
+    }
+
+    match /verpakkingFotos/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
+    match /verpaktedozen/{docId} {
+      allow read: if isActive();
+      allow create, update: if isActive();
+      allow delete: if isAdmin();
+    }
+
     match /voorraadmutaties/{docId} {
       allow read: if isActive();
       allow create: if isActive();

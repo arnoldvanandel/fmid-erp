@@ -154,4 +154,17 @@ for (const artikel of ['test-1', 'test-2']) {
   })
 }
 
+await zet('verpakkingen/v-1', {
+  bron: 'controlsys', artikelnummer: 'TEST-001', artikelnummerKlant: 'KL-4711', soortDoos: 'Doos 300x200x150',
+  soortZak: 'PE-zak 200x300', aantalPerZak: 25, zakkenPerDoos: 4, storten: false, karton: true, kartonPerLaag: false,
+  soortTape: 'Bruin 50 mm', etiketOpZak: false, etiketOpDoos: true, noppenfolie: false, gewichtPerProduct: 0.12,
+  aantalPerDoos: 100, tarraDoos: 0.35, opmerkingen: 'Zakken dichtsealen',
+})
+await zet('axaptaProductieorders/P0012345', {
+  bron: 'axapta', prodId: 'P0012345', artikelnummer: 'TEST-001', artikelnaam: 'Testfitting 22 mm',
+})
+await zet('axaptaProductieorders/P0012346', {
+  bron: 'axapta', prodId: 'P0012346', artikelnummer: 'TEST-002', artikelnaam: 'Testbocht 90 graden 28 mm',
+})
+
 console.log(`Emulator gevuld. Inloggen als ${TESTGEBRUIKER.email} (wachtwoord in scripts/emulator-seed.mjs).`)

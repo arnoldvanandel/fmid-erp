@@ -222,3 +222,24 @@ export async function drukAfOpPrinter({ printer, copies, pngBase64, widthMm, hei
   if (!res.ok) throw new Error(data.fout || 'Afdrukken mislukt')
   return data
 }
+
+// Maakt een afbeelding van het label op het scherm en stuurt die naar de printer.
+export async function drukElementAf(element, { printer, copies }) {
+  const { default: html2canvas } = await import('html2canvas')
+  const canvas = await html2canvas(element, { scale: 3, backgroundColor: '#ffffff', useCORS: true })
+  const verschuivingPx = Math.round(canvas.width * (AFDRUK_VERSCHUIVING_MM / LABEL_MAAT.breedteMm))
+  const vel = document.createElement('canvas')
+  vel.width = canvas.width
+  vel.height = canvas.height
+  const ctx = vel.getContext('2d')
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, vel.width, vel.height)
+  ctx.drawImage(canvas, verschuivingPx, 0)
+  return drukAfOpPrinter({
+    printer,
+    copies,
+    pngBase64: vel.toDataURL('image/png').split(',')[1],
+    widthMm: LABEL_MAAT.breedteMm,
+    heightMm: LABEL_MAAT.hoogteMm,
+  })
+}

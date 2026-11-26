@@ -42,6 +42,15 @@ service firebase.storage {
       allow read: if isActive();
     }
 
+    // Foto van de verpakking per artikel (zie lib/verpakken.js).
+    match /verpakking/{sleutel}/{fileName} {
+      allow read: if isActive();
+      allow create: if isActive()
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isAdmin();
+    }
+
     // Foto's van wisselplaten en houders (zie lib/gereedschapFotos.js).
     match /gereedschap/{sleutel}/{fileName} {
       allow read: if isActive();

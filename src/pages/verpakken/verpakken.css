@@ -1,0 +1,66 @@
+.verpak-blok { margin-bottom: 16px; }
+.verpak-kolommen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+  gap: 16px;
+}
+.verpak-kolommen h3, .verpak-blok h3 { margin-bottom: 12px; }
+.verpak-waarde { min-height: 24px; font-weight: 500; white-space: pre-wrap; }
+.verpak-instructie { display: grid; grid-template-columns: 1fr 180px; gap: 16px; }
+.field-row.verpak-twee { grid-template-columns: 1fr 1fr; }
+.verpak-foto { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.verpak-foto img { width: 180px; max-height: 160px; object-fit: contain; border: 1px solid var(--color-border); }
+.verpak-foto .empty-state { width: 180px; padding: 32px 8px; border: 1px dashed var(--color-border-strong); }
+.verpak-janee { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 14px; }
+.verpak-janee > div { display: flex; justify-content: space-between; align-items: center; }
+.verpak-weeg { display: flex; flex-direction: column; gap: 12px; }
+.verpak-gewicht { display: flex; align-items: center; gap: 12px; font-size: 36px; }
+.verpak-gewicht .hint { font-size: 12.5px; }
+.verpak-gewicht strong, .verpak-gewicht input {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 44px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.verpak-licht {
+  flex: 1;
+  min-height: 140px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 24px;
+  font-weight: 600;
+}
+.verpak-licht.goed { background: var(--color-success); color: var(--color-surface); }
+.verpak-licht.fout { background: var(--color-danger); color: var(--color-surface); }
+.verpak-uit { opacity: 0.6; }
+.verpak-knoppen { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.verpak-laatste { margin-top: 20px; }
+
+/* Etiket voor de labelprinter (LABEL_MAAT in lib/labels.js). De afdruk schuift
+   4 mm naar rechts, dus rechts blijft die ruimte vrij. */
+.doos-etiket {
+  width: 96mm;
+  height: 98mm;
+  padding: 4mm 7mm 3mm 3mm;
+  background: #fff;
+  color: #000;
+  font-family: Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.2;
+  overflow: hidden;
+}
+.doos-etiket-kop { font-size: 16pt; font-weight: 700; margin-bottom: 2mm; }
+.doos-etiket table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.doos-etiket th { width: 36mm; text-align: left; font-weight: 400; padding: 0.8mm 0; vertical-align: top; }
+.doos-etiket td { padding: 0.8mm 0; overflow-wrap: anywhere; vertical-align: top; }
+.doos-etiket .groot th { font-size: 14pt; font-weight: 700; }
+.doos-etiket .groot td { font-size: 17pt; font-weight: 700; }
+
+@media (max-width: 640px) {
+  .verpak-instructie, .verpak-janee { grid-template-columns: 1fr; }
+}
