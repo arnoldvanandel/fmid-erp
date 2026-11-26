@@ -23,7 +23,7 @@ export const DoosEtiket = forwardRef(function DoosEtiket({ doos }, ref) {
     ['Weight (kg)/pcs.', kg(doos.gewichtPerProduct)],
     ['Total weight (kg):', kg(doos.totaalGewicht)],
     ['Article FMID:', doos.artikelnummer],
-  ]
+  ].filter(([label, waarde]) => label !== 'Prod. order no:' || waarde)
   return (
     <div className="doos-etiket" ref={ref}>
       <div className="doos-etiket-kop">F.M.I. Dussen B.V.</div>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { useAuth } from '../../contexts/AuthContext'
-import { useQueryWhere } from '../../hooks/useQueryWhere'
+import { haalArtikelOpNummer } from '../../lib/artikelZoeken'
 import Modal from '../../components/Modal'
 import { drukElementAf, haalPrintersOp, printerNaam } from '../../lib/labels'
 import { useWeegschaal, weegschaalOndersteund } from '../../lib/weegschaal'
@@ -15,7 +15,7 @@ import {
   registreerDoos,
   totaalGewicht,
   uploadVerpakkingFoto,
-  zoekProductieorders,
+  zoekVerpakkingen,
 } from '../../lib/verpakken'
 import { DoosEtiket } from './DoosEtiket'
 import './verpakken.css'
@@ -52,9 +52,9 @@ export default function VerpakkenDoos() {
   const weegschaal = useWeegschaal()
 
   const [term, setTerm] = useState('')
-  const [orders, setOrders] = useState([])
+  const [lijst, setLijst] = useState([])
   const [gezocht, setGezocht] = useState('')
-  const [order, setOrder] = useState(null)
+  const [verpakking, setVerpakking] = useState(null)
   const [artikelnaam, setArtikelnaam] = useState('')
   const [handGewicht, setHandGewicht] = useState('')
   const [fotoDoc, setFotoDoc] = useState(null)
@@ -66,10 +66,7 @@ export default function VerpakkenDoos() {
   const etiket = useRef(null)
   const teDrukken = useRef(null)
 
-  const artikelnummer = order?.artikelnummer || ''
-  const { data: gevonden, loading } = useQueryWhere('verpakkingen', 'artikelnummer', artikelnummer)
-  // De hook houdt even het vorige artikel vast; toon dat nooit bij een nieuwe order.
-  const verpakking = (artikelnummer && gevonden.find((v) => v.artikelnummer === artikelnummer)) || null
+  const artikelnummer = verpakking?.artikelnummer || ''
   const perStuk = Number(verpakking?.gewichtPerProduct) || 0
   const volledig = Boolean(
     verpakking && perStuk > 0 && verpakking.aantalPerDoos != null && verpakking.tarraDoos != null
@@ -82,14 +79,16 @@ export default function VerpakkenDoos() {
     let weg = false
     const t = setTimeout(async () => {
       try {
-        const lijst = await zoekProductieorders(term)
+        const gevonden = await zoekVerpakkingen(term)
         if (weg) return
-        const nummer = term.trim().toUpperCase()
-        const exact = lijst.find((o) => o.nummer === nummer) || null
-        setOrders(lijst)
+        const nummer = term.trim().toLowerCase()
+        const exact = (nummer && gevonden.find((v) => v.artikelnummer.toLowerCase() === nummer)) || null
+        setLijst(gevonden)
         setGezocht(term)
-        setOrder(exact)
-        setArtikelnaam(exact?.artikelnaam || '')
+        setVerpakking(exact)
+        // Naam uit de artikelen (Axapta); aan te passen voor het etiket.
+        const artikel = exact ? await haalArtikelOpNummer(exact.artikelnummer).catch(() => null) : null
+        if (!weg) setArtikelnaam(artikel?.naam || '')
       } catch (e) {
         if (!weg) setFout(e.message)
       }
@@ -110,10 +109,10 @@ export default function VerpakkenDoos() {
     )
   }, [artikelnummer])
 
-  function wijzigOrder(waarde) {
+  function wijzigArtikel(waarde) {
     setTerm(waarde)
-    // Direct leeg, zodat er nooit een etiket van de vorige order uitkomt.
-    setOrder(null)
+    // Direct leeg, zodat er nooit een etiket van het vorige artikel uitkomt.
+    setVerpakking(null)
     setArtikelnaam('')
     setHandGewicht('')
     setFout(null)
@@ -154,8 +153,8 @@ export default function VerpakkenDoos() {
   function etiketPrinten() {
     setFout(null)
     setMelding(null)
-    if (!order || !volledig) {
-      setFout(order ? 'De verpakkingsgegevens van dit artikel zijn niet compleet.' : 'Geen productieorder geselecteerd.')
+    if (!verpakking || !volledig) {
+      setFout(verpakking ? 'De verpakkingsgegevens van dit artikel zijn niet compleet.' : 'Kies eerst een artikel.')
       return
     }
     if (gewicht === null) {
@@ -172,7 +171,7 @@ export default function VerpakkenDoos() {
     setBezig(true)
     try {
       const printer = await zoekPrinter()
-      const doos = await registreerDoos({ order, verpakking, artikelnaam, gewicht: kg, tarra, gebruiker })
+      const doos = await registreerDoos({ verpakking, artikelnaam, gewicht: kg, tarra, gebruiker })
       teDrukken.current = printer
       setLaatste(doos)
       setHandGewicht('')
@@ -228,27 +227,26 @@ export default function VerpakkenDoos() {
         <h3>Selecteren</h3>
         <div className="field-row">
           <div className="field">
-            <label htmlFor="vp-order">Productieorder</label>
+            <label htmlFor="vp-artikel">Artikelnummer</label>
             <input
-              id="vp-order"
+              id="vp-artikel"
               type="text"
-              list="vp-orders"
+              list="vp-artikelen"
               autoComplete="off"
               autoFocus
               value={term}
               disabled={bezig}
-              onChange={(e) => wijzigOrder(e.target.value)}
-              placeholder="Typ of scan het ordernummer"
+              onChange={(e) => wijzigArtikel(e.target.value)}
+              placeholder="Typ of scan het artikelnummer"
             />
-            <datalist id="vp-orders">
-              {orders.map((o) => (
-                <option key={o.nummer} value={o.nummer}>
-                  {o.artikelnummer} {o.artikelnaam}
+            <datalist id="vp-artikelen">
+              {lijst.map((v) => (
+                <option key={v.id} value={v.artikelnummer}>
+                  {v.artikelnummerKlant}
                 </option>
               ))}
             </datalist>
           </div>
-          <Veld label="Artikelnummer" waarde={artikelnummer} />
           <Veld label="Artikelnr. klant" waarde={verpakking?.artikelnummerKlant} />
           <div className="field">
             <label htmlFor="vp-naam">Artikelnaam</label>
@@ -256,16 +254,13 @@ export default function VerpakkenDoos() {
               id="vp-naam"
               type="text"
               value={artikelnaam}
-              disabled={!order || bezig}
+              disabled={!verpakking || bezig}
               onChange={(e) => setArtikelnaam(e.target.value)}
             />
           </div>
         </div>
-        {term.trim() && gezocht === term && orders.length === 0 && (
-          <div className="banner banner-warning">Geen productieorder gevonden die met {term.trim()} begint.</div>
-        )}
-        {order && !loading && !verpakking && (
-          <div className="banner banner-warning">Voor artikel {artikelnummer} is geen verpakkingsinstructie bekend.</div>
+        {term.trim() && gezocht === term && lijst.length === 0 && (
+          <div className="banner banner-warning">Geen verpakkingsinstructie voor een artikel dat met {term.trim()} begint.</div>
         )}
         {verpakking && !volledig && (
           <div className="banner banner-warning">
@@ -295,7 +290,7 @@ export default function VerpakkenDoos() {
               ) : (
                 <div className="empty-state">Geen foto</div>
               )}
-              {order && (
+              {verpakking && (
                 <label className="btn btn-secondary btn-sm">
                   {fotoDoc ? 'Foto vervangen' : 'Foto toevoegen'}
                   <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={kiesFoto} />
@@ -340,7 +335,7 @@ export default function VerpakkenDoos() {
             <span>Kg</span>
           </div>
           <div className={'verpak-licht' + (volledig ? (klopt ? ' goed' : ' fout') : '')} role="status">
-            {!volledig ? 'Kies een productieorder' : klopt ? 'Gewicht klopt' : 'Gewicht klopt niet'}
+            {!volledig ? 'Kies een artikel' : klopt ? 'Gewicht klopt' : 'Gewicht klopt niet'}
           </div>
           {weegschaal.fout && <div className="banner banner-warning">{weegschaal.fout}</div>}
           {!weegschaalOndersteund ? (

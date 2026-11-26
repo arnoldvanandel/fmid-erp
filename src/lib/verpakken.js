@@ -1,6 +1,6 @@
 // Verpakken van dozen, nagebouwd naar frmVerpakkenDoos uit Controlsys.
-// De verpakkingsinstructies (`verpakkingen`) en de Axapta-productieorders
-// (`axaptaProductieorders`) komen uit koppeling/verpakking_sync.py.
+// De verpakkingsinstructies (`verpakkingen`) komen uit koppeling/verpakking_sync.py.
+// Voorlopig kies je een artikelnummer; de productieorder is (nog) optioneel.
 import {
   collection,
   doc,
@@ -16,42 +16,24 @@ import {
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from '../firebase'
 
-const BRONNEN = [
-  { naam: 'axaptaProductieorders', veld: 'prodId' },
-  { naam: 'productieorders', veld: 'ordernummer' },
-]
 const EINDE = ''
 const MAX_FOTO = 5 * 1024 * 1024
 
-// Productieorders waarvan het nummer met `term` begint, nieuwste eerst. Zoekt
-// in de orders uit Axapta en in de eigen orders (PO-…).
-export async function zoekProductieorders(term, max = 30) {
-  const begin = String(term || '').trim().toUpperCase()
+// Verpakkingsinstructies waarvan het artikelnummer met `term` begint. Firestore
+// let op hoofdletters, dus zoek zoals getypt en in hoofdletters.
+export async function zoekVerpakkingen(term, max = 30) {
+  const getypt = String(term || '').trim()
+  const varianten = getypt ? [...new Set([getypt, getypt.toUpperCase()])] : ['']
   const lijsten = await Promise.all(
-    BRONNEN.map(async ({ naam, veld }) => {
-      const delen = [orderBy(veld, 'desc'), limit(max)]
-      if (begin) delen.unshift(where(veld, '>=', begin), where(veld, '<=', begin + EINDE))
-      const snap = await getDocs(query(collection(db, naam), ...delen))
-      const lijst = snap.docs.map((d) => ({
-        nummer: d.data()[veld],
-        artikelnummer: d.data().artikelnummer || '',
-        artikelnaam: d.data().artikelnaam || '',
-      }))
-      // Aflopend met een limiet kan het exacte nummer net buiten de lijst vallen.
-      if (begin && snap.size === max && !lijst.some((o) => o.nummer === begin)) {
-        const exact = await getDocs(query(collection(db, naam), where(veld, '==', begin), limit(1)))
-        exact.forEach((d) =>
-          lijst.unshift({
-            nummer: d.data()[veld],
-            artikelnummer: d.data().artikelnummer || '',
-            artikelnaam: d.data().artikelnaam || '',
-          })
-        )
-      }
-      return lijst
+    varianten.map(async (begin) => {
+      const delen = [orderBy('artikelnummer'), limit(max)]
+      if (begin) delen.unshift(where('artikelnummer', '>=', begin), where('artikelnummer', '<=', begin + EINDE))
+      const snap = await getDocs(query(collection(db, 'verpakkingen'), ...delen))
+      return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
     })
   )
-  return lijsten.flat()
+  const perId = new Map(lijsten.flat().map((v) => [v.id, v]))
+  return [...perId.values()].sort((a, b) => a.artikelnummer.localeCompare(b.artikelnummer))
 }
 
 export function totaalGewicht(verpakking) {
@@ -80,7 +62,7 @@ export function leesKilo(tekst) {
 
 // Legt een doos vast met een uniek doosnummer (DS-000001, …). Nummer en doos in
 // één transactie. Een eigen reeks, los van de doosnummers uit Controlsys.
-export async function registreerDoos({ order, verpakking, artikelnaam, gewicht, tarra, gebruiker }) {
+export async function registreerDoos({ verpakking, productieorder = '', artikelnaam, gewicht, tarra, gebruiker }) {
   const gewichtPerProduct = Number(verpakking.gewichtPerProduct)
   const aantal = aantalInDoos({ gewicht, tarra, gewichtPerProduct })
   if (!Number.isFinite(aantal) || aantal < 1) throw new Error('Het gewicht is te laag voor een gevulde doos.')
@@ -90,11 +72,11 @@ export async function registreerDoos({ order, verpakking, artikelnaam, gewicht, 
     artikelnummerKlant: verpakking.artikelnummerKlant || '',
     artikelnaam,
     aantal,
-    productieorder: order.nummer,
+    productieorder,
     tarra,
     gewichtPerProduct,
     totaalGewicht: gewicht,
-    artikelnummer: order.artikelnummer,
+    artikelnummer: verpakking.artikelnummer,
     verpaktDoor: gebruiker || '',
   }
   const doosnummer = await runTransaction(db, async (tx) => {
